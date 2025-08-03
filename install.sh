@@ -577,143 +577,156 @@ function installQuestions() {
 	APPROVE_INSTALL=${APPROVE_INSTALL:-n}
 }
 
+# =====================
+# Install OpenVPN server (main orchestrator)
+# =====================
 function installOpenVPN() {
-	if [[ $AUTO_INSTALL == "y" ]]; then
-		# Set default choices so that no questions will be asked.
-		APPROVE_INSTALL=${APPROVE_INSTALL:-y}
-		APPROVE_IP=${APPROVE_IP:-y}
-		IPV6_SUPPORT=${IPV6_SUPPORT:-n}
-		PORT_CHOICE=${PORT_CHOICE:-1}
-		PROTOCOL_CHOICE=${PROTOCOL_CHOICE:-1}
-		DNS=${DNS:-1}
-		COMPRESSION_ENABLED=${COMPRESSION_ENABLED:-n}
-		CUSTOMIZE_ENC=${CUSTOMIZE_ENC:-n}
-		CLIENT=${CLIENT:-client}
-		PASS=${PASS:-1}
-		CONTINUE=${CONTINUE:-y}
+    installPrerequisites
+    askInstallQuestions
+    detectNetworkInterface
+    installOpenVPNPackage
+    installEasyRSA
+    generateServerCertificates
+    configureCertServer
+    createClientTemplate
+    configureLoginServer
+    configureSysctl
+    configureFirewall
+    enableSystemdServices
+    finalizeInstallation
+}
 
-		if [[ -z $ENDPOINT ]]; then
-			ENDPOINT=$(resolvePublicIP)
-		fi
-	fi
+# =====================
+# Install required packages
+# =====================
+function installPrerequisites() {
+    apt-get update
+    apt-get -y install ca-certificates gnupg
+    
+    # For Ubuntu 16.04, add OpenVPN repository
+    if [[ $VERSION_ID == "16.04" ]]; then
+        echo "deb http://build.openvpn.net/debian/openvpn/stable xenial main" >/etc/apt/sources.list.d/openvpn.list
+        wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg | apt-key add -
+        apt-get update
+    fi
+    
+    apt-get install -y openvpn iptables openssl wget ca-certificates curl
+    
+    # Remove old easy-rsa if exists
+    if [[ -d /etc/openvpn/easy-rsa/ ]]; then
+        rm -rf /etc/openvpn/easy-rsa/
+    fi
+}
 
-	# Run setup questions first, and set other variables if auto-install
-	installQuestions
+# =====================
+# Ask user all install questions (ports, protocols, DNS, etc)
+# =====================
+function askInstallQuestions() {
+    installQuestions
+}
 
-	# Get the "public" interface from the default route
-	NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
-	if [[ -z $NIC ]] && [[ $IPV6_SUPPORT == 'y' ]]; then
-		NIC=$(ip -6 route show default | sed -ne 's/^default .* dev \([^ ]*\) .*$/\1/p')
-	fi
+# =====================
+# Detect public network interface
+# =====================
+function detectNetworkInterface() {
+    NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )([^ ]+)' | head -1)
+    if [[ -z $NIC ]] && [[ $IPV6_SUPPORT == 'y' ]]; then
+        NIC=$(ip -6 route show default | sed -ne 's/^default .* dev \([^ ]*\) .*$/\1/p')
+    fi
+    if [[ -z $NIC ]]; then
+        echo
+        echo "Could not detect public interface."
+        echo "This needs for setup MASQUERADE."
+        until [[ $CONTINUE =~ (y|n) ]]; do
+            read -rp "Continue? [y/n]: " -e CONTINUE
+        done
+        if [[ $CONTINUE == "n" ]]; then
+            exit 1
+        fi
+    fi
+}
 
-	# $NIC can not be empty for script rm-openvpn-rules.sh
-	if [[ -z $NIC ]]; then
-		echo
-		echo "Could not detect public interface."
-		echo "This needs for setup MASQUERADE."
-		until [[ $CONTINUE =~ (y|n) ]]; do
-			read -rp "Continue? [y/n]: " -e CONTINUE
-		done
-		if [[ $CONTINUE == "n" ]]; then
-			exit 1
-		fi
-	fi
+# =====================
+# Install OpenVPN package if not installed
+# =====================
+function installOpenVPNPackage() {
+    if [[ ! -e /etc/openvpn/server.conf ]]; then
+        apt-get install -y openvpn iptables openssl wget ca-certificates curl
+        if [[ -d /etc/openvpn/easy-rsa/ ]]; then
+            rm -rf /etc/openvpn/easy-rsa/
+        fi
+    fi
+}
 
-	# If OpenVPN isn't installed yet, install it
-	if [[ ! -e /etc/openvpn/server.conf ]]; then
-		apt-get update
-		apt-get -y install ca-certificates gnupg
-		
-		# For Ubuntu 16.04, add OpenVPN repository
-		if [[ $VERSION_ID == "16.04" ]]; then
-			echo "deb http://build.openvpn.net/debian/openvpn/stable xenial main" >/etc/apt/sources.list.d/openvpn.list
-			wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg | apt-key add -
-			apt-get update
-		fi
-		
-		# Install OpenVPN and dependencies
-		apt-get install -y openvpn iptables openssl wget ca-certificates curl
-		
-		# Remove old easy-rsa if exists
-		if [[ -d /etc/openvpn/easy-rsa/ ]]; then
-			rm -rf /etc/openvpn/easy-rsa/
-		fi
-	fi
+# =====================
+# Install EasyRSA if not installed
+# =====================
+function installEasyRSA() {
+    if [[ ! -d /etc/openvpn/easy-rsa/ ]]; then
+        local version="3.1.2"
+        wget -O ~/easy-rsa.tgz https://github.com/OpenVPN/easy-rsa/releases/download/v${version}/EasyRSA-${version}.tgz
+        mkdir -p /etc/openvpn/easy-rsa
+        tar xzf ~/easy-rsa.tgz --strip-components=1 --no-same-owner --directory /etc/openvpn/easy-rsa
+        rm -f ~/easy-rsa.tgz
+    fi
+}
 
-	# Find out if the machine uses nogroup or nobody for the permissionless group
-	if grep -qs "^nogroup:" /etc/group; then
-		NOGROUP=nogroup
-	else
-		NOGROUP=nobody
-	fi
+# =====================
+# Generate server certificates and keys
+# =====================
+function generateServerCertificates() {
+    cd /etc/openvpn/easy-rsa/ || return
+    case $CERT_TYPE in
+    1)
+        echo "set_var EASYRSA_ALGO ec" >vars
+        echo "set_var EASYRSA_CURVE $CERT_CURVE" >>vars
+        ;;
+    2)
+        echo "set_var EASYRSA_KEY_SIZE $RSA_KEY_SIZE" >vars
+        ;;
+    esac
+    SERVER_CN="cn_$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
+    echo "$SERVER_CN" >SERVER_CN_GENERATED
+    SERVER_NAME="server_$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
+    echo "$SERVER_NAME" >SERVER_NAME_GENERATED
+    ./easyrsa init-pki
+    EASYRSA_CA_EXPIRE=3650 ./easyrsa --batch --req-cn="$SERVER_CN" build-ca nopass
+    if [[ $DH_TYPE == "2" ]]; then
+        openssl dhparam -out dh.pem $DH_KEY_SIZE
+    fi
+    EASYRSA_CERT_EXPIRE=3650 ./easyrsa --batch build-server-full "$SERVER_NAME" nopass
+    EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl
+    case $TLS_SIG in
+    1)
+        openvpn --genkey --secret /etc/openvpn/tls-crypt.key
+        ;;
+    2)
+        openvpn --genkey --secret /etc/openvpn/tls-auth.key
+        ;;
+    esac
+    cp pki/ca.crt pki/private/ca.key "pki/issued/$SERVER_NAME.crt" "pki/private/$SERVER_NAME.key" /etc/openvpn/easy-rsa/pki/crl.pem /etc/openvpn
+    if [[ $DH_TYPE == "2" ]]; then
+        cp dh.pem /etc/openvpn
+    fi
+    chmod 644 /etc/openvpn/crl.pem
+}
 
-	# Install the latest version of easy-rsa from source, if not already installed.
-	if [[ ! -d /etc/openvpn/easy-rsa/ ]]; then
-		local version="3.1.2"
-		wget -O ~/easy-rsa.tgz https://github.com/OpenVPN/easy-rsa/releases/download/v${version}/EasyRSA-${version}.tgz
-		mkdir -p /etc/openvpn/easy-rsa
-		tar xzf ~/easy-rsa.tgz --strip-components=1 --no-same-owner --directory /etc/openvpn/easy-rsa
-		rm -f ~/easy-rsa.tgz
-
-		cd /etc/openvpn/easy-rsa/ || return
-		case $CERT_TYPE in
-		1)
-			echo "set_var EASYRSA_ALGO ec" >vars
-			echo "set_var EASYRSA_CURVE $CERT_CURVE" >>vars
-			;;
-		2)
-			echo "set_var EASYRSA_KEY_SIZE $RSA_KEY_SIZE" >vars
-			;;
-		esac
-
-		# Generate a random, alphanumeric identifier of 16 characters for CN and one for server name
-		SERVER_CN="cn_$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
-		echo "$SERVER_CN" >SERVER_CN_GENERATED
-		SERVER_NAME="server_$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
-		echo "$SERVER_NAME" >SERVER_NAME_GENERATED
-
-		# Create the PKI, set up the CA, the DH params and the server certificate
-		./easyrsa init-pki
-		EASYRSA_CA_EXPIRE=3650 ./easyrsa --batch --req-cn="$SERVER_CN" build-ca nopass
-
-		if [[ $DH_TYPE == "2" ]]; then
-			# ECDH keys are generated on-the-fly so we don't need to generate them beforehand
-			openssl dhparam -out dh.pem $DH_KEY_SIZE
-		fi
-
-		EASYRSA_CERT_EXPIRE=3650 ./easyrsa --batch build-server-full "$SERVER_NAME" nopass
-		EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl
-
-		case $TLS_SIG in
-		1)
-			# Generate tls-crypt key
-			openvpn --genkey --secret /etc/openvpn/tls-crypt.key
-			;;
-		2)
-			# Generate tls-auth key
-			openvpn --genkey --secret /etc/openvpn/tls-auth.key
-			;;
-		esac
-	else
-		cd /etc/openvpn/easy-rsa/ || return
-		SERVER_NAME=$(cat SERVER_NAME_GENERATED)
-	fi
-
-	cp pki/ca.crt pki/private/ca.key "pki/issued/$SERVER_NAME.crt" "pki/private/$SERVER_NAME.key" /etc/openvpn/easy-rsa/pki/crl.pem /etc/openvpn
-	if [[ $DH_TYPE == "2" ]]; then
-		cp dh.pem /etc/openvpn
-	fi
-
-	chmod 644 /etc/openvpn/crl.pem
-
-	echo "port $PORT" >/etc/openvpn/server.conf
-	if [[ $IPV6_SUPPORT == 'n' ]]; then
-		echo "proto $PROTOCOL" >>/etc/openvpn/server.conf
-	elif [[ $IPV6_SUPPORT == 'y' ]]; then
-		echo "proto ${PROTOCOL}6" >>/etc/openvpn/server.conf
-	fi
-
-	echo "dev tun
+# =====================
+# Configure certificate-based server
+# =====================
+function configureCertServer() {
+    if grep -qs "^nogroup:" /etc/group; then
+        NOGROUP=nogroup
+    else
+        NOGROUP=nobody
+    fi
+    echo "port $PORT" >/etc/openvpn/server.conf
+    if [[ $IPV6_SUPPORT == 'n' ]]; then
+        echo "proto $PROTOCOL" >>/etc/openvpn/server.conf
+    elif [[ $IPV6_SUPPORT == 'y' ]]; then
+        echo "proto ${PROTOCOL}6" >>/etc/openvpn/server.conf
+    fi
+    echo "dev tun
 user nobody
 group $NOGROUP
 persist-key
@@ -722,37 +735,32 @@ keepalive 10 120
 topology subnet
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist ipp.txt" >>/etc/openvpn/server.conf
-
-	echo 'push "redirect-gateway def1 bypass-dhcp"' >>/etc/openvpn/server.conf
-	if [[ $IPV6_SUPPORT == 'y' ]]; then
-		echo 'server-ipv6 fd42:42:42:42::/112
+    echo 'push "redirect-gateway def1 bypass-dhcp"' >>/etc/openvpn/server.conf
+    if [[ $IPV6_SUPPORT == 'y' ]]; then
+        echo 'server-ipv6 fd42:42:42:42::/112
 tun-ipv6
 push tun-ipv6
 push "route-ipv6 2000::/3"
 push "redirect-gateway ipv6"' >>/etc/openvpn/server.conf
-	fi
-
-	if [[ $COMPRESSION_ENABLED == "y" ]]; then
-		echo "compress $COMPRESSION_ALG" >>/etc/openvpn/server.conf
-	fi
-
-	if [[ $DH_TYPE == "1" ]]; then
-		echo "dh none" >>/etc/openvpn/server.conf
-		echo "ecdh-curve $DH_CURVE" >>/etc/openvpn/server.conf
-	elif [[ $DH_TYPE == "2" ]]; then
-		echo "dh dh.pem" >>/etc/openvpn/server.conf
-	fi
-
-	case $TLS_SIG in
-	1)
-		echo "tls-crypt tls-crypt.key" >>/etc/openvpn/server.conf
-		;;
-	2)
-		echo "tls-auth tls-auth.key 0" >>/etc/openvpn/server.conf
-		;;
-	esac
-
-	echo "crl-verify crl.pem
+    fi
+    if [[ $COMPRESSION_ENABLED == "y" ]]; then
+        echo "compress $COMPRESSION_ALG" >>/etc/openvpn/server.conf
+    fi
+    if [[ $DH_TYPE == "1" ]]; then
+        echo "dh none" >>/etc/openvpn/server.conf
+        echo "ecdh-curve $DH_CURVE" >>/etc/openvpn/server.conf
+    elif [[ $DH_TYPE == "2" ]]; then
+        echo "dh dh.pem" >>/etc/openvpn/server.conf
+    fi
+    case $TLS_SIG in
+    1)
+        echo "tls-crypt tls-crypt.key" >>/etc/openvpn/server.conf
+        ;;
+    2)
+        echo "tls-auth tls-auth.key 0" >>/etc/openvpn/server.conf
+        ;;
+    esac
+    echo "crl-verify crl.pem
 ca ca.crt
 cert $SERVER_NAME.crt
 key $SERVER_NAME.key
@@ -765,78 +773,22 @@ tls-cipher $CC_CIPHER
 client-config-dir /etc/openvpn/ccd
 status /var/log/openvpn/status.log
 verb 3" >>/etc/openvpn/server.conf
+    mkdir -p /etc/openvpn/ccd
+    mkdir -p /var/log/openvpn
+}
 
-	mkdir -p /etc/openvpn/ccd
-	mkdir -p /var/log/openvpn
-
-	echo 'net.ipv4.ip_forward=1' >/etc/sysctl.d/99-openvpn.conf
-	if [[ $IPV6_SUPPORT == 'y' ]]; then
-		echo 'net.ipv6.conf.all.forwarding=1' >>/etc/sysctl.d/99-openvpn.conf
-	fi
-	sysctl --system
-
-	if hash sestatus 2>/dev/null; then
-		if sestatus | grep "Current mode" | grep -qs "enforcing"; then
-			if [[ $PORT != '1194' ]]; then
-				semanage port -a -t openvpn_port_t -p "$PROTOCOL" "$PORT"
-			fi
-		fi
-	fi
-
-	if [[ $VERSION_ID != "16.04" ]]; then
-		cp /lib/systemd/system/openvpn\@.service /etc/systemd/system/openvpn\@.service
-
-		sed -i 's|LimitNPROC|#LimitNPROC|' /etc/systemd/system/openvpn\@.service
-		sed -i 's|/etc/openvpn/server|/etc/openvpn|' /etc/systemd/system/openvpn\@.service
-
-		systemctl daemon-reload
-	fi
-	
-	if [[ $DNS == 2 ]]; then
-		installUnbound
-	fi
-
-	mkdir -p /etc/iptables
-
-	if [[ $IPV6_SUPPORT == 'y' ]]; then
-		echo "ip6tables -t nat -D POSTROUTING -s fd42:42:42:42::/112 -o $NIC -j MASQUERADE
-ip6tables -D INPUT -i tun0 -j ACCEPT
-ip6tables -D FORWARD -i $NIC -o tun0 -j ACCEPT
-ip6tables -D FORWARD -i tun0 -o $NIC -j ACCEPT
-ip6tables -D INPUT -i $NIC -p $PROTOCOL --dport $PORT -j ACCEPT" >>/etc/iptables/rm-openvpn-rules.sh
-	fi
-
-	echo "[Unit]
-Description=iptables rules for OpenVPN
-After=network-online.target openvpn@server-cert.service openvpn@server-login.service
-Wants=network-online.target openvpn@server-cert.service openvpn@server-login.service
-
-[Service]
-Type=oneshot
-ExecStart=/etc/iptables/add-openvpn-rules.sh
-ExecStop=/etc/iptables/rm-openvpn-rules.sh
-RemainAfterExit=yes
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target" >/etc/systemd/system/iptables-openvpn.service
-
-	systemctl daemon-reload
-	systemctl enable iptables-openvpn
-
-	if [[ $ENDPOINT != "" ]]; then
-		IP=$ENDPOINT
-	fi
-
-	echo "client" >/etc/openvpn/client-template.txt
-	if [[ $PROTOCOL == 'udp' ]]; then
-		echo "proto udp" >>/etc/openvpn/client-template.txt
-		echo "explicit-exit-notify" >>/etc/openvpn/client-template.txt
-	elif [[ $PROTOCOL == 'tcp' ]]; then
-		echo "proto tcp-client" >>/etc/openvpn/client-template.txt
-	fi
-	echo "remote $IP $PORT
+# =====================
+# Create client template file for client config generation
+# =====================
+function createClientTemplate() {
+    echo "client" >/etc/openvpn/client-template.txt
+    if [[ $PROTOCOL == 'udp' ]]; then
+        echo "proto udp" >>/etc/openvpn/client-template.txt
+        echo "explicit-exit-notify" >>/etc/openvpn/client-template.txt
+    elif [[ $PROTOCOL == 'tcp' ]]; then
+        echo "proto tcp-client" >>/etc/openvpn/client-template.txt
+    fi
+    echo "remote $IP $PORT
 dev tun
 resolv-retry infinite
 nobind
@@ -853,35 +805,52 @@ tls-cipher $CC_CIPHER
 ignore-unknown-option block-outside-dns
 setenv opt block-outside-dns # Prevent Windows 10 DNS leak
 verb 3" >>/etc/openvpn/client-template.txt
+    if [[ $COMPRESSION_ENABLED == "y" ]]; then
+        echo "compress $COMPRESSION_ALG" >>/etc/openvpn/client-template.txt
+    fi
+}
 
-	if [[ $COMPRESSION_ENABLED == "y" ]]; then
-		echo "compress $COMPRESSION_ALG" >>/etc/openvpn/client-template.txt
-	fi
+# =====================
+# Configure login-based server
+# =====================
+function configureLoginServer() {
+    createDualServerConfigs
+}
 
-	echo ""
-	echo "Setting up dual authentication (Certificate + Username/Password)..."
-	
-	installPAMPlugin
-	
-	createDualServerConfigs
-	
-	setupDualSystemdServices
-	
-	# Save server IP for future use
-	if [[ -n $ENDPOINT ]]; then
-		echo "$ENDPOINT" > /etc/openvpn/server_ip.conf
-	elif [[ -n $IP ]]; then
-		echo "$IP" > /etc/openvpn/server_ip.conf
-	fi
-	
-	generateSharedLoginConfig
-	
-	# Install ovpn command globally
-	cp "$0" /usr/local/bin/ovpn
-	chmod +x /usr/local/bin/ovpn
-	
-	clear
-	manageMenu
+# =====================
+# Configure sysctl for forwarding
+# =====================
+function configureSysctl() {
+    echo 'net.ipv4.ip_forward=1' >/etc/sysctl.d/99-openvpn.conf
+    if [[ $IPV6_SUPPORT == 'y' ]]; then
+        echo 'net.ipv6.conf.all.forwarding=1' >>/etc/sysctl.d/99-openvpn.conf
+    fi
+    sysctl --system
+}
+
+# =====================
+# Configure firewall and iptables
+# =====================
+function configureFirewall() {
+    updateIptablesForDual
+}
+
+# =====================
+# Enable and start systemd services
+# =====================
+function enableSystemdServices() {
+    setupDualSystemdServices
+}
+
+# =====================
+# Finalize installation (client config, menu, etc)
+# =====================
+function finalizeInstallation() {
+    generateSharedLoginConfig
+    cp "$0" /usr/local/bin/ovpn
+    chmod +x /usr/local/bin/ovpn
+    clear
+    manageMenu
 }
 
 function revokeCertClient() {
@@ -925,12 +894,6 @@ function revokeLoginUser() {
 }
 
 function revokeUser() {
-    if [[ ! -e /etc/openvpn/easy-rsa/pki/index.txt && ! -e /etc/openvpn/login-users.txt ]]; then
-        echo "No users found!"
-        return
-    fi
-    echo ""
-    echo "Select the user you want to remove:"
     local users=()
     if [[ -e /etc/openvpn/easy-rsa/pki/index.txt ]]; then
         mapfile -t cert_users < <(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | grep -v "^main$")
@@ -946,13 +909,17 @@ function revokeUser() {
     fi
     if [[ ${#users[@]} -eq 0 ]]; then
         echo "No users found!"
+        read -rp "Press Enter to return to menu..."
+        manageMenu
         return
     fi
+    echo ""
+    echo "Select the user you want to remove (regardless of type):"
     for i in "${!users[@]}"; do
         printf "%d) %s\n" $((i+1)) "${users[$i]}"
     done
     echo "0) Back"
-    local USERNUMBER
+    local USERNUMBER=""
     until [[ "$USERNUMBER" =~ ^[0-9]+$ && $USERNUMBER -ge 0 && $USERNUMBER -le ${#users[@]} ]]; do
         read -rp "Select one user [0-${#users[@]}]: " USERNUMBER
     done
@@ -1501,59 +1468,88 @@ function removeOpenVPN() {
 	fi
 }
 
-function manageMenu() {
-	echo "OpenVPN Dual Auth Installer"
-	echo "Repository: https://github.com/smaghili/openvpn"
-	echo ""
-	
-	# Get actual ports from config files
-	local cert_port="1194"
-	local login_port="1195"
-	local cert_protocol="UDP"
-	local login_protocol="UDP"
-	
-	if [[ -e /etc/openvpn/server-cert.conf ]]; then
-		cert_port=$(grep '^port ' /etc/openvpn/server-cert.conf | cut -d ' ' -f 2)
-		cert_protocol=$(grep '^proto ' /etc/openvpn/server-cert.conf | cut -d ' ' -f 2 | tr '[:lower:]' '[:upper:]')
-	fi
-	
-	if [[ -e /etc/openvpn/server-login.conf ]]; then
-		login_port=$(grep '^port ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2)
-		login_protocol=$(grep '^proto ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2 | tr '[:lower:]' '[:upper:]')
-	fi
-	
-	echo "OpenVPN is running with dual authentication support:"
-	echo "  📜 Certificate-based: Port $cert_port/$cert_protocol (Professional users)"
-	echo "  🔐 Username/Password: Port $login_port/$login_protocol (Simple users)"
-	echo ""
-	
-	echo "What do you want to do?"
-	echo "   1) Add a new user"
-	echo "   2) Remove user"
-	echo "   3) List all clients"
-	echo "   4) Remove OpenVPN"
-	echo "   5) Exit"
-	until [[ $MENU_OPTION =~ ^[1-5]$ ]]; do
-		read -rp "Select an option [1-5]: " MENU_OPTION
-	done
+function hasAnyUser() {
+    local users=()
+    if [[ -e /etc/openvpn/easy-rsa/pki/index.txt ]]; then
+        mapfile -t cert_users < <(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | grep -v "^main$")
+        users+=("${cert_users[@]}")
+    fi
+    if [[ -e /etc/openvpn/login-users.txt ]]; then
+        mapfile -t login_users < <(cat /etc/openvpn/login-users.txt)
+        for u in "${login_users[@]}"; do
+            if [[ ! " ${users[*]} " =~ " $u " ]]; then
+                users+=("$u")
+            fi
+        done
+    fi
+    [[ ${#users[@]} -gt 0 ]]
+}
 
-	case $MENU_OPTION in
-	1)
-		addUserDual
-		;;
-	2)
-		revokeUser
-		;;
-	3)
-		listClients
-		;;
-	4)
-		removeOpenVPN
-		;;
-	5)
-		exit 0
-		;;
-	esac
+function manageMenu() {
+    while true; do
+        echo "OpenVPN Dual Auth Installer"
+        echo "Repository: https://github.com/smaghili/openvpn"
+        echo ""
+        # Get actual ports from config files
+        local cert_port="1194"
+        local login_port="1195"
+        local cert_protocol="UDP"
+        local login_protocol="UDP"
+        if [[ -e /etc/openvpn/server-cert.conf ]]; then
+            cert_port=$(grep '^port ' /etc/openvpn/server-cert.conf | cut -d ' ' -f 2)
+            cert_protocol=$(grep '^proto ' /etc/openvpn/server-cert.conf | cut -d ' ' -f 2 | tr '[:lower:]' '[:upper:]')
+        fi
+        if [[ -e /etc/openvpn/server-login.conf ]]; then
+            login_port=$(grep '^port ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2)
+            login_protocol=$(grep '^proto ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2 | tr '[:lower:]' '[:upper:]')
+        fi
+        echo "OpenVPN is running with dual authentication support:"
+        echo "  📜 Certificate-based: Port $cert_port/$cert_protocol (Professional users)"
+        echo "  🔐 Username/Password: Port $login_port/$login_protocol (Simple users)"
+        echo ""
+        echo "What do you want to do?"
+        echo "   1) Add a new user"
+        if hasAnyUser; then
+            echo "   2) Remove user"
+            echo "   3) List all clients"
+        else
+            echo "   2) Remove user (no users to remove)"
+            echo "   3) List all clients (no users)"
+        fi
+        echo "   4) Remove OpenVPN"
+        echo "   5) Exit"
+        local MENU_OPTION=""
+        until [[ $MENU_OPTION =~ ^[1-5]$ ]]; do
+            read -rp "Select an option [1-5]: " MENU_OPTION
+        done
+        case $MENU_OPTION in
+            1)
+                addUserDual
+                ;;
+            2)
+                if hasAnyUser; then
+                    revokeUser
+                else
+                    echo "No users found to remove!"
+                    read -rp "Press Enter to return to menu..."
+                fi
+                ;;
+            3)
+                if hasAnyUser; then
+                    listClients
+                else
+                    echo "No users found!"
+                    read -rp "Press Enter to return to menu..."
+                fi
+                ;;
+            4)
+                removeOpenVPN
+                ;;
+            5)
+                exit 0
+                ;;
+        esac
+    done
 }
 
 function returnToMenu() {
