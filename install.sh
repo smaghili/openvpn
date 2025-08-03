@@ -153,44 +153,13 @@ function resolvePublicIP() {
 }
 
 function installQuestions() {
-	echo "Welcome to Enhanced OpenVPN with Dual Authentication!"
-	echo "The git repository is available at: https://github.com/angristan/openvpn-install"
+	echo "OpenVPN Dual Auth Installer"
+	echo "Repository: https://github.com/smaghili/openvpn"
 	echo ""
-	echo "✨ This enhanced version supports dual authentication methods:"
-	echo "  📜 Certificate-based: For professional users (TLS with dedicated certs)"
-	echo "  🔐 Username/Password: For simple users (PAM authentication)"
-	echo ""
-
-	echo "I need to ask you a few questions before starting the setup."
-	echo "You can leave the default options and just press enter if you are okay with them."
-	echo ""
-	echo "I need to know the IPv4 address of the network interface you want OpenVPN listening to."
-	echo "Unless your server is behind NAT, it should be your public IPv4 address."
-
-	# Detect public IPv4 address and pre-fill for the user
-	IP=$(ip -4 addr | sed -ne 's|^.* inet \([^/]*\)/.* scope global.*$|\1|p' | head -1)
-
-	if [[ -z $IP ]]; then
-		# Detect public IPv6 address
-		IP=$(ip -6 addr | sed -ne 's|^.* inet6 \([^/]*\)/.* scope global.*$|\1|p' | head -1)
-	fi
-	APPROVE_IP=${APPROVE_IP:-n}
-	if [[ $APPROVE_IP =~ n ]]; then
-		read -rp "IP address: " -e -i "$IP" IP
-	fi
-	# If $IP is a private IP address, the server must be behind NAT
-	if echo "$IP" | grep -qE '^(10\.|172\.1[6789]\.|172\.2[0-9]\.|172\.3[01]\.|192\.168)'; then
-		echo ""
-		echo "It seems this server is behind NAT. What is its public IPv4 address or hostname?"
-		echo "We need it for the clients to connect to the server."
-
-		if [[ -z $ENDPOINT ]]; then
-			DEFAULT_ENDPOINT=$(resolvePublicIP)
-		fi
-
-		until [[ $ENDPOINT != "" ]]; do
-			read -rp "Public IPv4 address or hostname: " -e -i "$DEFAULT_ENDPOINT" ENDPOINT
-		done
+	IP=$(hostname -I | awk '{print $1}')
+	read -rp "Server IP address: " -e -i "$IP" IP
+	if echo "$IP" | grep -qE '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168)'; then
+		read -rp "Public IP or hostname (NAT): " -e ENDPOINT
 	fi
 
 	echo ""
@@ -204,7 +173,7 @@ function installQuestions() {
 	fi
 	if eval "$PING6"; then
 		echo "Your host appears to have IPv6 connectivity."
-		SUGGESTION="y"
+		SUGGESTION="n"
 	else
 		echo "Your host does not appear to have IPv6 connectivity."
 		SUGGESTION="n"
@@ -606,9 +575,6 @@ function installQuestions() {
 	echo "Okay, that was all I needed. We are ready to setup your OpenVPN server now."
 	echo "You will be able to generate a client at the end of the installation."
 	APPROVE_INSTALL=${APPROVE_INSTALL:-n}
-	if [[ $APPROVE_INSTALL =~ n ]]; then
-		read -n1 -r -p "Press any key to continue..."
-	fi
 }
 
 function installOpenVPN() {
@@ -910,314 +876,148 @@ verb 3" >>/etc/openvpn/client-template.txt
 	
 	generateSharedLoginConfig
 	
-	echo ""
-	echo "✅ Dual authentication OpenVPN setup completed!"
-	echo ""
-	echo "📜 Certificate-based server: Port $CERT_PORT/$CERT_PROTOCOL"
-	echo "🔐 Username/Password server: Port $LOGIN_PORT/$LOGIN_PROTOCOL"
-	echo ""
-	echo "🔴 Next steps:"
-	echo "  1. Run this script again to add certificate-based clients"
-	echo "  2. Run this script again to add username/password users"
-	echo "  3. Download the generated client configs from /root/"
-	echo ""
-	echo "Two authentication methods are now available:"
-	echo "  📜 Certificate-based: Port $CERT_PORT/$CERT_PROTOCOL (for professionals)"
-	echo "  🔐 Username/Password: Port $LOGIN_PORT/$LOGIN_PROTOCOL (for simple users)"
-	echo ""
-	echo "You can now run this script again to:"
-	echo "  - Add more certificate-based clients"
-	echo "  - Add username/password users"
-	echo "  - Manage existing clients"
-}
-
-function newCertClient() {
-	echo ""
-	echo "Tell me a name for the client."
-	echo "The name must consist of alphanumeric character. It may also include an underscore or a dash."
-
-	until [[ $CLIENT =~ ^[a-zA-Z0-9_-]+$ ]]; do
-		read -rp "Client name: " -e CLIENT
-	done
-
-	echo ""
-	echo "Do you want to protect the configuration file with a password?"
-	echo "(e.g. encrypt the private key with a password)"
-	echo "   1) Add a passwordless client"
-	echo "   2) Use a password for the client"
-
-	until [[ $PASS =~ ^[1-2]$ ]]; do
-		read -rp "Select an option [1-2]: " -e -i 1 PASS
-	done
-
-	CLIENTEXISTS=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep -c -E "/CN=$CLIENT\$")
-	if [[ $CLIENTEXISTS == '1' ]]; then
-		echo ""
-		echo "The specified client CN was already found in easy-rsa, please choose another name."
-		exit
-	else
-		cd /etc/openvpn/easy-rsa/ || return
-		case $PASS in
-		1)
-			EASYRSA_CERT_EXPIRE=3650 ./easyrsa --batch build-client-full "$CLIENT" nopass
-			;;
-		2)
-			echo "⚠️ You will be asked for the client password below ⚠️"
-			EASYRSA_CERT_EXPIRE=3650 ./easyrsa --batch build-client-full "$CLIENT"
-			;;
-		esac
-		echo "Client $CLIENT added."
-	fi
-
-	if [ -e "/home/${CLIENT}" ]; then
-		homeDir="/home/${CLIENT}"
-	elif [ "${SUDO_USER}" ]; then
-		if [ "${SUDO_USER}" == "root" ]; then
-			homeDir="/root"
-		else
-			homeDir="/home/${SUDO_USER}"
-		fi
-	else
-		homeDir="/root"
-	fi
-
-	if grep -qs "^tls-crypt" /etc/openvpn/server.conf; then
-		TLS_SIG="1"
-	elif grep -qs "^tls-auth" /etc/openvpn/server.conf; then
-		TLS_SIG="2"
-	fi
-
-	cp /etc/openvpn/client-template.txt "$homeDir/$CLIENT.ovpn"
-	{
-		echo "<ca>"
-		cat "/etc/openvpn/easy-rsa/pki/ca.crt"
-		echo "</ca>"
-
-		echo "<cert>"
-		awk '/BEGIN/,/END CERTIFICATE/' "/etc/openvpn/easy-rsa/pki/issued/$CLIENT.crt"
-		echo "</cert>"
-
-		echo "<key>"
-		cat "/etc/openvpn/easy-rsa/pki/private/$CLIENT.key"
-		echo "</key>"
-
-		case $TLS_SIG in
-		1)
-			echo "<tls-crypt>"
-			cat /etc/openvpn/tls-crypt.key
-			echo "</tls-crypt>"
-			;;
-		2)
-			echo "key-direction 1"
-			echo "<tls-auth>"
-			cat /etc/openvpn/tls-auth.key
-			echo "</tls-auth>"
-			;;
-		esac
-	} >>"$homeDir/$CLIENT.ovpn"
-
-	echo ""
-	echo "The configuration file has been written to $homeDir/$CLIENT.ovpn."
-	echo "Download the .ovpn file and import it in your OpenVPN client."
-
-	exit 0
-}
-
-function revokeClient() {
-	echo ""
-	echo "=== Revoke Client/User ==="
-	echo ""
-	echo "What type of client do you want to revoke?"
-	echo "   1) Certificate-based client"
-	echo "   2) Login-based user"
-	echo "   3) Back to main menu"
+	# Install ovpn command globally
+	cp "$0" /usr/local/bin/ovpn
+	chmod +x /usr/local/bin/ovpn
 	
-	until [[ $REVOKE_TYPE =~ ^[1-3]$ ]]; do
-		read -rp "Select client type [1-3]: " REVOKE_TYPE
-	done
-	
-	case $REVOKE_TYPE in
-	1)
-		revokeCertClient
-		;;
-	2)
-		revokeLoginUser
-		;;
-	3)
-		manageMenu
-		;;
-	esac
+	clear
+	manageMenu
 }
 
 function revokeCertClient() {
-	if [[ ! -e /etc/openvpn/easy-rsa/pki/index.txt ]]; then
-		echo "Certificate system not found!"
-		return
-	fi
-	
-	NUMBEROFCLIENTS=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep -c "^V")
-	if [[ $NUMBEROFCLIENTS == '0' ]]; then
-		echo ""
-		echo "You have no existing certificate-based clients!"
-		return
-	fi
-
-	echo ""
-	echo "Select the existing client certificate you want to revoke:"
-	tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | nl -s ') '
-	until [[ $CLIENTNUMBER -ge 1 && $CLIENTNUMBER -le $NUMBEROFCLIENTS ]]; do
-		if [[ $CLIENTNUMBER == '1' ]]; then
-			read -rp "Select one client [1]: " CLIENTNUMBER
-		else
-			read -rp "Select one client [1-$NUMBEROFCLIENTS]: " CLIENTNUMBER
-		fi
-	done
-	CLIENT=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | sed -n "$CLIENTNUMBER"p)
-	cd /etc/openvpn/easy-rsa/ || return
-	./easyrsa --batch revoke "$CLIENT"
-	EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl
-	rm -f /etc/openvpn/crl.pem
-	cp /etc/openvpn/easy-rsa/pki/crl.pem /etc/openvpn/crl.pem
-	chmod 644 /etc/openvpn/crl.pem
-	find /home/ -maxdepth 2 -name "$CLIENT.ovpn" -delete
-	rm -f "/root/$CLIENT.ovpn"
-	
-	sed -i "/^$CLIENT,.*/d" /etc/openvpn/ipp.txt 2>/dev/null
-	sed -i "/^$CLIENT,.*/d" /etc/openvpn/ipp-cert.txt 2>/dev/null
-	
-	cp /etc/openvpn/easy-rsa/pki/index.txt{,.bk}
-
-	echo ""
-	echo "Certificate for client $CLIENT revoked."
+    local USERNAME="$1"
+    if [[ "$USERNAME" == "main" ]]; then
+        echo "Error: Cannot remove main certificate (required for login-based authentication)"
+        return 1
+    fi
+    if [[ -e /etc/openvpn/easy-rsa/pki/index.txt ]]; then
+        if grep -q "/CN=$USERNAME$" /etc/openvpn/easy-rsa/pki/index.txt; then
+            cd /etc/openvpn/easy-rsa/ || return
+            ./easyrsa --batch revoke "$USERNAME" >/dev/null 2>&1
+            EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl >/dev/null 2>&1
+            rm -f /etc/openvpn/crl.pem
+            cp /etc/openvpn/easy-rsa/pki/crl.pem /etc/openvpn/crl.pem
+            chmod 644 /etc/openvpn/crl.pem
+            if ./easyrsa --help 2>&1 | grep -q 'remove'; then
+                ./easyrsa --batch remove "$USERNAME" >/dev/null 2>&1
+            else
+                sed -i "/CN=$USERNAME$/d" /etc/openvpn/easy-rsa/pki/index.txt
+            fi
+        fi
+        rm -f "/etc/openvpn/clients/${USERNAME}-cert.ovpn"
+        rm -f "/etc/openvpn/easy-rsa/pki/issued/${USERNAME}.crt"
+        rm -f "/etc/openvpn/easy-rsa/pki/private/${USERNAME}.key"
+        rm -f "/etc/openvpn/easy-rsa/pki/reqs/${USERNAME}.req"
+        if [[ -e /etc/openvpn/easy-rsa/pki/index.txt.attr ]]; then
+            sed -i "/$USERNAME/d" /etc/openvpn/easy-rsa/pki/index.txt.attr
+        fi
+    fi
 }
 
 function revokeLoginUser() {
-	if [[ ! -e /etc/openvpn/login-users.txt ]]; then
-		echo "No login-based users found!"
-		return
-	fi
-	
-	if [[ ! -s /etc/openvpn/login-users.txt ]]; then
-		echo "No login-based users found!"
-		return
-	fi
-	
-	echo ""
-	echo "Select the login-based user you want to remove:"
-	cat /etc/openvpn/login-users.txt | nl -s ') '
-	
-	NUMBEROFUSERS=$(wc -l < /etc/openvpn/login-users.txt)
-	until [[ $USERNUMBER -ge 1 && $USERNUMBER -le $NUMBEROFUSERS ]]; do
-		if [[ $USERNUMBER == '1' ]]; then
-			read -rp "Select one user [1]: " USERNUMBER
-		else
-			read -rp "Select one user [1-$NUMBEROFUSERS]: " USERNUMBER
-		fi
-	done
-	
-	USERNAME=$(sed -n "${USERNUMBER}p" /etc/openvpn/login-users.txt)
-	
-	if id "$USERNAME" &>/dev/null; then
-		userdel "$USERNAME"
-		echo "System user $USERNAME removed."
-	fi
-	
-	sed -i "/^$USERNAME$/d" /etc/openvpn/login-users.txt
-	
-	rm -f "/root/${USERNAME}-login.ovpn"
-	
-	echo ""
-	echo "Login-based user $USERNAME has been removed."
+    local USERNAME="$1"
+    if [[ -e /etc/openvpn/login-users.txt ]]; then
+        sed -i "/^$USERNAME$/d" /etc/openvpn/login-users.txt
+        if id "$USERNAME" &>/dev/null; then
+            userdel "$USERNAME" >/dev/null 2>&1
+        fi
+    fi
 }
 
-function newLoginUser() {
-	echo ""
-	echo "=== Creating Login-based User ==="
-	echo "This will create a user that connects using username/password."
-	echo ""
-	
-	until [[ $USERNAME =~ ^[a-zA-Z0-9_-]+$ ]]; do
-		read -rp "Username: " -e USERNAME
-	done
-	
-	if id "$USERNAME" &>/dev/null; then
-		echo "User $USERNAME already exists in the system."
-		read -rp "Do you want to update the password? [y/n]: " -e UPDATE_PASS
-		if [[ $UPDATE_PASS == "n" ]]; then
-			return
-		fi
-	else
-		useradd -s /bin/false -M "$USERNAME"
-		echo "System user $USERNAME created."
-	fi
-    
-	echo "Please set password for user $USERNAME:"
-	passwd "$USERNAME"
-	
-	generateSharedLoginConfig
-	
-	if [[ ! -e /etc/openvpn/login-users.txt ]]; then
-		touch /etc/openvpn/login-users.txt
-	fi
-	
-	if ! grep -q "^$USERNAME$" /etc/openvpn/login-users.txt; then
-		echo "$USERNAME" >> /etc/openvpn/login-users.txt
-	fi
-	
-	echo ""
-	echo "✅ Login-based user $USERNAME has been created."
-	echo "📁 Shared config file: /root/shared-login.ovpn"
-	echo "💡 All login users can use the same config file!"
-	echo "Username: $USERNAME"
-	echo "Password: [as set above]"
+function revokeUser() {
+    if [[ ! -e /etc/openvpn/easy-rsa/pki/index.txt && ! -e /etc/openvpn/login-users.txt ]]; then
+        echo "No users found!"
+        return
+    fi
+    echo ""
+    echo "Select the user you want to remove:"
+    local users=()
+    if [[ -e /etc/openvpn/easy-rsa/pki/index.txt ]]; then
+        mapfile -t cert_users < <(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | grep -v "^main$")
+        users+=("${cert_users[@]}")
+    fi
+    if [[ -e /etc/openvpn/login-users.txt ]]; then
+        mapfile -t login_users < <(cat /etc/openvpn/login-users.txt)
+        for u in "${login_users[@]}"; do
+            if [[ ! " ${users[*]} " =~ " $u " ]]; then
+                users+=("$u")
+            fi
+        done
+    fi
+    if [[ ${#users[@]} -eq 0 ]]; then
+        echo "No users found!"
+        return
+    fi
+    for i in "${!users[@]}"; do
+        printf "%d) %s\n" $((i+1)) "${users[$i]}"
+    done
+    echo "0) Back"
+    local USERNUMBER
+    until [[ "$USERNUMBER" =~ ^[0-9]+$ && $USERNUMBER -ge 0 && $USERNUMBER -le ${#users[@]} ]]; do
+        read -rp "Select one user [0-${#users[@]}]: " USERNUMBER
+    done
+    if [[ "$USERNUMBER" == "0" ]]; then
+        returnToMenu
+        return
+    fi
+    local USERNAME="${users[$((USERNUMBER-1))]}"
+    revokeCertClient "$USERNAME"
+    revokeLoginUser "$USERNAME"
+    # Double-check removal
+    if grep -q "/CN=$USERNAME$" /etc/openvpn/easy-rsa/pki/index.txt 2>/dev/null || grep -q "^$USERNAME$" /etc/openvpn/login-users.txt 2>/dev/null; then
+        echo "Warning: User $USERNAME was not fully removed. Please check manually."
+    else
+        echo "User $USERNAME removed."
+    fi
+    returnToMenu
 }
 
 function generateSharedLoginConfig() {
-	local config_file="/root/shared-login.ovpn"
-	
-	# Get server IP and port from saved config or detect dynamically
-	local server_ip
-	local server_port
-	local server_protocol
-	
-	if [[ -e /etc/openvpn/server-login.conf ]]; then
-		server_port=$(grep '^port ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2)
-		server_protocol=$(grep '^proto ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2)
-		
-		# Try to get IP from saved config first, then fallback methods
-		if [[ -e /etc/openvpn/server_ip.conf ]]; then
-			server_ip=$(cat /etc/openvpn/server_ip.conf)
-		elif [[ -n $ENDPOINT ]]; then
-			server_ip="$ENDPOINT"
-		elif [[ -n $IP ]]; then
-			server_ip="$IP"
-		else
-			# Try to detect external IP
-			server_ip=$(ip route get 8.8.8.8 | awk '{print $7; exit}' 2>/dev/null || echo "YOUR_SERVER_IP")
-		fi
-	else
-		server_port="1195"
-		server_protocol="udp"
-		server_ip="YOUR_SERVER_IP"
-	fi
-	
-	# Create shared login certificate if it doesn't exist
-	if [[ ! -e /etc/openvpn/easy-rsa/pki/issued/shared-login.crt ]]; then
-		echo "Creating shared login certificate..."
-		cd /etc/openvpn/easy-rsa
-		echo "yes" | ./easyrsa build-client-full shared-login nopass >/dev/null 2>&1
-		cd - >/dev/null
-	fi
-	
-	# Ensure server-login.conf uses verify-client-cert require
-	if grep -q "verify-client-cert none" /etc/openvpn/server-login.conf; then
-		sed -i 's/verify-client-cert none/verify-client-cert require/' /etc/openvpn/server-login.conf
-		systemctl restart openvpn@server-login
-		echo "Updated server-login config for certificate + password authentication"
-	fi
-	
-	# Generate the complete client config
-	cat > "$config_file" << EOF
+    local CLIENTS_DIR="/etc/openvpn/clients"
+    mkdir -p "$CLIENTS_DIR"
+    chmod 700 "$CLIENTS_DIR"
+    local config_file="$CLIENTS_DIR/main.ovpn"
+    if [[ ! -e /etc/openvpn/easy-rsa/pki/issued/main.crt || ! -e /etc/openvpn/easy-rsa/pki/private/main.key ]]; then
+        cd /etc/openvpn/easy-rsa/ || return 1
+        EASYRSA_CERT_EXPIRE=3650 ./easyrsa --batch build-client-full main nopass >/dev/null 2>&1
+    fi
+    if [[ ! -e /etc/openvpn/easy-rsa/pki/issued/main.crt || ! -e /etc/openvpn/easy-rsa/pki/private/main.key ]]; then
+        echo "[ERROR] main certificate or key not found. Cannot generate main.ovpn." >&2
+        return 1
+    fi
+    if [[ ! -e $config_file ]]; then
+        if [[ -e /etc/openvpn/server-login.conf ]]; then
+            server_port=$(grep '^port ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2)
+            server_protocol=$(grep '^proto ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2)
+            if [[ -e /etc/openvpn/server_ip.conf ]]; then
+                server_ip=$(cat /etc/openvpn/server_ip.conf)
+            elif [[ -n $ENDPOINT ]]; then
+                server_ip="$ENDPOINT"
+            elif [[ -n $IP ]]; then
+                server_ip="$IP"
+            else
+                server_ip=$(hostname -I | awk '{print $1}')
+                if [[ -z "$server_ip" ]]; then
+                    server_ip="YOUR_SERVER_IP"
+                fi
+            fi
+        else
+            server_port="1195"
+            server_protocol="udp"
+            server_ip=$(hostname -I | awk '{print $1}')
+            if [[ -z "$server_ip" ]]; then
+                server_ip="YOUR_SERVER_IP"
+            fi
+        fi
+        local cipher="AES-256-GCM"
+        local auth="SHA256"
+        if [[ -n $CIPHER ]]; then
+            cipher="$CIPHER"
+        fi
+        if [[ -n $HMAC_ALG ]]; then
+            auth="$HMAC_ALG"
+        fi
+        cat > "$config_file" << EOF
 client
 dev tun
 proto $server_protocol
@@ -1226,147 +1026,90 @@ resolv-retry infinite
 nobind
 persist-key
 persist-tun
-remote-cert-tls server
 auth-user-pass
+remote-cert-tls server
 verb 3
-cipher AES-256-GCM
-auth SHA256
+cipher $cipher
+auth $auth
 tls-version-min 1.2
-
 <ca>
 EOF
-
-	cat /etc/openvpn/ca.crt >> "$config_file"
-	
-	cat >> "$config_file" << 'EOF'
-</ca>
-
-<cert>
-EOF
-
-	cat /etc/openvpn/easy-rsa/pki/issued/shared-login.crt >> "$config_file"
-	
-	cat >> "$config_file" << 'EOF'
-</cert>
-
-<key>
-EOF
-
-	cat /etc/openvpn/easy-rsa/pki/private/shared-login.key >> "$config_file"
-	
-	cat >> "$config_file" << 'EOF'
-</key>
-
-EOF
-
-	# Check what TLS method the server uses and match it
-	if grep -q "^tls-crypt" /etc/openvpn/server-login.conf; then
-		echo "<tls-crypt>" >> "$config_file"
-		cat /etc/openvpn/tls-crypt.key >> "$config_file"
-		echo "</tls-crypt>" >> "$config_file"
-	else
-		echo "<tls-auth>" >> "$config_file"
-		if [[ -e /etc/openvpn/tls-auth-login.key ]]; then
-			cat /etc/openvpn/tls-auth-login.key >> "$config_file"
-		else
-			cat /etc/openvpn/tls-auth.key >> "$config_file"
-		fi
-		cat >> "$config_file" << 'EOF'
-</tls-auth>
-key-direction 1
-EOF
-	fi
-
-	echo ""
-	echo "📁 Shared login config generated: $config_file"
-	echo "💡 All username/password users can use this same file"
-	echo "🔐 Two-layer security: Certificate + Username/Password"
-	echo "✅ No certificate warnings will appear"
+        cat /etc/openvpn/easy-rsa/pki/ca.crt >> "$config_file"
+        echo "</ca>" >> "$config_file"
+        echo "<cert>" >> "$config_file"
+        awk '/BEGIN/,/END CERTIFICATE/' /etc/openvpn/easy-rsa/pki/issued/main.crt >> "$config_file"
+        echo "</cert>" >> "$config_file"
+        echo "<key>" >> "$config_file"
+        cat /etc/openvpn/easy-rsa/pki/private/main.key >> "$config_file"
+        echo "</key>" >> "$config_file"
+        if grep -q "^tls-crypt" /etc/openvpn/server-login.conf 2>/dev/null; then
+            echo "<tls-crypt>" >> "$config_file"
+            cat /etc/openvpn/tls-crypt.key >> "$config_file"
+            echo "</tls-crypt>" >> "$config_file"
+        elif grep -q "^tls-auth" /etc/openvpn/server-login.conf 2>/dev/null; then
+            echo "<tls-auth>" >> "$config_file"
+            if [[ -e /etc/openvpn/tls-auth-login.key ]]; then
+                cat /etc/openvpn/tls-auth-login.key >> "$config_file"
+            else
+                cat /etc/openvpn/tls-auth.key >> "$config_file"
+            fi
+            echo "</tls-auth>" >> "$config_file"
+            echo "key-direction 1" >> "$config_file"
+        fi
+    fi
 }
 
-function generateLoginConfig() {
-	local username=$1
-	local config_file="/root/${username}-login.ovpn"
-	
-	local server_ip
-	local server_port
-	
-	if [[ -e /etc/openvpn/server-login.conf ]]; then
-		server_port=$(grep '^port ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2)
-		if [[ -n $ENDPOINT ]]; then
-			server_ip="$ENDPOINT"
-		elif [[ -n $IP ]]; then
-			server_ip="$IP"
-		else
-			server_ip="YOUR_SERVER_IP"
-		fi
-	else
-		server_port="1195"
-		server_ip="YOUR_SERVER_IP"
-	fi
-	
-	cat > "$config_file" << EOF
-client
-dev tun
-proto udp
-remote $server_ip $server_port
-resolv-retry infinite
-nobind
-persist-key
-persist-tun
-remote-cert-tls server
-auth-user-pass
-verb 3
-cipher AES-256-GCM
-auth SHA256
-tls-version-min 1.2
-
-<ca>
-$(cat /etc/openvpn/easy-rsa/pki/ca.crt)
-</ca>
-
-<tls-auth>
-$(cat /etc/openvpn/tls-auth-login.key)
-</tls-auth>
-key-direction 1
-EOF
-
-	echo "Client configuration generated: $config_file"
+function createLoginUser() {
+    local USERNAME="$1"
+    local PASSWORD="$2"
+    if id "$USERNAME" &>/dev/null; then
+        echo "$PASSWORD" | passwd --stdin "$USERNAME" >/dev/null 2>&1 || echo -e "$PASSWORD\n$PASSWORD" | passwd "$USERNAME" >/dev/null 2>&1
+    else
+        useradd -s /bin/false -M "$USERNAME" >/dev/null 2>&1
+        echo "$PASSWORD" | passwd --stdin "$USERNAME" >/dev/null 2>&1 || echo -e "$PASSWORD\n$PASSWORD" | passwd "$USERNAME" >/dev/null 2>&1
+    fi
+    if [[ ! -e /etc/openvpn/login-users.txt ]]; then
+        touch /etc/openvpn/login-users.txt
+    fi
+    if ! grep -q "^$USERNAME$" /etc/openvpn/login-users.txt; then
+        echo "$USERNAME" >> /etc/openvpn/login-users.txt
+    fi
+    generateSharedLoginConfig
+    local CLIENTS_DIR="/etc/openvpn/clients"
+    echo "[INFO] Login-based config: $CLIENTS_DIR/main.ovpn"
 }
 
 function listClients() {
-	echo ""
-	echo "=== OpenVPN Client List ==="
-	echo ""
-	
-	echo "📜 Certificate-based clients:"
-	if [[ -e /etc/openvpn/easy-rsa/pki/index.txt ]]; then
-		CERT_CLIENTS=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2)
-		if [[ -n $CERT_CLIENTS ]]; then
-			echo "$CERT_CLIENTS" | nl -s ') '
-		else
-			echo "  No certificate-based clients found."
-		fi
-	else
-		echo "  Certificate system not initialized."
-	fi
-	
-	echo ""
-	
-	echo "🔐 Login-based users:"
-	if [[ -e /etc/openvpn/login-users.txt ]]; then
-		if [[ -s /etc/openvpn/login-users.txt ]]; then
-			cat /etc/openvpn/login-users.txt | nl -s ') '
-		else
-			echo "  No login-based users found."
-		fi
-	else
-		echo "  Login-based authentication not configured."
-	fi
-	
-	echo ""
-	read -rp "Press Enter to continue..."
-	manageMenu
+    echo ""
+    echo "=== OpenVPN Client List ==="
+    echo ""
+    
+    echo "📜 Certificate-based clients:"
+    if [[ -e /etc/openvpn/easy-rsa/pki/index.txt ]]; then
+        CERT_CLIENTS=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2)
+        if [[ -n $CERT_CLIENTS ]]; then
+            echo "$CERT_CLIENTS" | nl -s ') '
+        else
+            echo "  No certificate-based clients found."
+        fi
+    else
+        echo "  Certificate system not initialized."
+    fi
+    
+    echo ""
+    
+    echo "🔐 Login-based users:"
+    if [[ -e /etc/openvpn/login-users.txt ]]; then
+        if [[ -s /etc/openvpn/login-users.txt ]]; then
+            cat /etc/openvpn/login-users.txt | nl -s ') '
+        else
+            echo "  No login-based users found."
+        fi
+    else
+        echo "  Login-based authentication not configured."
+    fi
+    
+    returnToMenu
 }
 
 
@@ -1652,7 +1395,7 @@ function setupDualSystemdServices() {
 	touch /etc/openvpn/login-users.txt
 	systemctl start iptables-openvpn
 	
-	echo "Dual systemd services configured and started."
+
 }
 
 function removeUnbound() {
@@ -1683,7 +1426,7 @@ function removeUnbound() {
 
 function removeOpenVPN() {
 	echo ""
-	read -rp "Do you really want to remove OpenVPN? [y/n]: " -e -i n REMOVE
+			read -rp "Do you really want to remove OpenVPN? [y/n]: " -e -i y REMOVE
 	if [[ $REMOVE == 'y' ]]; then
 		PORT=$(grep '^port ' /etc/openvpn/server.conf | cut -d " " -f 2)
 		PROTOCOL=$(grep '^proto ' /etc/openvpn/server.conf | cut -d " " -f 2)
@@ -1759,48 +1502,131 @@ function removeOpenVPN() {
 }
 
 function manageMenu() {
-	echo "Welcome to Enhanced OpenVPN with Dual Authentication!"
-	echo "The git repository is available at: https://github.com/angristan/openvpn-install"
+	echo "OpenVPN Dual Auth Installer"
+	echo "Repository: https://github.com/smaghili/openvpn"
 	echo ""
+	
+	# Get actual ports from config files
+	local cert_port="1194"
+	local login_port="1195"
+	local cert_protocol="UDP"
+	local login_protocol="UDP"
+	
+	if [[ -e /etc/openvpn/server-cert.conf ]]; then
+		cert_port=$(grep '^port ' /etc/openvpn/server-cert.conf | cut -d ' ' -f 2)
+		cert_protocol=$(grep '^proto ' /etc/openvpn/server-cert.conf | cut -d ' ' -f 2 | tr '[:lower:]' '[:upper:]')
+	fi
+	
+	if [[ -e /etc/openvpn/server-login.conf ]]; then
+		login_port=$(grep '^port ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2)
+		login_protocol=$(grep '^proto ' /etc/openvpn/server-login.conf | cut -d ' ' -f 2 | tr '[:lower:]' '[:upper:]')
+	fi
+	
 	echo "OpenVPN is running with dual authentication support:"
-	echo "  📜 Certificate-based: Port 1194/UDP (Professional users)"
-	echo "  🔐 Username/Password: Port 1195/UDP (Simple users)"
+	echo "  📜 Certificate-based: Port $cert_port/$cert_protocol (Professional users)"
+	echo "  🔐 Username/Password: Port $login_port/$login_protocol (Simple users)"
 	echo ""
 	
 	echo "What do you want to do?"
-	echo "   1) Add a new cert-based client"
-	echo "   2) Add a new login-based user"
-	echo "   3) Revoke existing client"
-	echo "   4) List all clients"
-	echo "   5) Remove OpenVPN"
-	echo "   6) Exit"
-	until [[ $MENU_OPTION =~ ^[1-6]$ ]]; do
-		read -rp "Select an option [1-6]: " MENU_OPTION
+	echo "   1) Add a new user"
+	echo "   2) Remove user"
+	echo "   3) List all clients"
+	echo "   4) Remove OpenVPN"
+	echo "   5) Exit"
+	until [[ $MENU_OPTION =~ ^[1-5]$ ]]; do
+		read -rp "Select an option [1-5]: " MENU_OPTION
 	done
 
 	case $MENU_OPTION in
 	1)
-		newCertClient
+		addUserDual
 		;;
 	2)
-		newLoginUser
+		revokeUser
 		;;
 	3)
-		revokeClient
-		;;
-	4)
 		listClients
 		;;
-	5)
+	4)
 		removeOpenVPN
 		;;
-	6)
+	5)
 		exit 0
 		;;
 	esac
 }
 
+function returnToMenu() {
+    echo ""
+    read -rp "Press Enter to continue..."
+    MENU_OPTION=""
+    manageMenu
+}
+
+function createCertUser() {
+    local USERNAME="$1"
+    local CLIENTS_DIR="/etc/openvpn/clients"
+    mkdir -p "$CLIENTS_DIR"
+    chmod 700 "$CLIENTS_DIR"
+    CLIENTEXISTS=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep -c -E "/CN=$USERNAME\$")
+    if [[ $CLIENTEXISTS == '1' ]]; then
+        echo "Error: Username '$USERNAME' already exists as a certificate user."
+        return 1
+    else
+        cd /etc/openvpn/easy-rsa/ || return
+        EASYRSA_CERT_EXPIRE=3650 ./easyrsa --batch build-client-full "$USERNAME" nopass >/dev/null 2>&1
+    fi
+    local homeDir="$CLIENTS_DIR"
+    cp /etc/openvpn/client-template.txt "$homeDir/$USERNAME-cert.ovpn"
+    {
+        echo "<ca>"
+        cat "/etc/openvpn/easy-rsa/pki/ca.crt"
+        echo "</ca>"
+        echo "<cert>"
+        awk '/BEGIN/,/END CERTIFICATE/' "/etc/openvpn/easy-rsa/pki/issued/$USERNAME.crt"
+        echo "</cert>"
+        echo "<key>"
+        cat "/etc/openvpn/easy-rsa/pki/private/$USERNAME.key"
+        echo "</key>"
+        if grep -qs "^tls-crypt" /etc/openvpn/server.conf; then
+            echo "<tls-crypt>"
+            cat /etc/openvpn/tls-crypt.key
+            echo "</tls-crypt>"
+        elif grep -qs "^tls-auth" /etc/openvpn/server.conf; then
+            echo "key-direction 1"
+            echo "<tls-auth>"
+            cat /etc/openvpn/tls-auth.key
+            echo "</tls-auth>"
+        fi
+    } >>"$homeDir/$USERNAME-cert.ovpn"
+    echo "[INFO] Cert-based config: $homeDir/$USERNAME-cert.ovpn"
+}
+
+function addUserDual() {
+    USERNAME=""
+    until [[ $USERNAME =~ ^[a-zA-Z0-9_-]+$ ]]; do
+        read -rp "Username: " -e USERNAME
+        if [[ -z "$USERNAME" ]]; then
+            echo ""
+            MENU_OPTION=""
+            manageMenu
+            return
+        fi
+    done
+    read -s -rp "Password: " PASSWORD
+    echo
+    createCertUser "$USERNAME"
+    createLoginUser "$USERNAME" "$PASSWORD"
+    returnToMenu
+}
+
 initialCheck
+
+# Install ovpn command globally if not exists
+if [[ ! -e /usr/local/bin/ovpn ]]; then
+	cp "$0" /usr/local/bin/ovpn
+	chmod +x /usr/local/bin/ovpn
+fi
 
 if [[ (-e /etc/openvpn/server-cert.conf && -e /etc/openvpn/server-login.conf) || (-e /etc/openvpn/server.conf) ]] && [[ $AUTO_INSTALL != "y" ]]; then
 	manageMenu
