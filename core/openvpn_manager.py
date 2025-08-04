@@ -87,7 +87,6 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["./easyrsa", "gen-dh"], check=True, capture_output=True)
         subprocess.run(["./easyrsa", "gen-crl"], check=True, capture_output=True)
         subprocess.run(["openvpn", "--genkey", "tls-crypt", "ta.key"], check=True, capture_output=True)
-        subprocess.run(["./easyrsa", "--batch", "build-client-full", "main", "nopass"], check=True, capture_output=True)
 
 
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
@@ -121,12 +120,12 @@ class OpenVPNManager(IBackupable):
         
         # Certificate-based server (10.8.0.0/24)
         check_command = f"iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE"
-        if subprocess.run(check_command, shell=True, capture_output=True).returncode != 0:
+        if subprocess.run(check_command, shell=True, capture_output=True, text=True).returncode != 0:
             subprocess.run(f"iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE", shell=True, check=True)
         
         # Login-based server (10.9.0.0/24)
         check_command = f"iptables -t nat -C POSTROUTING -s 10.9.0.0/24 -o {net_interface} -j MASQUERADE"
-        if subprocess.run(check_command, shell=True, capture_output=True).returncode != 0:
+        if subprocess.run(check_command, shell=True, capture_output=True, text=True).returncode != 0:
             subprocess.run(f"iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o {net_interface} -j MASQUERADE", shell=True, check=True)
         
         os.makedirs(os.path.dirname(self.FIREWALL_RULES_V4), exist_ok=True)
@@ -201,6 +200,11 @@ class OpenVPNManager(IBackupable):
 
     def get_shared_config(self) -> str:
         ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
+        
+        if not os.path.exists(f"{self.PKI_DIR}/issued/main.crt"):
+            os.chdir(self.EASYRSA_DIR)
+            subprocess.run(["./easyrsa", "--batch", "build-client-full", "main", "nopass"], check=True, capture_output=True)
+        
         main_cert = self._extract_certificate(f"{self.PKI_DIR}/issued/main.crt")
         main_key = self._read_file(f"{self.PKI_DIR}/private/main.key")
         tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/ta.key")
@@ -383,12 +387,19 @@ verb 3
     
     def _extract_certificate(self, path: str) -> str:
         if os.path.exists(path):
-            try:
-                result = subprocess.run(
-                    ["openssl", "x509", "-in", path], 
-                    capture_output=True, text=True, check=True
-                )
-                return result.stdout.strip()
-            except subprocess.CalledProcessError:
-                return ""
+            with open(path, "r") as f:
+                content = f.read()
+                lines = content.split('\n')
+                cert_lines = []
+                in_cert = False
+                for line in lines:
+                    if '-----BEGIN CERTIFICATE-----' in line:
+                        in_cert = True
+                        cert_lines.append(line)
+                    elif '-----END CERTIFICATE-----' in line:
+                        cert_lines.append(line)
+                        break
+                    elif in_cert:
+                        cert_lines.append(line)
+                return '\n'.join(cert_lines)
         return ""

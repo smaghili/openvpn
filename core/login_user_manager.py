@@ -34,10 +34,11 @@ class LoginUserManager(IBackupable):
             )
         except subprocess.CalledProcessError as e:
             # Provide a more helpful error message if the user already exists
-            if "already exists" in e.stderr.lower():
+            stderr_text = e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else str(e.stderr)
+            if "already exists" in stderr_text.lower():
                 print(f"      -> Warning: System user '{username}' already exists. Skipping creation.")
             else:
-                raise RuntimeError(f"Failed to add system user '{username}': {e.stderr}")
+                raise RuntimeError(f"Failed to add system user '{username}': {stderr_text}")
 
     def remove_user(self, username: str):
         """
