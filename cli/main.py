@@ -97,7 +97,8 @@ def print_management_menu():
     print("5. System Backup")
     print("6. System Restore")
     print("7. Uninstall VPN")
-    print("8. Exit")
+    print("8. Get shared config")
+    print("9. Exit")
 
 def add_user_flow(user_service: UserService):
     """Handles the 'add user' workflow with robust input validation."""
@@ -171,6 +172,15 @@ def get_user_config_flow(user_service: UserService):
             print("User or config not found (note: only cert-based users have configs).")
     except Exception as e:
         print(f"❌ Error retrieving config: {e}")
+
+def get_shared_config_flow(openvpn_manager: OpenVPNManager):
+    """Handles the 'get shared config' workflow."""
+    try:
+        config = openvpn_manager.get_shared_config()
+        print("\n--- Shared Config ---")
+        print(config)
+    except Exception as e:
+        print(f"❌ Error retrieving shared config: {e}")
 
 def backup_flow(backup_service: BackupService):
     """Handles the system backup workflow."""
@@ -277,6 +287,8 @@ def main():
         elif choice == '7':
             uninstall_flow(openvpn_manager)
         elif choice == '8':
+            get_shared_config_flow(openvpn_manager)
+        elif choice == '9':
             print("Exiting.")
             break
         else:

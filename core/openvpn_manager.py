@@ -2,7 +2,9 @@ import os
 import subprocess
 import shutil
 import json
+import re
 from .backup_interface import IBackupable
+from config.shared_config import SHARED_CONFIG
 
 class OpenVPNManager(IBackupable):
     """
@@ -61,7 +63,10 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["apt-get", "install", "-y"] + packages, check=True)
 
     def _setup_pki(self):
-        """Initializes the PKI and generates an initial Certificate Revocation List."""
+        """
+        Initializes the PKI using modern ECC defaults and generates an initial CRL.
+        This method now correctly creates and uses an easy-rsa 'vars' file.
+        """
         print("[2/7] Setting up Public Key Infrastructure (PKI)...")
         if os.path.exists(self.EASYRSA_DIR):
              shutil.rmtree(self.EASYRSA_DIR)
@@ -70,35 +75,38 @@ class OpenVPNManager(IBackupable):
         os.chmod(easyrsa_script_path, 0o755)
 
         os.chdir(self.EASYRSA_DIR)
+        
+        # Create a 'vars' file to configure Easy-RSA with modern settings
+        with open("vars", "w") as f:
+            f.write('set_var EASYRSA_ALGO "ec"\n')
+            f.write('set_var EASYRSA_CURVE "secp384r1"\n')
+            # Generate a unique, random CN for the CA to avoid conflicts
+            random_cn = f"cn_{os.urandom(12).hex()}"
+            f.write(f'set_var EASYRSA_REQ_CN "{random_cn}"\n')
+
         subprocess.run(["./easyrsa", "init-pki"], check=True, capture_output=True)
         subprocess.run(["./easyrsa", "--batch", "build-ca", "nopass"], check=True, capture_output=True)
         subprocess.run(["./easyrsa", "--batch", "build-server-full", "server-cert", "nopass"], check=True, capture_output=True)
-        subprocess.run(["./easyrsa", "gen-dh"], check=True, capture_output=True)
-        
-        # CRITICAL: Generate the initial CRL file required for the server to start.
+        subprocess.run(["./easyrsa", "gen-dh"], check=True, capture_output=True) # DH is still needed for compatibility
         subprocess.run(["./easyrsa", "gen-crl"], check=True, capture_output=True)
 
-        # Copy all necessary files to /etc/openvpn
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
         shutil.copy(f"{self.PKI_DIR}/issued/server-cert.crt", f"{self.OPENVPN_DIR}/server-cert.crt")
         shutil.copy(f"{self.PKI_DIR}/private/ca.key", self.OPENVPN_DIR)
         shutil.copy(f"{self.PKI_DIR}/private/server-cert.key", f"{self.OPENVPN_DIR}/server-cert.key")
         shutil.copy(f"{self.PKI_DIR}/dh.pem", self.OPENVPN_DIR)
-        shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR) # Copy the newly created CRL
+        shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR)
 
     def _generate_server_configs(self):
         print("[3/7] Generating server configurations...")
         os.makedirs(self.SERVER_CONFIG_DIR, exist_ok=True)
-        
         for path in ["/var/log/openvpn", "/var/run/openvpn"]:
             os.makedirs(path, exist_ok=True)
             shutil.chown(path, user="nobody", group="nogroup")
-
         base_config = self._get_base_config()
         cert_config = base_config.format(port=self.settings["cert_port"], proto=self.settings["cert_proto"], extra_auth="")
         with open(f"{self.SERVER_CONFIG_DIR}/server-cert.conf", "w") as f:
             f.write(cert_config)
-
         login_config = base_config.format(port=self.settings["login_port"], proto=self.settings["login_proto"], extra_auth='plugin /usr/lib/openvpn/openvpn-plugin-auth-pam.so openvpn\nverify-client-cert none')
         with open(f"{self.SERVER_CONFIG_DIR}/server-login.conf", "w") as f:
             f.write(login_config)
@@ -109,7 +117,6 @@ class OpenVPNManager(IBackupable):
         check_command = f"iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE"
         if subprocess.run(check_command, shell=True, capture_output=True).returncode != 0:
             subprocess.run(f"iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE", shell=True, check=True)
-        
         os.makedirs(os.path.dirname(self.FIREWALL_RULES_V4), exist_ok=True)
         subprocess.run(f"iptables-save > {self.FIREWALL_RULES_V4}", shell=True, check=True)
 
@@ -124,21 +131,11 @@ class OpenVPNManager(IBackupable):
 
     def _setup_pam(self):
         print("[6/7] Configuring PAM for OpenVPN...")
-        pam_config = "auth required pam_unix.so shadow nodelay\naccount required pam_unix.so\n"
         with open("/etc/pam.d/openvpn", "w") as f:
-            f.write(pam_config)
-
-    def _setup_unbound(self):
-        # Implementation for Unbound setup
-        pass
+            f.write("auth required pam_unix.so shadow nodelay\naccount required pam_unix.so\n")
 
     def _start_openvpn_services(self, silent=False):
-        """Enables and starts the two OpenVPN systemd services."""
-        if not silent:
-            print("[7/7] Starting OpenVPN services...")
-        
-        # On modern systems, a restart is often required if the service fails to start initially.
-        # We try to restart instead of just starting.
+        print("[7/7] Starting OpenVPN services...")
         commands = [
             ["systemctl", "daemon-reload"],
             ["systemctl", "enable", "openvpn-server@server-cert"],
@@ -151,7 +148,7 @@ class OpenVPNManager(IBackupable):
 
     def create_user_certificate(self, username: str):
         os.chdir(self.EASYRSA_DIR)
-        subprocess.run(["./easyrsa", "--batch", "build-client-full", username, "nopass"], check=True, capture_output=True)
+        subprocess.run(["./easyrsa", "build-client-full", username, "nopass"], check=True, capture_output=True)
 
     def revoke_user_certificate(self, username: str):
         cert_path = f"{self.PKI_DIR}/issued/{username}.crt"
@@ -164,6 +161,11 @@ class OpenVPNManager(IBackupable):
         self._start_openvpn_services(silent=True)
 
     def generate_user_config(self, username: str) -> str:
+        """Generates a clean .ovpn config by extracting only the PEM blocks."""
+        ca_cert = self._read_pem_block(f"{self.OPENVPN_DIR}/ca.crt", "CERTIFICATE")
+        user_cert = self._read_pem_block(f"{self.PKI_DIR}/issued/{username}.crt", "CERTIFICATE")
+        user_key = self._read_pem_block(f"{self.PKI_DIR}/private/{username}.key", "PRIVATE KEY")
+
         client_config_template = f"""
 client
 dev tun
@@ -177,52 +179,32 @@ remote-cert-tls server
 cipher {self.settings.get("cipher", "AES-256-GCM")}
 verb 3
 <ca>
-{self._read_file(f"{self.OPENVPN_DIR}/ca.crt")}
+{ca_cert}
 </ca>
 <cert>
-{self._read_file(f"{self.PKI_DIR}/issued/{username}.crt")}
+{user_cert}
 </cert>
 <key>
-{self._read_file(f"{self.PKI_DIR}/private/{username}.key")}
+{user_key}
 </key>
 """
         return client_config_template
+
+    def get_shared_config(self) -> str:
+        """
+        Returns the shared, login-based OpenVPN configuration.
+        It replaces placeholders with actual server settings.
+        """
+        config = SHARED_CONFIG
+        config = config.replace("{{SERVER_IP}}", self.settings.get("public_ip", "YOUR_SERVER_IP"))
+        config = config.replace("{{LOGIN_PORT}}", self.settings.get("login_port", "1195"))
+        config = config.replace("{{LOGIN_PROTO}}", self.settings.get("login_proto", "udp"))
+        return config
 
     def uninstall_openvpn(self):
         print("▶️  Starting uninstallation...")
         subprocess.run(["systemctl", "stop", "openvpn-server@server-cert"], check=False, capture_output=True)
         subprocess.run(["systemctl", "stop", "openvpn-server@server-login"], check=False, capture_output=True)
-        subprocess.run(["systemctl", "disable", "openvpn-server@server-cert"], check=False, capture_output=True)
-        subprocess.run(["systemctl", "disable", "openvpn-server@server-login"], check=False, capture_output=True)
-        if os.path.exists(self.SETTINGS_FILE):
-             os.remove(self.SETTINGS_FILE)
-        if os.path.exists(self.OPENVPN_DIR):
-            shutil.rmtree(self.OPENVPN_DIR)
-        if os.path.exists("/etc/pam.d/openvpn"):
-            os.remove("/etc/pam.d/openvpn")
-        if os.path.exists(self.FIREWALL_RULES_V4):
-            os.remove(self.FIREWALL_RULES_V4)
-        for path in ["/var/log/openvpn", "/var/run/openvpn"]:
-            if os.path.exists(path):
-                shutil.rmtree(path)
-        packages = ["openvpn", "easy-rsa", "iptables-persistent"]
-        if os.path.exists("/etc/unbound"):
-            packages.append("unbound")
-        subprocess.run(["apt-get", "remove", "--purge", "-y"] + packages, check=True, capture_output=True)
-        subprocess.run(["apt-get", "autoremove", "-y"], check=True, capture_output=True)
-        print("✅ Uninstallation complete.")
-
-    def get_backup_assets(self) -> list[str]:
-        # ... (implementation)
-        pass
-
-    def pre_restore(self):
-        # ... (implementation)
-        pass
-
-    def post_restore(self):
-        # ... (implementation)
-        pass
 
     def _get_base_config(self) -> str:
         dns_lines = {
@@ -232,7 +214,6 @@ verb 3
             "4": 'push "dhcp-option DNS 8.8.8.8"\npush "dhcp-option DNS 8.8.4.4"',
             "5": 'push "dhcp-option DNS 94.140.14.14"\npush "dhcp-option DNS 94.140.15.15"'
         }.get(self.settings.get("dns", "3"), "")
-
         return f"""
 port {{port}}
 proto {{proto}}
@@ -258,6 +239,25 @@ verb 3
 {{extra_auth}}
 """
 
+    def _read_pem_block(self, file_path: str, block_name: str) -> str:
+        """
+        Reads a file and extracts a specific PEM block (e.g., CERTIFICATE, PRIVATE KEY).
+        Returns an empty string if the block is not found.
+        """
+        try:
+            with open(file_path, 'r') as f:
+                full_content = f.read()
+            
+            # Regex to find the PEM block
+            pem_regex = re.compile(f"-----BEGIN {block_name}-----(.*?)-----END {block_name}-----", re.DOTALL)
+            match = pem_regex.search(full_content)
+            if match:
+                # Return the full block including headers/footers
+                return match.group(0).strip()
+            return "" # Block not found
+        except IOError:
+            return ""
+
     def _get_primary_interface(self) -> str:
         try:
             result = subprocess.run("ip route get 8.8.8.8 | awk '{print $5; exit}'", shell=True, capture_output=True, text=True, check=True)
@@ -265,7 +265,7 @@ verb 3
         except Exception:
             return "eth0"
             
-    def _read_file(self, path: str) -> str:
+    def _read_file(self, path: str) -> str: # This is kept for non-PEM reading if needed elsewhere
         if os.path.exists(path):
             with open(path, "r") as f:
                 return f.read().strip()
