@@ -13,8 +13,8 @@ sys.path.insert(0, project_root)
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
 from service.user_service import UserService
-from data.user_repository import UserRepository
 from data.db import Database
+from data.user_repository import UserRepository
 from core.backup_service import BackupService
 
 def get_install_settings():
@@ -308,6 +308,22 @@ def uninstall_flow(openvpn_manager: OpenVPNManager):
     confirm = input("This will completely remove OpenVPN. Are you sure? (y/n): ").strip().lower()
     if confirm == 'y':
         try:
+            # Remove all users first
+            print("🗑️  Removing all VPN users...")
+            db = Database()
+            user_repo = UserRepository(db)
+            login_manager = LoginUserManager()
+            user_service = UserService(user_repo, openvpn_manager, login_manager)
+            
+            users = user_service.get_all_users()
+            unique_users = set()
+            for user in users:
+                unique_users.add(user['username'])
+            
+            for username in unique_users:
+                print(f"   Removing user: {username}")
+                user_service.remove_user(username)
+            
             openvpn_manager.uninstall_openvpn()
             print("✅ Uninstallation completed successfully. Exiting now.")
             sys.exit(0)
