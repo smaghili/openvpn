@@ -54,7 +54,8 @@ function install_deployment() {
     echo "--------------------------------------------------------"
     # We must use the python from the venv but run it with sudo
     # so that it has the necessary permissions for system-wide changes.
-    sudo "venv/bin/python" cli/main.py
+    # The -m flag runs the package as a script, ensuring correct module resolution.
+    sudo "venv/bin/python" -m cli.main
 
     echo "--------------------------------------------------------"
     echo "✅ Deployment script finished. The application has now taken over."
