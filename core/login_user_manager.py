@@ -40,18 +40,19 @@ class LoginUserManager(IBackupable):
 
     def remove_user(self, username: str):
         """
-        Removes an existing system user.
+        Removes an existing system user silently.
+        Standard output and error are redirected to DEVNULL to suppress messages.
         """
-        print(f"... Removing system user '{username}'")
         try:
             # userdel will fail if the user doesn't exist, which is fine.
+            # We redirect stdout and stderr to os.devnull to keep the output clean.
             subprocess.run(
                 ["userdel", "-r", username],
-                check=False, capture_output=True
+                check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
-        except subprocess.CalledProcessError as e:
-            # We don't want to stop the process if user deletion fails, just warn.
-            print(f"      -> Warning: Could not remove system user '{username}': {e.stderr}")
+        except Exception:
+            # We don't want to stop the main process for any reason here.
+            pass
 
     # --- IBackupable Interface Implementation ---
 

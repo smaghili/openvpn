@@ -74,18 +74,18 @@ class OpenVPNManager(IBackupable):
 
         # Create PKI and CA
         os.chdir(self.EASYRSA_DIR)
-        subprocess.run(["./easyrsa", "init-pki"], check=True)
+        subprocess.run(["./easyrsa", "init-pki"], check=True, capture_output=True)
         # The 'nopass' option is critical for an unattended server setup
-        subprocess.run(["./easyrsa", "--batch", "build-ca", "nopass"], check=True)
+        subprocess.run(["./easyrsa", "--batch", "build-ca", "nopass"], check=True, capture_output=True)
 
         # Generate server certificate and key
         # Note: The commonName for the server is set directly here.
         subprocess.run(
             ["./easyrsa", "--batch", "build-server-full", "server-cert", "nopass"],
-            check=True
+            check=True, capture_output=True
         )
         # Generate Diffie-Hellman parameters
-        subprocess.run(["./easyrsa", "gen-dh"], check=True)
+        subprocess.run(["./easyrsa", "gen-dh"], check=True, capture_output=True)
 
         # Copy essential files to the OpenVPN directory
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
@@ -138,7 +138,7 @@ class OpenVPNManager(IBackupable):
         with open("/etc/sysctl.conf", "a") as f:
             f.write("\nnet.ipv4.ip_forward=1\n")
         # Apply changes immediately
-        subprocess.run(["sysctl", "-p"], check=True)
+        subprocess.run(["sysctl", "-p"], check=True, capture_output=True)
 
     def _setup_pam(self):
         """Configures PAM for OpenVPN login authentication."""
@@ -191,39 +191,61 @@ forward-zone:
         subprocess.run(["systemctl", "restart", "unbound"], check=True)
         subprocess.run(["systemctl", "enable", "unbound"], check=True)
 
-    def _start_openvpn_services(self):
-        """Enables and starts the two OpenVPN systemd services."""
-        print("[7/7] Starting OpenVPN services...")
-        subprocess.run(["systemctl", "daemon-reload"], check=True)
-        subprocess.run(["systemctl", "enable", "openvpn-server@server-cert"], check=True)
-        subprocess.run(["systemctl", "enable", "openvpn-server@server-login"], check=True)
-        subprocess.run(["systemctl", "restart", "openvpn-server@server-cert"], check=True)
-        subprocess.run(["systemctl", "restart", "openvpn-server@server-login"], check=True)
+    def _start_openvpn_services(self, silent=False):
+        """
+        Enables and starts the two OpenVPN systemd services.
+        Can be run in silent mode to suppress output.
+        """
+        if not silent:
+            print("[7/7] Starting OpenVPN services...")
+        
+        capture = silent # Capture output if in silent mode
+        subprocess.run(["systemctl", "daemon-reload"], check=True, capture_output=capture)
+        subprocess.run(["systemctl", "enable", "openvpn-server@server-cert"], check=True, capture_output=capture)
+        subprocess.run(["systemctl", "enable", "openvpn-server@server-login"], check=True, capture_output=capture)
+        subprocess.run(["systemctl", "restart", "openvpn-server@server-cert"], check=True, capture_output=capture)
+        subprocess.run(["systemctl", "restart", "openvpn-server@server-login"], check=True, capture_output=capture)
 
     # --- User Management ---
 
     def create_user_certificate(self, username: str):
         """
-        Generates a certificate for a new user.
-        The commonName for the certificate is taken from the 'username' argument.
+        Generates a certificate for a new user silently.
         """
         os.chdir(self.EASYRSA_DIR)
-        # In modern Easy-RSA, the common name is the primary argument, and --req-cn is not needed.
         subprocess.run(
             ["./easyrsa", "--batch", "build-client-full", username, "nopass"],
-            check=True
+            check=True, capture_output=True
         )
 
     def revoke_user_certificate(self, username: str):
-        """Revokes an existing user's certificate."""
+        """
+        Revokes a user's certificate if it exists, silently.
+        This method is now idempotent and will not fail if the user does not exist.
+        """
+        cert_path = f"{self.PKI_DIR}/issued/{username}.crt"
+        
+        if not os.path.exists(cert_path):
+            return # Silently exit if no certificate is found
+
         os.chdir(self.EASYRSA_DIR)
-        subprocess.run(["./easyrsa", "--batch", "revoke", username], check=True)
-        # Generate a new Certificate Revocation List (CRL)
-        subprocess.run(["./easyrsa", "gen-crl"], check=True)
-        # Copy the new CRL to the OpenVPN directory
-        shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR)
-        # Restart services to apply the new CRL
-        self._start_openvpn_services()
+        # Suppress output from all easy-rsa and systemd commands during revocation
+        subprocess.run(
+            ["./easyrsa", "--batch", "revoke", username],
+            check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        
+        subprocess.run(
+            ["./easyrsa", "gen-crl"],
+            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        
+        crl_path = f"{self.PKI_DIR}/crl.pem"
+        if os.path.exists(crl_path):
+            shutil.copy(crl_path, self.OPENVPN_DIR)
+        
+        # Restart services silently to apply the new CRL
+        self._start_openvpn_services(silent=True)
 
     def generate_user_config(self, username: str) -> str:
         """Generates the .ovpn configuration file for a user."""
@@ -259,13 +281,13 @@ verb 3
         print("▶️  Starting uninstallation...")
         
         # Stop and disable services
-        subprocess.run(["systemctl", "stop", "openvpn-server@server-cert"], check=False)
-        subprocess.run(["systemctl", "stop", "openvpn-server@server-login"], check=False)
-        subprocess.run(["systemctl", "disable", "openvpn-server@server-cert"], check=False)
-        subprocess.run(["systemctl", "disable", "openvpn-server@server-login"], check=False)
+        subprocess.run(["systemctl", "stop", "openvpn-server@server-cert"], check=False, capture_output=True)
+        subprocess.run(["systemctl", "stop", "openvpn-server@server-login"], check=False, capture_output=True)
+        subprocess.run(["systemctl", "disable", "openvpn-server@server-cert"], check=False, capture_output=True)
+        subprocess.run(["systemctl", "disable", "openvpn-server@server-login"], check=False, capture_output=True)
         if os.path.exists("/etc/unbound/unbound.conf.d/openvpn.conf"):
-             subprocess.run(["systemctl", "stop", "unbound"], check=False)
-             subprocess.run(["systemctl", "disable", "unbound"], check=False)
+             subprocess.run(["systemctl", "stop", "unbound"], check=False, capture_output=True)
+             subprocess.run(["systemctl", "disable", "unbound"], check=False, capture_output=True)
 
         # Remove configuration files and directories
         if os.path.exists(self.OPENVPN_DIR):

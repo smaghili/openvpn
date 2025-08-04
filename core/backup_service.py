@@ -39,11 +39,16 @@ class BackupService:
             # 2. Copy assets to the temporary directory
             for asset_path in all_assets:
                 if os.path.exists(asset_path):
-                    destination = os.path.join(tmp_dir, os.path.basename(asset_path))
+                    # To preserve the directory structure (e.g., /etc/openvpn), we need to handle paths carefully.
+                    # We will copy the contents into a structure inside tmp_dir that mimics the root.
+                    # Example: /etc/openvpn/server.conf -> /tmp/backup_tmp/etc/openvpn/server.conf
+                    dest_path = os.path.join(tmp_dir, asset_path.lstrip('/'))
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
                     if os.path.isdir(asset_path):
-                        shutil.copytree(asset_path, destination)
+                        shutil.copytree(asset_path, dest_path, dirs_exist_ok=True)
                     else:
-                        shutil.copy2(asset_path, destination)
+                        shutil.copy2(asset_path, dest_path)
                 else:
                     print(f"⚠️  Warning: Asset not found and will be skipped: {asset_path}")
 
@@ -53,7 +58,7 @@ class BackupService:
             tar_path = os.path.join(backup_path, tar_filename)
             print(f"🗜️ Compressing assets into {tar_filename}...")
             with tarfile.open(tar_path, "w:gz") as tar:
-                tar.add(tmp_dir, arcname='.') # Add contents directly
+                tar.add(tmp_dir, arcname='/') # Add contents preserving the structure from root
 
             # 4. Encrypt the tarball
             print("🔒 Encrypting backup file...")
@@ -82,7 +87,7 @@ class BackupService:
                 shutil.rmtree(tmp_dir)
             raise RuntimeError(f"Backup creation failed: {e}")
 
-    def restore_from_backup(self, gpg_path: str, password: str):
+    def restore_system(self, gpg_path: str, password: str):
         """
         Restores the entire system from an encrypted backup.
         1. Calls the pre-restore hook for all services (e.g., to stop daemons).
@@ -114,7 +119,7 @@ class BackupService:
             process = subprocess.Popen(gpg_command, stdin=subprocess.PIPE, text=True, stderr=subprocess.PIPE)
             _, stderr = process.communicate(input=password)
             if process.returncode != 0:
-                if "bad passphrase" in stderr:
+                if "bad passphrase" in stderr.lower():
                     raise ValueError("Decryption failed. Incorrect password.")
                 raise RuntimeError(f"GPG decryption failed: {stderr}")
 
@@ -123,23 +128,12 @@ class BackupService:
             for service in self.services:
                 service.pre_restore()
 
-            # 3. Extract the tarball and replace files
-            print("📦 Extracting and restoring files...")
-            extract_dir = os.path.join(tmp_dir, "extracted")
+            # 3. Extract the tarball to the root directory
+            print("📦 Extracting and restoring files to / ...")
             with tarfile.open(tar_path, "r:gz") as tar:
-                tar.extractall(path=extract_dir)
-
-            for item in os.listdir(extract_dir):
-                src_path = os.path.join(extract_dir, item)
-                dest_path = f"/{item}" if item.startswith("etc") else f"./{item}"
-                
-                # Clean up destination before moving
-                if os.path.isdir(dest_path):
-                    shutil.rmtree(dest_path)
-                elif os.path.isfile(dest_path):
-                    os.remove(dest_path)
-
-                shutil.move(src_path, dest_path)
+                # This is a critical step: extract directly to the root filesystem.
+                # This requires running the script as root.
+                tar.extractall(path="/")
 
             # 4. Call post-restore hooks
             print("🚀 Finalizing restore (restarting services)...")

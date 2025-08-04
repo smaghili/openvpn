@@ -35,7 +35,16 @@ class UserService(IBackupable):
         return client_config
 
     def remove_user(self, username):
-        """Removes a user from all systems (certificate and system user)."""
+        """
+        Removes a user from all systems (certificate and system user).
+        It first checks if the user exists in the database to provide a clear message.
+        """
+        # First, check if the user exists in our database.
+        db_user_records = self.user_repo.get_user_by_username(username)
+        if not db_user_records:
+            print(f"User '{username}' not found.")
+            return
+
         print(f"Removing user '{username}'...")
         
         # 1. Revoke certificate
@@ -53,8 +62,11 @@ class UserService(IBackupable):
         """Retrieves all users from the database."""
         return self.user_repo.get_all_users()
 
-    def get_user_config(self, username):
-        """Retrieves a specific user's certificate-based configuration."""
+    def get_user_config(self, username: str):
+        """
+        Retrieves a specific user's certificate-based configuration.
+        """
+        # We specifically look for the 'certificate' type entry for the user.
         user = self.user_repo.get_user_by_username(username, auth_type="certificate")
         if user:
             return user.get("config_data")
