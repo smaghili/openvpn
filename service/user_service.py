@@ -25,7 +25,7 @@ class UserService(IBackupable):
         
         self.openvpn_manager.create_user_certificate(username)
         
-        cert_content = self.openvpn_manager._read_file(f"{self.openvpn_manager.PKI_DIR}/issued/{username}.crt")
+        cert_content = self.openvpn_manager._extract_certificate(f"{self.openvpn_manager.PKI_DIR}/issued/{username}.crt")
         key_content = self.openvpn_manager._read_file(f"{self.openvpn_manager.PKI_DIR}/private/{username}.key")
         
         if not cert_content or not key_content:

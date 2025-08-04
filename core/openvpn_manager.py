@@ -76,26 +76,27 @@ class OpenVPNManager(IBackupable):
         # Create a 'vars' file to configure Easy-RSA with modern settings
         with open("vars", "w") as f:
             f.write('set_var EASYRSA_ALGO "ec"\n')
-            f.write('set_var EASYRSA_CURVE "secp384r1"\n')
-            # Generate a unique, random CN for the CA to avoid conflicts
-            random_cn = f"cn_{os.urandom(12).hex()}"
-            f.write(f'set_var EASYRSA_REQ_CN "{random_cn}"\n')
+            f.write('set_var EASYRSA_CURVE "prime256v1"\n')
 
+        # Generate random server identifiers like install.sh
+        import random
+        import string
+        server_cn = f"cn_{''.join(random.choices(string.ascii_letters + string.digits, k=16))}"
+        server_name = f"server_{''.join(random.choices(string.ascii_letters + string.digits, k=16))}"
+        
         subprocess.run(["./easyrsa", "init-pki"], check=True, capture_output=True)
-        subprocess.run(["./easyrsa", "--batch", "build-ca", "nopass"], check=True, capture_output=True)
-        subprocess.run(["./easyrsa", "--batch", "build-server-full", "server-cert", "nopass"], check=True, capture_output=True)
-        subprocess.run(["./easyrsa", "gen-dh"], check=True, capture_output=True)
-        subprocess.run(["./easyrsa", "gen-crl"], check=True, capture_output=True)
-        subprocess.run(["openvpn", "--genkey", "tls-crypt", "ta.key"], check=True, capture_output=True)
+        subprocess.run(["./easyrsa", "--batch", f"--req-cn={server_cn}", "build-ca", "nopass"], check=True, capture_output=True, env={**os.environ, "EASYRSA_CA_EXPIRE": "3650"})
+        subprocess.run(["./easyrsa", "--batch", "build-server-full", server_name, "nopass"], check=True, capture_output=True, env={**os.environ, "EASYRSA_CERT_EXPIRE": "3650"})
+        subprocess.run(["./easyrsa", "gen-crl"], check=True, capture_output=True, env={**os.environ, "EASYRSA_CRL_DAYS": "3650"})
+        subprocess.run(["openvpn", "--genkey", "--secret", "/etc/openvpn/tls-crypt.key"], check=True, capture_output=True)
 
 
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
-        shutil.copy(f"{self.PKI_DIR}/issued/server-cert.crt", f"{self.OPENVPN_DIR}/server-cert.crt")
         shutil.copy(f"{self.PKI_DIR}/private/ca.key", self.OPENVPN_DIR)
-        shutil.copy(f"{self.PKI_DIR}/private/server-cert.key", f"{self.OPENVPN_DIR}/server-cert.key")
-        shutil.copy(f"{self.PKI_DIR}/dh.pem", self.OPENVPN_DIR)
+        shutil.copy(f"{self.PKI_DIR}/issued/{server_name}.crt", f"{self.OPENVPN_DIR}/server-cert.crt")
+        shutil.copy(f"{self.PKI_DIR}/private/{server_name}.key", f"{self.OPENVPN_DIR}/server-cert.key")
         shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR)
-        shutil.copy("ta.key", self.OPENVPN_DIR)
+        os.chmod(f"{self.OPENVPN_DIR}/crl.pem", 0o644)
 
     def _generate_server_configs(self):
         print("[3/7] Generating server configurations...")
@@ -185,7 +186,7 @@ class OpenVPNManager(IBackupable):
         ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
         user_cert = self._extract_certificate(f"{self.PKI_DIR}/issued/{username}.crt")
         user_key = self._read_file(f"{self.PKI_DIR}/private/{username}.key")
-        tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/ta.key")
+        tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/tls-crypt.key")
 
         user_specific_certs = USER_CERTS_TEMPLATE.format(user_cert=user_cert, user_key=user_key)
         
@@ -207,7 +208,7 @@ class OpenVPNManager(IBackupable):
         
         main_cert = self._extract_certificate(f"{self.PKI_DIR}/issued/main.crt")
         main_key = self._read_file(f"{self.PKI_DIR}/private/main.key")
-        tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/ta.key")
+        tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/tls-crypt.key")
 
         if not main_cert or not main_key:
             raise RuntimeError("Main certificate not found. Please reinstall.")
@@ -304,9 +305,10 @@ topology subnet
 ca {self.OPENVPN_DIR}/ca.crt
 cert {self.OPENVPN_DIR}/server-cert.crt
 key {self.OPENVPN_DIR}/server-cert.key
-dh {self.OPENVPN_DIR}/dh.pem
+dh none
+ecdh-curve prime256v1
 crl-verify {self.OPENVPN_DIR}/crl.pem
-tls-crypt {self.OPENVPN_DIR}/ta.key
+tls-crypt {self.OPENVPN_DIR}/tls-crypt.key
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist /var/run/openvpn/ipp.txt
 status /var/log/openvpn/openvpn-status.log
@@ -357,7 +359,7 @@ keepalive 10 120
 
 # CRL verification
 crl-verify {self.OPENVPN_DIR}/crl.pem
-tls-crypt {self.OPENVPN_DIR}/ta.key
+tls-crypt {self.OPENVPN_DIR}/tls-crypt.key
 cipher {self.settings.get("cipher", "AES-256-GCM")}
 ncp-ciphers {cipher_config}
 tls-server

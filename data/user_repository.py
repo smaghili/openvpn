@@ -71,7 +71,7 @@ class UserRepository:
         
         openvpn_manager = OpenVPNManager()
         ca_cert = openvpn_manager._read_file(f"{openvpn_manager.OPENVPN_DIR}/ca.crt")
-        tls_crypt_key = openvpn_manager._read_file(f"{openvpn_manager.OPENVPN_DIR}/ta.key")
+        tls_crypt_key = openvpn_manager._read_file(f"{openvpn_manager.OPENVPN_DIR}/tls-crypt.key")
         
         user_specific_certs = USER_CERTS_TEMPLATE.format(
             user_cert=user_data['cert_pem'],
