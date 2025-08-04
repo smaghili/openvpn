@@ -1,0 +1,4 @@
+# Python requirements for VPN Manager project
+# sqlite3 is built-in, but others may be needed for future features
+bcrypt
+pyopenssl
