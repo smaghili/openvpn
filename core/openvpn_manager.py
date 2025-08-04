@@ -87,7 +87,7 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["./easyrsa", "gen-dh"], check=True, capture_output=True)
         subprocess.run(["./easyrsa", "gen-crl"], check=True, capture_output=True)
         subprocess.run(["openvpn", "--genkey", "tls-crypt", "ta.key"], check=True, capture_output=True)
-        subprocess.run(["./easyrsa", "--batch", "build-client-full", "shared-login-client", "nopass"], check=True, capture_output=True)
+        subprocess.run(["./easyrsa", "--batch", "build-client-full", "main", "nopass"], check=True, capture_output=True)
 
 
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
@@ -102,7 +102,7 @@ class OpenVPNManager(IBackupable):
         print("[3/7] Generating server configurations...")
         os.makedirs(self.SERVER_CONFIG_DIR, exist_ok=True)
         
-        for path in ["/var/log/openvpn", "/var/run/openvpn"]:
+        for path in ["/var/log/openvpn", "/var/run/openvpn", "/etc/openvpn/ccd"]:
             os.makedirs(path, exist_ok=True)
             shutil.chown(path, user="nobody", group="nogroup")
 
@@ -111,16 +111,23 @@ class OpenVPNManager(IBackupable):
         with open(f"{self.SERVER_CONFIG_DIR}/server-cert.conf", "w") as f:
             f.write(cert_config)
 
-        login_config = base_config.format(port=self.settings["login_port"], proto=self.settings["login_proto"], extra_auth='plugin /usr/lib/openvpn/openvpn-plugin-auth-pam.so openvpn\nverify-client-cert none')
+        login_config = self._get_login_config()
         with open(f"{self.SERVER_CONFIG_DIR}/server-login.conf", "w") as f:
             f.write(login_config)
 
     def _setup_firewall_rules(self):
         print("[4/7] Setting up firewall rules...")
         net_interface = self._get_primary_interface()
+        
+        # Certificate-based server (10.8.0.0/24)
         check_command = f"iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE"
         if subprocess.run(check_command, shell=True, capture_output=True).returncode != 0:
             subprocess.run(f"iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE", shell=True, check=True)
+        
+        # Login-based server (10.9.0.0/24)
+        check_command = f"iptables -t nat -C POSTROUTING -s 10.9.0.0/24 -o {net_interface} -j MASQUERADE"
+        if subprocess.run(check_command, shell=True, capture_output=True).returncode != 0:
+            subprocess.run(f"iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o {net_interface} -j MASQUERADE", shell=True, check=True)
         
         os.makedirs(os.path.dirname(self.FIREWALL_RULES_V4), exist_ok=True)
         subprocess.run(f"iptables-save > {self.FIREWALL_RULES_V4}", shell=True, check=True)
@@ -176,9 +183,8 @@ class OpenVPNManager(IBackupable):
         self._start_openvpn_services(silent=True)
 
     def generate_user_config(self, username: str) -> str:
-        """Generates a dynamic, certificate-based .ovpn config."""
         ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
-        user_cert = self._read_file(f"{self.PKI_DIR}/issued/{username}.crt")
+        user_cert = self._extract_certificate(f"{self.PKI_DIR}/issued/{username}.crt")
         user_key = self._read_file(f"{self.PKI_DIR}/private/{username}.key")
         tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/ta.key")
 
@@ -194,35 +200,48 @@ class OpenVPNManager(IBackupable):
         )
 
     def get_shared_config(self) -> str:
-        """
-        Generates a dynamic, shared login-based .ovpn config, mirroring the
-        secure two-layer authentication logic from the original install.sh.
-        This config uses a dedicated, shared client certificate to establish
-        the TLS tunnel, and then prompts for username/password.
-        """
         ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
-        shared_client_cert = self._read_file(f"{self.PKI_DIR}/issued/shared-login-client.crt")
-        shared_client_key = self._read_file(f"{self.PKI_DIR}/private/shared-login-client.key")
+        main_cert = self._extract_certificate(f"{self.PKI_DIR}/issued/main.crt")
+        main_key = self._read_file(f"{self.PKI_DIR}/private/main.key")
         tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/ta.key")
 
-        if not shared_client_cert or not shared_client_key:
-            raise RuntimeError("The necessary 'shared-login-client' certificate and key have not been generated. Please reinstall the application.")
-            
-        user_specific_certs = USER_CERTS_TEMPLATE.format(
-            user_cert=shared_client_cert, 
-            user_key=shared_client_key
-        )
+        if not main_cert or not main_key:
+            raise RuntimeError("Main certificate not found. Please reinstall.")
 
-        client_config = CLIENT_TEMPLATE.format(
-            proto=self.settings.get("login_proto", "udp"),
-            server_ip=self.settings.get("public_ip"),
-            port=self.settings.get("login_port", "1195"),
-            ca_cert=ca_cert,
-            user_specific_certs=user_specific_certs,
-            tls_crypt_key=tls_crypt_key
-        )
+        server_protocol = self.settings.get("login_proto", "udp")
+        server_ip = self.settings.get("public_ip")
+        server_port = self.settings.get("login_port", "1195")
+        cipher = self.settings.get("cipher", "AES-256-GCM")
+        auth = "SHA256"
+
+        config = f"""client
+dev tun
+proto {server_protocol}
+remote {server_ip} {server_port}
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+auth-user-pass
+remote-cert-tls server
+verb 3
+cipher {cipher}
+auth {auth}
+tls-version-min 1.2
+<ca>
+{ca_cert}
+</ca>
+<cert>
+{main_cert}
+</cert>
+<key>
+{main_key}
+</key>
+<tls-crypt>
+{tls_crypt_key}
+</tls-crypt>"""
         
-        return client_config + "\nauth-user-pass"
+        return config
 
     def uninstall_openvpn(self):
         print("▶️  Starting uninstallation...")
@@ -299,6 +318,54 @@ verb 3
 {{extra_auth}}
 """
 
+    def _get_login_config(self) -> str:
+        dns_lines = {
+            "1": "",
+            "2": f'push "dhcp-option DNS 10.9.0.1"',
+            "3": 'push "dhcp-option DNS 1.1.1.1"\npush "dhcp-option DNS 1.0.0.1"',
+            "4": 'push "dhcp-option DNS 8.8.8.8"\npush "dhcp-option DNS 8.8.4.4"',
+            "5": 'push "dhcp-option DNS 94.140.14.14"\npush "dhcp-option DNS 94.140.15.15"'
+        }.get(self.settings.get("dns", "3"), "")
+
+        cipher_config = self.settings.get("cipher", "AES-256-GCM") + ":AES-128-GCM"
+        cc_cipher_config = "TLS-ECDHE-RSA-WITH-AES-256-GCM-SHA384:TLS-ECDHE-RSA-WITH-CHACHA20-POLY1305-SHA256:TLS-ECDHE-RSA-WITH-AES-128-GCM-SHA256:TLS-ECDHE-RSA-WITH-AES-256-CBC-SHA384"
+
+        return f"""port {self.settings["login_port"]}
+proto {self.settings["login_proto"]}
+dev tun1
+ca {self.OPENVPN_DIR}/ca.crt
+cert {self.OPENVPN_DIR}/server-cert.crt
+key {self.OPENVPN_DIR}/server-cert.key
+dh none
+ecdh-curve prime256v1
+server 10.9.0.0 255.255.255.0
+ifconfig-pool-persist ipp-login.txt
+
+# PAM authentication
+plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so openvpn
+username-as-common-name
+verify-client-cert none
+
+push "redirect-gateway def1 bypass-dhcp"
+{dns_lines}
+keepalive 10 120
+
+# CRL verification
+crl-verify {self.OPENVPN_DIR}/crl.pem
+tls-crypt {self.OPENVPN_DIR}/ta.key
+ncp-ciphers {cipher_config}
+tls-server
+tls-version-min 1.2
+tls-cipher {cc_cipher_config}
+client-config-dir /etc/openvpn/ccd
+user nobody
+group nogroup
+persist-key
+persist-tun
+status /var/log/openvpn/status-login.log
+verb 3
+"""
+
     def _get_primary_interface(self) -> str:
         try:
             result = subprocess.run("ip route get 8.8.8.8 | awk '{print $5; exit}'", shell=True, capture_output=True, text=True, check=True)
@@ -310,4 +377,23 @@ verb 3
         if os.path.exists(path):
             with open(path, "r") as f:
                 return f.read().strip()
+        return ""
+    
+    def _extract_certificate(self, path: str) -> str:
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                content = f.read()
+                lines = content.split('\n')
+                cert_lines = []
+                in_cert = False
+                for line in lines:
+                    if 'BEGIN CERTIFICATE' in line:
+                        in_cert = True
+                        cert_lines.append(line)
+                    elif 'END CERTIFICATE' in line:
+                        cert_lines.append(line)
+                        break
+                    elif in_cert:
+                        cert_lines.append(line)
+                return '\n'.join(cert_lines)
         return ""
