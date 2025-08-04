@@ -1,263 +1,274 @@
-import getpass
 import os
-import socket
-import subprocess
+import sys
+from getpass import getpass
 import urllib.request
 
-from core.login_user_manager import LoginUserManager
+# Adjust the Python path to include the project root, allowing for absolute imports
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
 from core.openvpn_manager import OpenVPNManager
-from core.backup_service import BackupService
-from data.db import Database
-from data.protocol_repository import ProtocolRepository
-from data.user_repository import UserRepository
+from core.login_user_manager import LoginUserManager
 from service.user_service import UserService
+from data.user_repository import UserRepository
+from data.db import Database
+from core.backup_service import BackupService
 
-
-def get_default_ip():
-    """Gets the default public IP address of the server."""
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "127.0.0.1"
-
-
-def get_network_interface():
-    """Gets the default network interface."""
-    try:
-        result = subprocess.run(
-            ["ip", "route", "get", "8.8.8.8"], capture_output=True, text=True, check=True
-        )
-        return result.stdout.split("dev")[1].split()[0]
-    except Exception:
-        return "eth0"
-
-
+# --- Installation Flow ---
 def get_install_settings():
-    """Gathers all necessary settings for a new OpenVPN installation."""
-    print("🚀 Welcome to the OpenVPN Dual-Auth Installer!")
+    """
+    Interactively gathers all necessary settings for the initial installation.
+    This function is designed to be self-contained and easy to understand.
+    """
     settings = {}
-    default_ip = get_default_ip()
-    settings["server_ip"] = input(f"Server IP address [{default_ip}]: ").strip() or default_ip
+    print("--- Initial VPN Setup ---")
+    
+    # 1. Detect public IP
+    try:
+        public_ip = urllib.request.urlopen('https://api.ipify.org').read().decode('utf8')
+        print(f"Detected Public IP: {public_ip}")
+        settings["public_ip"] = input(f"Enter Public IP or press Enter to use detected IP [{public_ip}]: ").strip() or public_ip
+    except Exception as e:
+        print(f"Could not auto-detect public IP: {e}")
+        settings["public_ip"] = input("Please enter the server's public IP address: ").strip()
 
-    print("\\n--- Certificate Server (for advanced users) ---")
+    # 2. Ports and Protocol for Certificate-based Auth
+    print("\n--- Certificate-based Authentication ---")
     settings["cert_port"] = input("Port [1194]: ").strip() or "1194"
-    settings["cert_proto"] = input("Protocol (udp/tcp) [udp]: ").strip().lower() or "udp"
+    settings["cert_proto"] = input("Protocol (udp/tcp) [udp]: ").strip() or "udp"
 
-    print("\\n--- Login Server (for simple users) ---")
+    # 3. Ports and Protocol for Login-based Auth
+    print("\n--- Username/Password-based Authentication ---")
     settings["login_port"] = input("Port [1195]: ").strip() or "1195"
-    settings["login_proto"] = input("Protocol (udp/tcp) [udp]: ").strip().lower() or "udp"
+    settings["login_proto"] = input("Protocol (udp/tcp) [udp]: ").strip() or "udp"
 
-    print("\\n--- DNS Configuration ---")
-    print("1) System DNS\\n2) Unbound (self-hosted)\\n3) Cloudflare\\n4) Google\\n5) AdGuard DNS")
+    # 4. DNS Configuration
+    print("\n--- DNS Configuration ---")
+    print("1) System DNS\n2) Unbound (self-hosted)\n3) Cloudflare\n4) Google\n5) AdGuard DNS")
     dns_choice = ""
     while dns_choice not in ("1", "2", "3", "4", "5"):
         dns_choice = input("DNS [3]: ").strip() or "3"
     settings["dns"] = dns_choice
 
-    print("\\n--- Encryption Settings ---")
-    print("1) AES-128-GCM (Recommended)\\n2) AES-256-GCM\\n3) CHACHA20-POLY1305")
-    cipher_choice = ""
-    while cipher_choice not in ("1", "2", "3"):
-        cipher_choice = input("Cipher [1]: ").strip() or "1"
-    settings["cipher"] = cipher_choice
+    # 5. Encryption Settings
+    print("\n--- Encryption Settings ---")
+    settings["cipher"] = input("Cipher (e.g., AES-256-GCM) [AES-256-GCM]: ").strip() or "AES-256-GCM"
+    settings["cert_size"] = input("Certificate Size (e.g., 2048) [2048]: ").strip() or "2048"
 
-    settings["compression"] = (input("Enable compression? (not recommended) [n]: ").strip().lower() or "n") == "y"
-    settings["ipv6"] = (input("Enable IPv6 support? [n]: ").strip().lower() or "n") == "y"
-    settings["network_interface"] = get_network_interface()
-
-    print("\\n✅ Configuration complete. Ready to install.")
     return settings
 
+def install_flow(openvpn_manager: OpenVPNManager):
+    """Orchestrates the entire installation process."""
+    if os.path.exists("/etc/openvpn/server-cert.conf"):
+        print("Installation already detected. Aborting.")
+        return
 
-def install_flow(openvpn_mgr):
-    """Orchestrates the first-time installation of OpenVPN."""
     settings = get_install_settings()
-    if input("Proceed with installation? [y/n]: ").strip().lower() != "y":
+    
+    print("\nStarting installation with the following settings:")
+    for key, value in settings.items():
+        print(f"  - {key}: {value}")
+    
+    confirm = input("Proceed with installation? (y/n): ").strip().lower()
+    if confirm != 'y':
         print("Installation aborted.")
-        return False
+        return
+
     try:
-        print("🔧 Starting installation...")
-        openvpn_mgr.install_prerequisites()
-        openvpn_mgr.setup_pki()
-        openvpn_mgr.generate_server_configs(settings)
-        openvpn_mgr.setup_firewall_rules(settings)
-        openvpn_mgr.enable_ip_forwarding()
-        openvpn_mgr.setup_pam()
-        openvpn_mgr.start_openvpn_services()
-        if settings["dns"] == "2":
-            # This is a bit of a hack. UnboundManager should be a separate service.
-            # For now, we call it directly from OpenVPNManager.
-            pass # Unbound setup is now part of OpenVPNManager's assets
-        print("\\n🎉 OpenVPN has been successfully installed!")
-        return True
+        # Pass the entire settings dictionary to the manager
+        openvpn_manager.install_openvpn(settings)
+        print("\n✅ Installation completed successfully!")
+        print("You can now manage users from the main menu.")
     except Exception as e:
-        print(f"❌ Installation failed: {e}")
-        return False
+        print(f"\n❌ Installation failed: {e}")
+        sys.exit(1)
 
 
+# --- Management Menu Flows ---
 def print_management_menu():
-    """Prints the user management menu."""
-    print("\\n--- VPN User Manager ---")
-    print("1) Add User")
-    print("2) Remove User")
-    print("3) List Users")
-    print("4) Create System Backup")
-    print("5) Restore from Backup")
-    print("6) Uninstall OpenVPN")
-    print("7) Exit")
+    """Prints the main management menu."""
+    print("\n--- VPN Management Menu ---")
+    print("1. Add a new user")
+    print("2. Remove an existing user")
+    print("3. List all users")
+    print("4. Get a user's config file")
+    print("5. System Backup")
+    print("6. System Restore")
+    print("7. Uninstall VPN")
+    print("8. Exit")
 
+def add_user_flow(user_service: UserService):
+    """Handles the 'add user' workflow."""
+    username = input("Enter username: ").strip()
+    # Ask if this user should have password-based login
+    create_login = input(f"Enable password login for '{username}'? (y/n) [n]: ").strip().lower()
+    password = None
+    if create_login == 'y':
+        password = getpass("Enter a password for the user: ")
 
-def add_user_flow(user_service):
-    """Handles the flow for adding a new user."""
-    username = input("Username: ")
-    if not username:
-        print("Username cannot be empty.")
-        return
-    password = getpass.getpass("Password: ")
     try:
-        user_service.create_user(username, password)
-        print(f"✅ User '{username}' created.")
-        print(f"Certificate config: /etc/openvpn/clients/{username}-cert.ovpn")
-        print(f"Login config: /etc/openvpn/clients/login.ovpn")
+        config_data = user_service.create_user(username, password)
+        if config_data:
+            config_path = os.path.join(os.path.expanduser("~"), f"{username}.ovpn")
+            with open(config_path, "w") as f:
+                f.write(config_data)
+            print(f"✅ User config saved to: {config_path}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error creating user: {e}")
 
-
-def remove_user_flow(user_service):
-    """Handles the flow for removing a user."""
-    username = input("Username to remove: ")
-    if not username:
-        return
+def remove_user_flow(user_service: UserService):
+    """Handles the 'remove user' workflow."""
+    username = input("Enter username to remove: ").strip()
     try:
         user_service.remove_user(username)
-        print("✅ User removed successfully.")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error removing user: {e}")
 
-
-def list_users_flow(user_service):
-    """Handles the flow for listing all users."""
-    users = user_service.list_users()
-    if not users:
-        print("No users found.")
-        return
-    print("\\n--- Registered Users ---")
-    for u in users:
-        print(f"- {u['username']} (status: {u['status']})")
-
-
-def backup_flow(backup_service):
-    """Handles the system backup flow using the dedicated service."""
-    print("This will create a complete, encrypted backup of all system configurations.")
-    password = getpass.getpass("Enter a strong password for the backup file: ")
-    if not password:
-        print("Password cannot be empty. Aborting.")
-        return
-    password_confirm = getpass.getpass("Confirm password: ")
-    if password != password_confirm:
-        print("Passwords do not match. Aborting.")
-        return
+def list_users_flow(user_service: UserService):
+    """Handles the 'list users' workflow."""
     try:
-        backup_service.create_backup(password)
+        users = user_service.get_all_users()
+        if not users:
+            print("No users found.")
+            return
+        print("\n--- User List ---")
+        # Process to show unique usernames with their auth types
+        user_map = {}
+        for user in users:
+            if user['username'] not in user_map:
+                user_map[user['username']] = []
+            user_map[user['username']].append(user['auth_type'])
+        
+        for username, auth_types in user_map.items():
+            print(f"- {username} ({', '.join(auth_types)})")
+
+    except Exception as e:
+        print(f"❌ Error listing users: {e}")
+
+def get_user_config_flow(user_service: UserService):
+    """Handles the 'get user config' workflow."""
+    username = input("Enter username to get config for: ").strip()
+    try:
+        config = user_service.get_user_config(username)
+        if config:
+            print("\n--- User Config ---")
+            print(config)
+        else:
+            print("User or config not found (note: only cert-based users have configs).")
+    except Exception as e:
+        print(f"❌ Error retrieving config: {e}")
+
+def backup_flow(backup_service: BackupService):
+    """Handles the system backup workflow."""
+    try:
+        password = getpass("Enter a password to encrypt the backup: ")
+        if not password:
+            print("Password cannot be empty. Backup cancelled.")
+            return
+        
+        backup_dir = input("Enter backup directory path [~/]: ").strip() or "~/"
+        backup_file = backup_service.create_backup(password, backup_dir)
+        print(f"Backup created at: {backup_file}")
     except Exception as e:
         print(f"❌ Backup failed: {e}")
 
-
-def restore_flow(backup_service):
-    """Handles the system restore flow using the dedicated service."""
-    print("⚠️  WARNING: This will overwrite your current configurations.")
-    path = input("Enter path or URL to the encrypted backup file (.gpg): ").strip()
-    if not path:
+def restore_flow(backup_service: BackupService):
+    """Handles the system restore workflow."""
+    backup_path = input("Enter path to the backup file (local path or URL): ").strip()
+    if not backup_path:
+        print("Backup path cannot be empty. Restore cancelled.")
         return
-    
-    local_path = path
-    if path.startswith(('http://', 'https://')):
+
+    # Handle URL download
+    local_path = backup_path
+    if backup_path.startswith(('http://', 'https://')):
         try:
-            print(f"Downloading backup from {path}...")
-            local_path = "/tmp/system_backup_download.gpg"
-            urllib.request.urlretrieve(path, local_path)
-            print("Download complete.")
+            print(f"Downloading backup from {backup_path}...")
+            local_path = os.path.join("/tmp", os.path.basename(backup_path))
+            urllib.request.urlretrieve(backup_path, local_path)
+            print(f"Download complete. Saved to {local_path}")
         except Exception as e:
-            print(f"❌ Failed to download file: {e}")
+            print(f"❌ Failed to download backup file: {e}")
             return
 
-    password = getpass.getpass("Enter the password for the backup file: ")
-    if not password:
-        print("Password cannot be empty. Aborting.")
-        return
+    password = getpass("Enter the password for the backup file: ")
     try:
-        backup_service.restore_from_backup(local_path, password)
-    except FileNotFoundError:
-        print("❌ Error: Backup file not found.")
-    except (ValueError, RuntimeError) as e:
-        print(f"❌ Error: {e}")
+        backup_service.restore_system(local_path, password)
+        print("✅ System restore completed successfully.")
     except Exception as e:
-        print(f"❌ A critical error occurred during restore: {e}")
+        print(f"❌ Restore failed: {e}")
+        # Critical: Exit if restore fails to prevent running a broken system
+        sys.exit(1)
     finally:
-        if local_path != path and os.path.exists(local_path):
+        # Clean up downloaded file
+        if backup_path.startswith(('http://', 'https://')) and os.path.exists(local_path):
             os.remove(local_path)
 
+def uninstall_flow(openvpn_manager: OpenVPNManager):
+    """Handles the uninstallation workflow."""
+    confirm = input("This will completely remove OpenVPN and all related configurations. Are you sure? (y/n): ").strip().lower()
+    if confirm == 'y':
+        try:
+            openvpn_manager.uninstall_openvpn()
+            print("✅ Uninstallation completed successfully.")
+        except Exception as e:
+            print(f"❌ Uninstallation failed: {e}")
 
-def remove_openvpn_flow(openvpn_mgr):
-    """Handles the flow for uninstalling OpenVPN."""
-    confirm = input("Are you sure you want to fully uninstall OpenVPN? (yes/no): ").strip().lower()
-    if confirm == "yes":
-        openvpn_mgr.remove_openvpn()
-        return True
-    else:
-        print("Operation cancelled.")
-        return False
 
-
+# --- Main Application Logic ---
 def main():
-    """Main entry point for the CLI application."""
+    """Main entry point of the application."""
     if os.geteuid() != 0:
         print("This script must be run as root.")
-        return
-
-    # --- Dependency Injection ---
+        sys.exit(1)
+    
+    # --- Dependency Injection Setup ---
     db = Database()
     user_repo = UserRepository(db)
-    protocol_repo = ProtocolRepository(db)
+    login_manager = LoginUserManager()
+    openvpn_manager = OpenVPNManager()
     
-    # Protocol managers
-    openvpn_mgr = OpenVPNManager(protocol_repo)
-    login_user_mgr = LoginUserManager()
-    # In the future, you would add other managers like:
-    # wireguard_mgr = WireGuardManager()
+    # UserService now depends on the managers
+    user_service = UserService(user_repo, openvpn_manager, login_manager)
     
-    # Create a list of all services that can be backed up
-    backupable_services = [openvpn_mgr] #, wireguard_mgr]
-    
-    # Core services
-    user_service = UserService(user_repo, protocol_repo, openvpn_mgr, login_user_mgr)
-    backup_service = BackupService(backupable_services)
+    # BackupService is aware of all components that can be backed up
+    backupable_components = [openvpn_manager, login_manager, user_service]
+    backup_service = BackupService(backupable_components)
+
 
     # --- Application Flow ---
+    # Check if OpenVPN is already installed. If not, run the installation flow.
     if not os.path.exists("/etc/openvpn/server-cert.conf"):
-        if not install_flow(openvpn_mgr):
-            return
+        print("Welcome! It looks like this is a fresh installation.")
+        install_flow(openvpn_manager)
+        # If installation was successful, we can proceed to the menu
+        if not os.path.exists("/etc/openvpn/server-cert.conf"):
+             sys.exit(0) # Exit if installation was aborted or failed
 
+    # Main management loop
     while True:
         print_management_menu()
-        choice = input("Select an option: ").strip()
-        if choice == "1": add_user_flow(user_service)
-        elif choice == "2": remove_user_flow(user_service)
-        elif choice == "3": list_users_flow(user_service)
-        elif choice == "4": backup_flow(backup_service)
-        elif choice == "5": restore_flow(backup_service)
-        elif choice == "6":
-            if remove_openvpn_flow(openvpn_mgr): break
-        elif choice == "7":
-            db.close()
-            print("Goodbye.")
+        choice = input("Enter your choice: ").strip()
+        
+        if choice == '1':
+            add_user_flow(user_service)
+        elif choice == '2':
+            remove_user_flow(user_service)
+        elif choice == '3':
+            list_users_flow(user_service)
+        elif choice == '4':
+            get_user_config_flow(user_service)
+        elif choice == '5':
+            backup_flow(backup_service)
+        elif choice == '6':
+            restore_flow(backup_service)
+        elif choice == '7':
+            uninstall_flow(openvpn_manager)
+        elif choice == '8':
+            print("Exiting.")
             break
         else:
-            print("Invalid option.")
+            print("Invalid choice. Please try again.")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

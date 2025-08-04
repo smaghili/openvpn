@@ -1,16 +1,92 @@
 import sqlite3
+import os
+
+# Define the standard, absolute path for the database file.
+# This ensures its location is predictable and independent of the script's working directory.
+DATABASE_DIR = "/etc/openvpn"
+DATABASE_FILE = os.path.join(DATABASE_DIR, "vpn_manager.db")
 
 class Database:
-    def __init__(self, db_path='vpn_manager.db'):
-        self.conn = sqlite3.connect(db_path)
-        self.conn.row_factory = sqlite3.Row
+    """
+    Handles all low-level interactions with the SQLite database.
+    """
+    def __init__(self, db_file=DATABASE_FILE):
+        """
+        Initializes the database connection.
 
-    def execute(self, query, params=()):
-        with self.conn:
-            return self.conn.execute(query, params)
+        Args:
+            db_file (str): The path to the SQLite database file.
+        """
+        self.db_file = db_file
+        # Ensure the directory for the database exists before connecting.
+        os.makedirs(os.path.dirname(self.db_file), exist_ok=True)
+        self.conn = None
 
-    def query(self, query, params=()):
-        return self.conn.execute(query, params)
+    def connect(self):
+        """Establishes a connection to the database."""
+        try:
+            # The check_same_thread=False is important for applications
+            # where different threads might interact with the database.
+            self.conn = sqlite3.connect(self.db_file, check_same_thread=False)
+            self.conn.row_factory = sqlite3.Row
+        except sqlite3.Error as e:
+            print(f"Error connecting to database: {e}")
+            raise
 
-    def close(self):
-        self.conn.close()
+    def disconnect(self):
+        """Closes the database connection."""
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def execute_query(self, query, params=()):
+        """
+        Executes a given SQL query (e.g., SELECT, INSERT, UPDATE, DELETE).
+        For queries that modify data, this method handles commit and rollback.
+
+        Args:
+            query (str): The SQL query to execute.
+            params (tuple): The parameters to substitute into the query.
+
+        Returns:
+            list: A list of rows for SELECT queries, otherwise an empty list.
+        """
+        try:
+            self.connect()
+            cursor = self.conn.cursor()
+            cursor.execute(query, params)
+
+            if query.strip().upper().startswith("SELECT"):
+                result = [dict(row) for row in cursor.fetchall()]
+                return result
+            else:
+                self.conn.commit()
+                return []
+        except sqlite3.Error as e:
+            if self.conn:
+                self.conn.rollback()
+            print(f"Database query failed: {e}")
+            # Re-raise the exception to allow higher-level modules to handle it.
+            raise
+        finally:
+            self.disconnect()
+
+    def execute_script(self, script: str):
+        """
+        Executes a multi-statement SQL script.
+
+        Args:
+            script (str): The SQL script to execute.
+        """
+        try:
+            self.connect()
+            cursor = self.conn.cursor()
+            cursor.executescript(script)
+            self.conn.commit()
+        except sqlite3.Error as e:
+            if self.conn:
+                self.conn.rollback()
+            print(f"Database script execution failed: {e}")
+            raise
+        finally:
+            self.disconnect()
