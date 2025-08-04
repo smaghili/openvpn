@@ -58,11 +58,10 @@ class OpenVPNManager(IBackupable):
         self._setup_firewall_rules()
         self._enable_ip_forwarding()
         self._setup_pam()
-        if self.settings.get("dns") == "2": # '2' is for Unbound
-             self._setup_unbound()
+        if self.settings.get("dns") == "2":
+            self._setup_unbound()
         self._start_openvpn_services()
         
-        # Save settings only after all steps have completed successfully
         self._save_settings()
         print("✅ OpenVPN installation phase completed and settings saved.")
 
@@ -92,8 +91,6 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["./easyrsa", "--batch", "build-server-full", "server-cert", "nopass"], check=True, capture_output=True)
         subprocess.run(["./easyrsa", "gen-dh"], check=True, capture_output=True)
 
-        # Copy essential files to the main OpenVPN directory, not the server-specific one.
-        # The configs will reference these from the parent directory.
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
         shutil.copy(f"{self.PKI_DIR}/issued/server-cert.crt", f"{self.OPENVPN_DIR}/server-cert.crt")
         shutil.copy(f"{self.PKI_DIR}/private/ca.key", self.OPENVPN_DIR)
@@ -101,17 +98,20 @@ class OpenVPNManager(IBackupable):
         shutil.copy(f"{self.PKI_DIR}/dh.pem", self.OPENVPN_DIR)
 
     def _generate_server_configs(self):
-        """Generates the two OpenVPN server configuration files in the correct directory."""
+        """Generates server configs and prepares necessary directories and permissions."""
         print("[3/7] Generating server configurations...")
-        os.makedirs(self.SERVER_CONFIG_DIR, exist_ok=True) # Ensure the /etc/openvpn/server directory exists
-        base_config = self._get_base_config()
+        os.makedirs(self.SERVER_CONFIG_DIR, exist_ok=True)
+        
+        # Create and set permissions for writable directories for the 'nobody' user
+        for path in ["/var/log/openvpn", "/var/run/openvpn"]:
+            os.makedirs(path, exist_ok=True)
+            shutil.chown(path, user="nobody", group="nogroup")
 
-        # Config 1: Certificate-based authentication
+        base_config = self._get_base_config()
         cert_config = base_config.format(port=self.settings["cert_port"], proto=self.settings["cert_proto"], extra_auth="")
         with open(f"{self.SERVER_CONFIG_DIR}/server-cert.conf", "w") as f:
             f.write(cert_config)
 
-        # Config 2: Username/Password-based authentication
         login_config = base_config.format(port=self.settings["login_port"], proto=self.settings["login_proto"], extra_auth='plugin /usr/lib/openvpn/openvpn-plugin-auth-pam.so openvpn\nverify-client-cert none')
         with open(f"{self.SERVER_CONFIG_DIR}/server-login.conf", "w") as f:
             f.write(login_config)
@@ -120,11 +120,8 @@ class OpenVPNManager(IBackupable):
         """Sets up iptables rules for NAT and saves them."""
         print("[4/7] Setting up firewall rules...")
         net_interface = self._get_primary_interface()
-        nat_rule = f"-t nat -A POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE"
-        # Check if the rule already exists before adding
         check_command = f"iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE"
-        rule_exists = subprocess.run(check_command, shell=True, capture_output=True).returncode == 0
-        if not rule_exists:
+        if subprocess.run(check_command, shell=True, capture_output=True).returncode != 0:
             subprocess.run(f"iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE", shell=True, check=True)
         
         os.makedirs(os.path.dirname(self.FIREWALL_RULES_V4), exist_ok=True)
@@ -148,9 +145,7 @@ class OpenVPNManager(IBackupable):
             f.write(pam_config)
 
     def _setup_unbound(self):
-        """Installs and configures Unbound as a local recursive DNS resolver."""
-        # ... (code is correct, no changes needed)
-        pass
+        pass # Not implemented in this snippet
 
     def _start_openvpn_services(self, silent=False):
         """Enables and starts the two OpenVPN systemd services."""
@@ -160,31 +155,24 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["systemctl", "daemon-reload"], check=True, capture_output=capture)
         subprocess.run(["systemctl", "enable", "openvpn-server@server-cert"], check=True, capture_output=capture)
         subprocess.run(["systemctl", "enable", "openvpn-server@server-login"], check=True, capture_output=capture)
-        subprocess.run(["systemctl", "restart", "openvpn-server@server-cert"], check=True, capture_output=capture)
-        subprocess.run(["systemctl", "restart", "openvpn-server@server-login"], check=True, capture_output=capture)
-
-    # --- User Management ---
+        subprocess.run(["systemctl", "restart", "openvpn-server@server-cert"], check=True)
+        subprocess.run(["systemctl", "restart", "openvpn-server@server-login"], check=True)
 
     def create_user_certificate(self, username: str):
-        # ... (code is correct, no changes needed)
         os.chdir(self.EASYRSA_DIR)
         subprocess.run(["./easyrsa", "--batch", "build-client-full", username, "nopass"], check=True, capture_output=True)
 
     def revoke_user_certificate(self, username: str):
-        # ... (code is correct, no changes needed)
         cert_path = f"{self.PKI_DIR}/issued/{username}.crt"
         if not os.path.exists(cert_path):
             return
         os.chdir(self.EASYRSA_DIR)
         subprocess.run(["./easyrsa", "--batch", "revoke", username], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["./easyrsa", "gen-crl"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        crl_path = f"{self.PKI_DIR}/crl.pem"
-        if os.path.exists(crl_path):
-            shutil.copy(crl_path, self.OPENVPN_DIR)
+        shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR)
         self._start_openvpn_services(silent=True)
 
     def generate_user_config(self, username: str) -> str:
-        """Generates the .ovpn configuration file for a user using persisted settings."""
         client_config_template = f"""
 client
 dev tun
@@ -209,68 +197,110 @@ verb 3
 """
         return client_config_template
 
-    # --- Uninstallation ---
-
     def uninstall_openvpn(self):
-        # ... (code is correct, no changes needed)
-        pass
+        print("▶️  Starting uninstallation...")
+        subprocess.run(["systemctl", "stop", "openvpn-server@server-cert"], check=False, capture_output=True)
+        subprocess.run(["systemctl", "stop", "openvpn-server@server-login"], check=False, capture_output=True)
+        subprocess.run(["systemctl", "disable", "openvpn-server@server-cert"], check=False, capture_output=True)
+        subprocess.run(["systemctl", "disable", "openvpn-server@server-login"], check=False, capture_output=True)
+        if os.path.exists("/etc/unbound/unbound.conf.d/openvpn.conf"):
+             subprocess.run(["systemctl", "stop", "unbound"], check=False, capture_output=True)
+             subprocess.run(["systemctl", "disable", "unbound"], check=False, capture_output=True)
+        
+        if os.path.exists(self.SETTINGS_FILE):
+             os.remove(self.SETTINGS_FILE)
+        if os.path.exists(self.OPENVPN_DIR):
+            shutil.rmtree(self.OPENVPN_DIR)
+        if os.path.exists("/etc/pam.d/openvpn"):
+            os.remove("/etc/pam.d/openvpn")
+        if os.path.exists(self.FIREWALL_RULES_V4):
+            os.remove(self.FIREWALL_RULES_V4)
+        
+        for path in ["/var/log/openvpn", "/var/run/openvpn"]:
+            if os.path.exists(path):
+                shutil.rmtree(path)
 
-    # --- IBackupable Interface ---
+        packages = ["openvpn", "easy-rsa", "iptables-persistent", "unbound"]
+        subprocess.run(["apt-get", "remove", "--purge", "-y"] + packages, check=True)
+        subprocess.run(["apt-get", "autoremove", "-y"], check=True)
+        print("✅ Uninstallation complete.")
 
     def get_backup_assets(self) -> list[str]:
-        # ... (code is correct, no changes needed)
-        pass
+        assets = [self.OPENVPN_DIR]
+        if os.path.exists(self.FIREWALL_RULES_V4):
+            assets.append(self.FIREWALL_RULES_V4)
+        return assets
 
     def pre_restore(self):
-        # ... (code is correct, no changes needed)
-        pass
+        subprocess.run(["systemctl", "stop", "openvpn-server@server-cert"], check=False)
+        subprocess.run(["systemctl", "stop", "openvpn-server@server-login"], check=False)
 
     def post_restore(self):
-        # ... (code is correct, no changes needed)
-        pass
+        self._load_settings()
+        if os.path.exists(f"{self.OPENVPN_DIR}/ca.key"):
+            os.chmod(f"{self.OPENVPN_DIR}/ca.key", 0o600)
+        if os.path.exists(f"{self.OPENVPN_DIR}/server-cert.key"):
+            os.chmod(f"{self.OPENVPN_DIR}/server-cert.key", 0o600)
+        
+        for path in ["/var/log/openvpn", "/var/run/openvpn"]:
+            os.makedirs(path, exist_ok=True)
+            shutil.chown(path, user="nobody", group="nogroup")
 
-    # --- Helper Methods ---
+        if os.path.exists(self.FIREWALL_RULES_V4):
+             subprocess.run(f"iptables-restore < {self.FIREWALL_RULES_V4}", shell=True, check=True)
+        self._start_openvpn_services()
+
     def _get_base_config(self) -> str:
-        """
-        Returns the shared base configuration string.
-        Paths to certs are now relative to the /etc/openvpn/server/ directory.
-        """
-        dns_options = {
-            "1": "", # System default
-            "2": f'push "dhcp-option DNS 10.8.0.1"', # Unbound
-            "3": 'push "dhcp-option DNS 1.1.1.1"\npush "dhcp-option DNS 1.0.0.1"', # Cloudflare
-            "4": 'push "dhcp-option DNS 8.8.8.8"\npush "dhcp-option DNS 8.8.4.4"', # Google
-            "5": 'push "dhcp-option DNS 94.140.14.14"\npush "dhcp-option DNS 94.140.15.15"' # AdGuard
-        }
-        dns_lines = dns_options.get(self.settings.get("dns", "3"), "")
+        """Returns the final, robust base configuration string."""
+        dns_lines = {
+            "1": "",
+            "2": f'push "dhcp-option DNS 10.8.0.1"',
+            "3": 'push "dhcp-option DNS 1.1.1.1"\npush "dhcp-option DNS 1.0.0.1"',
+            "4": 'push "dhcp-option DNS 8.8.8.8"\npush "dhcp-option DNS 8.8.4.4"',
+            "5": 'push "dhcp-option DNS 94.140.14.14"\npush "dhcp-option DNS 94.140.15.15"'
+        }.get(self.settings.get("dns", "3"), "")
 
-        # IMPORTANT: Paths are now relative to /etc/openvpn/server/, so we need to go one level up.
         return f"""
 port {{port}}
 proto {{proto}}
 dev tun
-ca ../ca.crt
-cert ../server-cert.crt
-key ../server-cert.key
-dh ../dh.pem
+# Use absolute paths for all critical files
+ca {self.OPENVPN_DIR}/ca.crt
+cert {self.OPENVPN_DIR}/server-cert.crt
+key {self.OPENVPN_DIR}/server-cert.key
+dh {self.OPENVPN_DIR}/dh.pem
+crl-verify {self.OPENVPN_DIR}/crl.pem
+
 server 10.8.0.0 255.255.255.0
-ifconfig-pool-persist ../ipp.txt
+
+# Persist data in standard, writable locations
+ifconfig-pool-persist /var/run/openvpn/ipp.txt
+status /var/log/openvpn/openvpn-status.log
+
 push "redirect-gateway def1 bypass-dhcp"
 {dns_lines}
 keepalive 10 120
 cipher {self.settings.get("cipher", "AES-256-GCM")}
+
+# Drop privileges for security
+user nobody
+group nogroup
+
 persist-key
 persist-tun
-status ../openvpn-status.log
 verb 3
-crl-verify ../crl.pem
 {{extra_auth}}
 """
 
     def _get_primary_interface(self) -> str:
-        # ... (code is correct, no changes needed)
-        pass
+        try:
+            result = subprocess.run("ip route get 8.8.8.8 | awk '{print $5; exit}'", shell=True, capture_output=True, text=True, check=True)
+            return result.stdout.strip()
+        except Exception:
+            return "eth0"
             
     def _read_file(self, path: str) -> str:
-        # ... (code is correct, no changes needed)
-        pass
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return f.read().strip()
+        return ""
