@@ -383,19 +383,12 @@ verb 3
     
     def _extract_certificate(self, path: str) -> str:
         if os.path.exists(path):
-            with open(path, "r") as f:
-                content = f.read()
-                lines = content.split('\n')
-                cert_lines = []
-                in_cert = False
-                for line in lines:
-                    if 'BEGIN CERTIFICATE' in line:
-                        in_cert = True
-                        cert_lines.append(line)
-                    elif 'END CERTIFICATE' in line:
-                        cert_lines.append(line)
-                        break
-                    elif in_cert:
-                        cert_lines.append(line)
-                return '\n'.join(cert_lines)
+            try:
+                result = subprocess.run(
+                    ["openssl", "x509", "-in", path], 
+                    capture_output=True, text=True, check=True
+                )
+                return result.stdout.strip()
+            except subprocess.CalledProcessError:
+                return ""
         return ""
