@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import sys
 import re
@@ -79,11 +80,34 @@ def install_flow(openvpn_manager: OpenVPNManager):
     try:
         # Pass the entire settings dictionary to the manager
         openvpn_manager.install_openvpn(settings)
+        _install_owpanel_command()
         print("\n✅ Installation completed successfully!")
         print("You can now manage users from the main menu.")
+        print("From now on, you can run the panel from anywhere by typing: owpanel")
     except Exception as e:
         print(f"\n❌ Installation failed: {e}")
         sys.exit(1)
+
+
+def _install_owpanel_command():
+    """Makes the script a system-wide command."""
+    print("▶️  Registering 'owpanel' command...")
+    try:
+        # Get the absolute path to the currently running script (main.py)
+        script_path = os.path.abspath(__file__)
+        command_path = "/usr/local/bin/owpanel"
+        
+        # Make the script executable
+        os.chmod(script_path, 0o755)
+        
+        # Create a symbolic link, overwriting if it exists
+        if os.path.exists(command_path):
+            os.remove(command_path)
+        os.symlink(script_path, command_path)
+        print("✅ 'owpanel' command registered successfully.")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not create system-wide command. You may need to run the panel using 'python3 -m cli.main'. Error: {e}")
+
 
 
 # --- Management Menu Flows ---

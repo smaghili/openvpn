@@ -27,22 +27,9 @@ class LoginUserManager(IBackupable):
             )
             # Set the user's password using chpasswd
             
-            # --- DEBUGGING CODE START ---
-            password_input_str = f"{username}:{password}"
-            print(f"--- DEBUG INFO ---")
-            print(f"Data before encoding: {password_input_str}")
-            print(f"Type before encoding: {type(password_input_str)}")
-            
-            password_input_bytes = password_input_str.encode('utf-8')
-            
-            print(f"Data after encoding: {password_input_bytes}")
-            print(f"Type after encoding: {type(password_input_bytes)}")
-            print(f"--- END DEBUG INFO ---")
-            # --- DEBUGGING CODE END ---
-
             subprocess.run(
                 ["chpasswd"],
-                input=password_input_bytes,
+                input=f"{username}:{password}".encode('utf-8'),
                 check=True, capture_output=True
             )
         except subprocess.CalledProcessError as e:
