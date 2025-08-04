@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 from getpass import getpass
 import urllib.request
 
@@ -98,8 +99,24 @@ def print_management_menu():
     print("8. Exit")
 
 def add_user_flow(user_service: UserService):
-    """Handles the 'add user' workflow."""
-    username = input("Enter username: ").strip()
+    """Handles the 'add user' workflow with robust input validation."""
+    # Regex for a valid system/certificate username.
+    # Must start with a letter, can contain letters, numbers, hyphen, underscore. Length 2-32.
+    username_pattern = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]{1,31}$")
+
+    while True:
+        username = input("Enter username: ").strip()
+        if not username_pattern.match(username):
+            print("❌ Invalid username. It must start with a letter and contain only letters, numbers, hyphens, or underscores (2-32 characters).")
+            continue
+
+        # Check if user already exists in the database to provide faster feedback.
+        if user_service.user_repo.get_user_by_username(username):
+            print(f"❌ User '{username}' already exists. Please choose a different name.")
+            continue
+        
+        break # Username is valid and available
+
     # Ask if this user should have password-based login
     create_login = input(f"Enable password login for '{username}'? (y/n) [n]: ").strip().lower()
     password = None
@@ -195,6 +212,8 @@ def restore_flow(backup_service: BackupService):
     try:
         backup_service.restore_system(local_path, password)
         print("✅ System restore completed successfully.")
+    except ValueError as e: # Catch specific error for incorrect password
+        print(f"❌ Restore failed: {e}")
     except Exception as e:
         print(f"❌ Restore failed: {e}")
         # Critical: Exit if restore fails to prevent running a broken system
