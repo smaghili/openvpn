@@ -1,80 +1,38 @@
 """
-This module stores the shared OpenVPN client configuration template.
-Placeholders {{SERVER_IP}}, {{LOGIN_PORT}}, and {{LOGIN_PROTO}} will be dynamically replaced.
+This module provides the template for OpenVPN client configurations.
 """
 
-SHARED_CONFIG = """
+CLIENT_TEMPLATE = """
 client
 dev tun
-proto {{LOGIN_PROTO}}
-remote {{SERVER_IP}} {{LOGIN_PORT}}
+proto {proto}
+remote {server_ip} {port}
 resolv-retry infinite
 nobind
 persist-key
 persist-tun
-auth-user-pass
 remote-cert-tls server
 verb 3
 cipher AES-128-GCM
 auth SHA256
 tls-version-min 1.2
+
 <ca>
------BEGIN CERTIFICATE-----
-MIIB1zCCAX2gAwIBAgIUXtkNLEOw+HLi25fgGQf/mcUILZcwCgYIKoZIzj0EAwIw
-HjEcMBoGA1UEAwwTY25fcVA1MlJOYVNXeGRsY3lqNDAeFw0yNTA4MDMwOTUxMTFa
-Fw0zNTA4MDEwOTUxMTFaMB4xHDAaBgNVBAMME2NuX3FQNTJSTmFTV3hkbGN5ajQw
-WTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQb5STMlyA+AamvYLk/+aQwEqYar2zN
-URH5xUi4dDxtFKexKnUvq2+fiBtgDVAhj3kHxDerPxtHxM1VGWb86Dbto4GYMIGV
-MAwGA1UdEwQFMAMBAf8wHQYDVR0OBBYEFDmDPKIjp8NNRQkv431YW5eQ0nQvMFkG
-A1UdIwRSMFCAFDmDPKIjp8NNRQkv431YW5eQ0nQvoSKkIDAeMRwwGgYDVQQDDBNj
-bl9xUDUyUk5hU1d4ZGxjeWo0ghRe2Q0sQ7D4cuLbl+AZB/+ZxQgtlzALBgNVHQ8E
-BAMCAQYwCgYIKoZIzj0EAwIDSAAwRQIhAICdB12m2zD2LXaPvdJuP2ZgJlMISXFF
-dPvr4v0/16QMAiAeZyqp++HhupFhxDLKf56FoUuohzOImADqQ2ueN6Forg==
------END CERTIFICATE-----
+{ca_cert}
 </ca>
+
+{user_specific_certs}
+
+<tls-crypt>
+{tls_crypt_key}
+</tls-crypt>
+"""
+
+USER_CERTS_TEMPLATE = """
 <cert>
------BEGIN CERTIFICATE-----
-MIIB3zCCAYSgAwIBAgIQJeSqBN21f6XLaQO+hYw4RjAKBggqhkjOPQQDAjAeMRww
-GgYDVQQDDBNjbl9xUDUyUk5hU1d4ZGxjeWo0MB4XDTI1MDgwMzA5NTExOFoXDTM1
-MDgwMTA5NTExOFowFzEVMBMGA1UEAwwMc2hhcmVkLWxvZ2luMFkwEwYHKoZIzj0C
-AQYIKoZIzj0DAQcDQgAEFVA/hIY/A3/dAbHWsULEuSRfkcCoKjUaBcyrfW1uc1Sz
-tg5RzoTwkXkZGbwPlYZCQ+Gg69HATZyBV+D+1lCo7qOBqjCBpzAJBgNVHRMEAjAA
-MB0GA1UdDgQWBBTXW4NTtfENU/brml3chzCXjSAx/TBZBgNVHSMEUjBQgBQ5gzyi
-I6fDTUUJL+N9WFuXkNJ0L6EipCAwHjEcMBoGA1UEAwwTY25fcVA1MlJOYVNXeGRs
-Y3lqNIIUXtkNLEOw+HLi25fgGQf/mcUILZcwEwYDVR0lBAwwCgYIKwYBBQUHAwIw
-CwYDVR0PBAQDAgeAMAoGCCqGSM49BAMCA0kAMEYCIQCCY/deK6cF3X+iLfkECXMO
-WjfLLPWmpW5xl9FHxg5r8AIhALK4teXTmM2+61Cg4ncGbbgm7p0OJhoSoGKyLIzu
-UrWk
------END CERTIFICATE-----
+{user_cert}
 </cert>
 <key>
------BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg3leDdE3mvpHtEe4b
-oLeD0DQmtQn+j6w5mXnV1aAPTS6hRANCAAQVUD+Ehj8Df90BsdaxQsS5JF+RwKgq
-NRoFzKt9bW5zVLO2DlHOhPCReRkZvA+VhkJD4aDr0cBNnIFX4P7WUKju
------END PRIVATE KEY-----
+{user_key}
 </key>
-<tls-crypt>
-#
-# 2048 bit OpenVPN static key
-#
------BEGIN OpenVPN Static key V1-----
-c3110d14c45bac83b3de3114f9047ef5
-e309fdca478757734266d0d43464f966
-df0b91bbeae73a37c84918359b1aae3b
-4f23795b947a731a3c3530153a8d3585
-116d187fec9605968040a067e101c055
-ba2d10fc121a64057f97bcd98e5a5b9c
-db30232cfa4d41ddc49e8038a4a81ad6
-f23b9402283b0fcca9e8d3098d22cbf7
-032bb3ec4b5ba9db92852746c1c00e95
-09d89f2072f4e32012cec6b6517bc9e0
-bf5a2999719d274878362d9bfbde4661
-7957e6d3a67d90dff75c12d4f06602b0
-51b7a305a55897d99806ec6a790bdb7b
-f35b32f19364674e5fde32c58e92ddc2
-4bd23c5971ed24baec540ae153cd35b0
-f4062fb612874975af42a53a71207ab4
------END OpenVPN Static key V1-----
-</tls-crypt>
 """

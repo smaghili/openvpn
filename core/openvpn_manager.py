@@ -85,17 +85,16 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["./easyrsa", "--batch", "build-ca", "nopass"], check=True, capture_output=True)
         subprocess.run(["./easyrsa", "--batch", "build-server-full", "server-cert", "nopass"], check=True, capture_output=True)
         subprocess.run(["./easyrsa", "gen-dh"], check=True, capture_output=True)
-        
-        # CRITICAL: Generate the initial CRL file required for the server to start.
         subprocess.run(["./easyrsa", "gen-crl"], check=True, capture_output=True)
+        subprocess.run(["openvpn", "--genkey", "tls-crypt", "ta.key"], check=True, capture_output=True)
 
-        # Copy all necessary files to /etc/openvpn
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
         shutil.copy(f"{self.PKI_DIR}/issued/server-cert.crt", f"{self.OPENVPN_DIR}/server-cert.crt")
         shutil.copy(f"{self.PKI_DIR}/private/ca.key", self.OPENVPN_DIR)
         shutil.copy(f"{self.PKI_DIR}/private/server-cert.key", f"{self.OPENVPN_DIR}/server-cert.key")
         shutil.copy(f"{self.PKI_DIR}/dh.pem", self.OPENVPN_DIR)
-        shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR) # Copy the newly created CRL
+        shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR)
+        shutil.copy("ta.key", self.OPENVPN_DIR)
 
     def _generate_server_configs(self):
         print("[3/7] Generating server configurations...")
@@ -175,40 +174,39 @@ class OpenVPNManager(IBackupable):
         self._start_openvpn_services(silent=True)
 
     def generate_user_config(self, username: str) -> str:
-        client_config_template = f"""
-client
-dev tun
-proto {self.settings.get("cert_proto", "udp")}
-remote {self.settings.get("public_ip")} {self.settings.get("cert_port", "1194")}
-resolv-retry infinite
-nobind
-persist-key
-persist-tun
-remote-cert-tls server
-cipher {self.settings.get("cipher", "AES-256-GCM")}
-verb 3
-<ca>
-{self._read_file(f"{self.OPENVPN_DIR}/ca.crt")}
-</ca>
-<cert>
-{self._read_file(f"{self.PKI_DIR}/issued/{username}.crt")}
-</cert>
-<key>
-{self._read_file(f"{self.PKI_DIR}/private/{username}.key")}
-</key>
-"""
-        return client_config_template
+        """Generates a dynamic, certificate-based .ovpn config."""
+        ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
+        user_cert = self._read_file(f"{self.PKI_DIR}/issued/{username}.crt")
+        user_key = self._read_file(f"{self.PKI_DIR}/private/{username}.key")
+        tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/ta.key")
+
+        user_specific_certs = USER_CERTS_TEMPLATE.format(user_cert=user_cert, user_key=user_key)
+        
+        return CLIENT_TEMPLATE.format(
+            proto=self.settings.get("cert_proto", "udp"),
+            server_ip=self.settings.get("public_ip"),
+            port=self.settings.get("cert_port", "1194"),
+            ca_cert=ca_cert,
+            user_specific_certs=user_specific_certs,
+            tls_crypt_key=tls_crypt_key
+        )
 
     def get_shared_config(self) -> str:
-        """
-        Returns the shared, login-based OpenVPN configuration.
-        It replaces placeholders with actual server settings.
-        """
-        config = SHARED_CONFIG
-        config = config.replace("{{SERVER_IP}}", self.settings.get("public_ip", "YOUR_SERVER_IP"))
-        config = config.replace("{{LOGIN_PORT}}", self.settings.get("login_port", "1195"))
-        config = config.replace("{{LOGIN_PROTO}}", self.settings.get("login_proto", "udp"))
-        return config
+        """Generates a dynamic, login-based .ovpn config."""
+        ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
+        tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/ta.key")
+
+        # For login-based auth, we add the 'auth-user-pass' directive and remove user-specific certs
+        # The placeholder for user_specific_certs is replaced with 'auth-user-pass'.
+        client_config = CLIENT_TEMPLATE.format(
+            proto=self.settings.get("login_proto", "udp"),
+            server_ip=self.settings.get("public_ip"),
+            port=self.settings.get("login_port", "1195"),
+            ca_cert=ca_cert,
+            user_specific_certs="auth-user-pass",
+            tls_crypt_key=tls_crypt_key
+        )
+        return client_config
 
     def uninstall_openvpn(self):
         print("▶️  Starting uninstallation...")
@@ -269,6 +267,7 @@ cert {self.OPENVPN_DIR}/server-cert.crt
 key {self.OPENVPN_DIR}/server-cert.key
 dh {self.OPENVPN_DIR}/dh.pem
 crl-verify {self.OPENVPN_DIR}/crl.pem
+tls-crypt {self.OPENVPN_DIR}/ta.key
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist /var/run/openvpn/ipp.txt
 status /var/log/openvpn/openvpn-status.log
