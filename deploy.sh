@@ -5,7 +5,6 @@
 set -e # Exit immediately if a command exits with a non-zero status.
 
 # --- Configuration ---
-# !!! IMPORTANT: Replace this with your actual repository URL !!!
 REPO_URL="https://github.com/smaghili/openvpn.git"
 PROJECT_DIR="openvpn" # The directory where the project will be cloned
 
@@ -27,21 +26,27 @@ function install_deployment() {
     apt-get update
     apt-get install -y git python3-venv
 
-    # 2. Clone the project repository
-    echo "[2/4] Cloning project from repository..."
+    # 2. Clone or Update the project repository
+    echo "[2/4] Syncing project files from repository..."
     if [ -d "$PROJECT_DIR" ]; then
-        echo "      -> Project directory '$PROJECT_DIR' already exists. Skipping clone."
+        echo "      -> Project directory exists. Fetching latest version..."
+        cd "$PROJECT_DIR"
+        # Reset any local changes to ensure a clean pull
+        git reset --hard HEAD
+        git pull origin main
     else
+        echo "      -> Cloning new copy of the project..."
         git clone "$REPO_URL" "$PROJECT_DIR"
+        cd "$PROJECT_DIR"
     fi
-    cd "$PROJECT_DIR"
 
     # 3. Set up Python virtual environment and install dependencies
     echo "[3/4] Setting up Python environment..."
     if [ ! -d "venv" ]; then
         python3 -m venv venv
     fi
-    source "venv/bin/activate"
+    # Use 'source' or '.' to activate the venv. The '.' is more portable.
+    . "venv/bin/activate"
     pip install --upgrade pip
     if [ -f "requirements.txt" ]; then
         pip install -r "requirements.txt"
@@ -69,8 +74,10 @@ function remove_project_files() {
 
     read -p "Are you sure you want to remove the '$PROJECT_DIR' directory? [y/N]: " confirm
     if [[ "$confirm" =~ ^[yY](es)?$ ]]; then
-        if [ -d "../$PROJECT_DIR" ]; then
-            rm -rf "../$PROJECT_DIR"
+        # Go up one level to be able to remove the directory
+        cd ..
+        if [ -d "$PROJECT_DIR" ]; then
+            rm -rf "$PROJECT_DIR"
             echo "✅ Project directory removed."
         else
             echo "Directory not found."
@@ -105,4 +112,6 @@ function main() {
     esac
 }
 
+# Ensure the script is executed from the user's home directory or a safe location
+cd ~
 main
