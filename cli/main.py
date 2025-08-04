@@ -132,24 +132,18 @@ def _install_owpanel_command():
         print(f"⚠️  Warning: Could not create system-wide command. Error: {e}")
 
 def print_management_menu():
-    """
-    Prints the main management menu.
-    """
-    print("\n--- VPN Management Menu ---")
-    print("1. Add a new user")
+    print("\n--- VPN Management Menu (Dual Authentication) ---")
+    print("1. Add a new user (Certificate + Optional Password)")
     print("2. Remove an existing user")
     print("3. List all users")
-    print("4. Get a user's config file")
-    print("5. System Backup")
-    print("6. System Restore")
-    print("7. Uninstall VPN")
-    print("8. Get shared config")
+    print("4. Get user's certificate-based config")
+    print("5. Get shared login-based config")
+    print("6. System Backup")
+    print("7. System Restore")
+    print("8. Uninstall VPN")
     print("9. Exit")
 
 def add_user_flow(user_service: UserService):
-    """
-    Handles the 'add user' workflow with robust input validation.
-    """
     username_pattern = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]{1,31}$")
 
     while True:
@@ -162,7 +156,10 @@ def add_user_flow(user_service: UserService):
             continue
         break
 
-    create_login = input(f"Enable password login for '{username}'? (y/n) [n]: ").strip().lower()
+    print(f"\n📜 Certificate-based authentication will be enabled for '{username}'")
+    create_login = input(f"🔐 Also enable password login for '{username}'? (y/n) [y]: ").strip().lower()
+    create_login = create_login if create_login else 'y'
+    
     password = None
     if create_login == 'y':
         password = getpass("Enter a password for the user: ")
@@ -170,17 +167,27 @@ def add_user_flow(user_service: UserService):
     try:
         config_data = user_service.create_user(username, password)
         if config_data:
-            config_path = os.path.join(os.path.expanduser("~"), f"{username}.ovpn")
+            config_path = os.path.join(os.path.expanduser("~"), f"{username}-cert.ovpn")
             with open(config_path, "w") as f:
                 f.write(config_data)
-            print(f"✅ User config saved to: {config_path}")
+            print(f"✅ Certificate-based config saved to: {config_path}")
+            
+        if password:
+            shared_config = user_service.get_shared_config()
+            shared_path = os.path.join(os.path.expanduser("~"), f"{username}-login.ovpn")
+            with open(shared_path, "w") as f:
+                f.write(shared_config)
+            print(f"✅ Login-based config saved to: {shared_path}")
+            
+        print(f"\n🎉 User '{username}' now has dual authentication access:")
+        print(f"   📜 Certificate-based: Use {username}-cert.ovpn")
+        if password:
+            print(f"   🔐 Username/Password: Use {username}-login.ovpn with username '{username}' and password")
+            
     except Exception as e:
         print(f"❌ Error creating user: {e}")
 
 def remove_user_flow(user_service: UserService):
-    """
-    Handles the 'remove user' workflow.
-    """
     username = input("Enter username to remove: ").strip()
     try:
         user_service.remove_user(username)
@@ -188,31 +195,41 @@ def remove_user_flow(user_service: UserService):
         print(f"❌ Error removing user: {e}")
 
 def list_users_flow(user_service: UserService):
-    """
-    Handles the 'list users' workflow.
-    """
     try:
         users = user_service.get_all_users()
         if not users:
             print("No users found.")
             return
-        print("\n--- User List ---")
+        print("\n--- User List (Dual Authentication Support) ---")
         user_map = {}
         for user in users:
-            if user['username'] not in user_map:
-                user_map[user['username']] = []
-            user_map[user['username']].append(user['auth_type'])
+            username = user['username']
+            if username not in user_map:
+                user_map[username] = {
+                    'username': username,
+                    'auth_types': [],
+                    'status': user.get('status', 'active'),
+                    'created_at': user.get('created_at', 'Unknown')
+                }
+            if user.get('auth_type'):
+                user_map[username]['auth_types'].append(user['auth_type'])
         
-        for username, auth_types in user_map.items():
-            print(f"- {username} ({', '.join(auth_types)})")
+        print("📜 = Certificate-based | 🔐 = Username/Password")
+        print("-" * 50)
+        for username, info in user_map.items():
+            auth_icons = []
+            if 'certificate' in info['auth_types']:
+                auth_icons.append('📜')
+            if 'login' in info['auth_types']:
+                auth_icons.append('🔐')
+            
+            status_icon = "✅" if info['status'] == 'active' else "❌"
+            print(f"{status_icon} {username} {' '.join(auth_icons)} ({', '.join(info['auth_types']) if info['auth_types'] else 'No protocols'})")
 
     except Exception as e:
         print(f"❌ Error listing users: {e}")
 
 def get_user_config_flow(user_service: UserService):
-    """
-    Handles the 'get user config' workflow.
-    """
     username = input("Enter username to get config for: ").strip()
     try:
         config = user_service.get_user_config(username)
@@ -225,20 +242,26 @@ def get_user_config_flow(user_service: UserService):
         print(f"❌ Error retrieving config: {e}")
 
 def get_shared_config_flow(openvpn_manager: OpenVPNManager):
-    """
-    Handles the 'get shared config' workflow.
-    """
     try:
         config = openvpn_manager.get_shared_config()
-        print("\n--- Shared Config ---")
+        print("\n--- Shared Login-Based Config ---")
+        print("This config can be used by any user with login credentials")
+        print("Users connect with their username and password")
+        print("-" * 60)
         print(config)
+        print("-" * 60)
+        
+        save_choice = input("\nSave this config to a file? (y/n) [n]: ").strip().lower()
+        if save_choice == 'y':
+            config_path = os.path.join(os.path.expanduser("~"), "shared-login.ovpn")
+            with open(config_path, "w") as f:
+                f.write(config)
+            print(f"✅ Shared login config saved to: {config_path}")
+            
     except Exception as e:
         print(f"❌ Error retrieving shared config: {e}")
 
 def backup_flow(backup_service: BackupService):
-    """
-    Handles the system backup workflow.
-    """
     try:
         password = getpass("Enter a password to encrypt the backup: ")
         if not password:
@@ -252,9 +275,6 @@ def backup_flow(backup_service: BackupService):
         print(f"❌ Backup failed: {e}")
 
 def restore_flow(backup_service: BackupService):
-    """
-    Handles the system restore workflow.
-    """
     backup_path = input("Enter path to the backup file (local path or URL): ").strip()
     if not backup_path:
         print("Backup path cannot be empty. Restore cancelled.")
@@ -285,9 +305,6 @@ def restore_flow(backup_service: BackupService):
             os.remove(local_path)
 
 def uninstall_flow(openvpn_manager: OpenVPNManager):
-    """
-    Handles the uninstallation workflow.
-    """
     confirm = input("This will completely remove OpenVPN. Are you sure? (y/n): ").strip().lower()
     if confirm == 'y':
         try:
@@ -298,9 +315,6 @@ def uninstall_flow(openvpn_manager: OpenVPNManager):
             print(f"❌ Uninstallation failed: {e}")
 
 def main():
-    """
-    Main entry point of the application.
-    """
     if os.geteuid() != 0:
         print("This script must be run as root.")
         sys.exit(1)
@@ -334,15 +348,15 @@ def main():
         elif choice == '4':
             get_user_config_flow(user_service)
         elif choice == '5':
-            backup_flow(backup_service)
-        elif choice == '6':
-            restore_flow(backup_service)
-        elif choice == '7':
-            uninstall_flow(openvpn_manager)
-        elif choice == '8':
             get_shared_config_flow(openvpn_manager)
+        elif choice == '6':
+            backup_flow(backup_service)
+        elif choice == '7':
+            restore_flow(backup_service)
+        elif choice == '8':
+            uninstall_flow(openvpn_manager)
         elif choice == '9':
-            print("Exiting.")
+            print("Goodbye!")
             break
         else:
             print("Invalid choice. Please try again.")

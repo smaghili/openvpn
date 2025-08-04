@@ -20,93 +20,105 @@
 - **فایل config:** `shared-login.ovpn` (مشترک برای همه)
 - **پورت پیش‌فرض:** 1195/UDP
 
-## 📋 منوی جدید
+## 📋 منوی جدید (Python-based)
 
 ```bash
-./install.sh
+sudo python3 cli/main.py
+# یا پس از نصب:
+sudo owpanel
 ```
 
 ```
-1) Add a new cert-based client     # ایجاد کلاینت certificate-based
-2) Add a new login-based user      # ایجاد کاربر username/password  
-3) Revoke existing client          # حذف کلاینت/کاربر
-4) List all clients                # لیست همه کلاینت‌ها
-5) Remove OpenVPN                  # حذف کامل OpenVPN
-6) Exit                           # خروج
+--- VPN Management Menu (Dual Authentication) ---
+1. Add a new user (Certificate + Optional Password)
+2. Remove an existing user
+3. List all users
+4. Get user's certificate-based config
+5. Get shared login-based config
+6. System Backup
+7. System Restore
+8. Uninstall VPN
+9. Exit
 ```
 
 ## 🛠 راه‌اندازی اولیه
 
 ### گام 1: نصب اولیه OpenVPN
 ```bash
-sudo ./install.sh
+sudo python3 cli/main.py
 ```
 
 ### گام 2: نتیجه نصب
 پس از نصب، هر دو روش authentication به طور خودکار راه‌اندازی می‌شوند:
    - **Certificate-based:** 1194/UDP (حرفه‌ای)
    - **Username/Password:** 1195/UDP (ساده)
-   - **Shared config:** `/root/shared-login.ovpn` تولید می‌شود
+   - **Database:** `/etc/openvpn/vpn_manager.db` ایجاد می‌شود
 
 ### گام 3: اضافه کردن کاربران
-برای اضافه کردن کاربران، مجدداً اسکریپت را اجرا کنید:
+برای اضافه کردن کاربران، مجدداً panel را اجرا کنید:
 ```bash
-sudo ./install.sh
+sudo owpanel
 ```
 
 ## 👥 مدیریت کاربران
 
-### ایجاد کاربر Certificate-based
+### ایجاد کاربر با Dual Authentication
 ```bash
 # گزینه 1 از منو
-1) Add a new cert-based client
-```
-- نام کلاینت وارد کنید
-- انتخاب password protection
-- فایل `.ovpn` در `/root/` ایجاد می‌شود
-
-### ایجاد کاربر Login-based
-```bash
-# گزینه 2 از منو  
-2) Add a new login-based user
+1. Add a new user (Certificate + Optional Password)
 ```
 - نام کاربری وارد کنید
-- رمز عبور تنظیم کنید
-- فایل مشترک `shared-login.ovpn` به‌روزرسانی می‌شود
-- همه کاربران login از همین فایل استفاده می‌کنند
+- Certificate همیشه ایجاد می‌شود
+- اختیاری: رمز عبور برای login-based access
+- دو فایل config تولید می‌شود:
+  - `username-cert.ovpn` (Certificate-based)
+  - `username-login.ovpn` (Username/Password)
+
+### مشاهده Shared Config
+```bash
+# گزینه 5 از منو  
+5. Get shared login-based config
+```
+- فایل config مشترک برای login-based access
+- همه کاربران با username/password از این config استفاده می‌کنند
 
 ## 🔧 تنظیمات شبکه
 
 ### Certificate-based Server
-- **Interface:** tun0
+- **Interface:** tun (مخصوص certificate clients)
 - **Subnet:** 10.8.0.0/24
-- **Config:** `/etc/openvpn/server-cert.conf`
-- **Service:** `openvpn@server-cert`
+- **Config:** `/etc/openvpn/server/server-cert.conf`
+- **Service:** `openvpn-server@server-cert`
 
 ### Login-based Server  
-- **Interface:** tun1
-- **Subnet:** 10.9.0.0/24
-- **Config:** `/etc/openvpn/server-login.conf`
-- **Service:** `openvpn@server-login`
+- **Interface:** tun1 (مخصوص login clients)
+- **Subnet:** 10.8.0.0/24 (مشترک با certificate)
+- **Config:** `/etc/openvpn/server/server-login.conf`
+- **Service:** `openvpn-server@server-login`
+
+### Database
+- **File:** `/etc/openvpn/vpn_manager.db`
+- **Type:** SQLite3
+- **Tables:** users, user_protocols
 
 ## 📊 مانیتورینگ
 
 ### بررسی وضعیت سرویس‌ها
 ```bash
-systemctl status openvpn@server-cert
-systemctl status openvpn@server-login
+systemctl status openvpn-server@server-cert
+systemctl status openvpn-server@server-login
 ```
 
 ### مشاهده لاگ‌ها
 ```bash
-tail -f /var/log/openvpn/status-cert.log
-tail -f /var/log/openvpn/status-login.log
+tail -f /var/log/openvpn/openvpn-status.log
+journalctl -u openvpn-server@server-cert -f
+journalctl -u openvpn-server@server-login -f
 ```
 
-### بررسی کانکشن‌های فعال
+### بررسی کاربران در دیتابیس
 ```bash
-cat /var/log/openvpn/status-cert.log | grep "CLIENT_LIST"
-cat /var/log/openvpn/status-login.log | grep "CLIENT_LIST"
+sqlite3 /etc/openvpn/vpn_manager.db "SELECT u.username, up.auth_type FROM users u LEFT JOIN user_protocols up ON u.id = up.user_id;"
 ```
 
 ## 🛡 امنیت
