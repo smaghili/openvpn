@@ -5,7 +5,8 @@ import re
 from getpass import getpass
 import urllib.request
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+real_script_path = os.path.realpath(__file__)
+project_root = os.path.abspath(os.path.join(os.path.dirname(real_script_path), '..'))
 os.chdir(project_root)
 sys.path.insert(0, project_root)
 
