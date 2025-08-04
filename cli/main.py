@@ -60,7 +60,8 @@ def get_install_settings():
 
 def install_flow(openvpn_manager: OpenVPNManager):
     """Orchestrates the entire installation process."""
-    if os.path.exists("/etc/openvpn/server-cert.conf"):
+    # The check for installation is now based on the existence of the settings file.
+    if os.path.exists(OpenVPNManager.SETTINGS_FILE):
         print("Installation already detected. Aborting.")
         return
 
@@ -101,7 +102,6 @@ def print_management_menu():
 def add_user_flow(user_service: UserService):
     """Handles the 'add user' workflow with robust input validation."""
     # Regex for a valid system/certificate username.
-    # Must start with a letter, can contain letters, numbers, hyphen, underscore. Length 2-32.
     username_pattern = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]{1,31}$")
 
     while True:
@@ -110,14 +110,12 @@ def add_user_flow(user_service: UserService):
             print("❌ Invalid username. It must start with a letter and contain only letters, numbers, hyphens, or underscores (2-32 characters).")
             continue
 
-        # Check if user already exists in the database to provide faster feedback.
         if user_service.user_repo.get_user_by_username(username):
             print(f"❌ User '{username}' already exists. Please choose a different name.")
             continue
         
-        break # Username is valid and available
+        break
 
-    # Ask if this user should have password-based login
     create_login = input(f"Enable password login for '{username}'? (y/n) [n]: ").strip().lower()
     password = None
     if create_login == 'y':
@@ -149,7 +147,6 @@ def list_users_flow(user_service: UserService):
             print("No users found.")
             return
         print("\n--- User List ---")
-        # Process to show unique usernames with their auth types
         user_map = {}
         for user in users:
             if user['username'] not in user_map:
@@ -196,7 +193,6 @@ def restore_flow(backup_service: BackupService):
         print("Backup path cannot be empty. Restore cancelled.")
         return
 
-    # Handle URL download
     local_path = backup_path
     if backup_path.startswith(('http://', 'https://')):
         try:
@@ -212,27 +208,27 @@ def restore_flow(backup_service: BackupService):
     try:
         backup_service.restore_system(local_path, password)
         print("✅ System restore completed successfully.")
-    except ValueError as e: # Catch specific error for incorrect password
+    except ValueError as e:
         print(f"❌ Restore failed: {e}")
     except Exception as e:
         print(f"❌ Restore failed: {e}")
-        # Critical: Exit if restore fails to prevent running a broken system
         sys.exit(1)
     finally:
-        # Clean up downloaded file
         if backup_path.startswith(('http://', 'https://')) and os.path.exists(local_path):
             os.remove(local_path)
 
 def uninstall_flow(openvpn_manager: OpenVPNManager):
-    """Handles the uninstallation workflow."""
+    """
+    Handles the uninstallation workflow and exits the application upon success.
+    """
     confirm = input("This will completely remove OpenVPN and all related configurations. Are you sure? (y/n): ").strip().lower()
     if confirm == 'y':
         try:
             openvpn_manager.uninstall_openvpn()
-            print("✅ Uninstallation completed successfully.")
+            print("✅ Uninstallation completed successfully. Exiting now.")
+            sys.exit(0) # Exit the application after successful uninstall
         except Exception as e:
             print(f"❌ Uninstallation failed: {e}")
-
 
 # --- Main Application Logic ---
 def main():
@@ -245,23 +241,20 @@ def main():
     db = Database()
     user_repo = UserRepository(db)
     login_manager = LoginUserManager()
+    # OpenVPNManager now loads its state upon initialization
     openvpn_manager = OpenVPNManager()
     
-    # UserService now depends on the managers
     user_service = UserService(user_repo, openvpn_manager, login_manager)
     
-    # BackupService is aware of all components that can be backed up
     backupable_components = [openvpn_manager, login_manager, user_service]
     backup_service = BackupService(backupable_components)
 
-
     # --- Application Flow ---
-    # Check if OpenVPN is already installed. If not, run the installation flow.
-    if not os.path.exists("/etc/openvpn/server-cert.conf"):
+    # The single source of truth for installation status is the settings file.
+    if not os.path.exists(OpenVPNManager.SETTINGS_FILE):
         print("Welcome! It looks like this is a fresh installation.")
         install_flow(openvpn_manager)
-        # If installation was successful, we can proceed to the menu
-        if not os.path.exists("/etc/openvpn/server-cert.conf"):
+        if not os.path.exists(OpenVPNManager.SETTINGS_FILE):
              sys.exit(0) # Exit if installation was aborted or failed
 
     # Main management loop
