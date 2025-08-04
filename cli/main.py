@@ -5,8 +5,8 @@ import re
 from getpass import getpass
 import urllib.request
 
-# Adjust the Python path to include the project root, allowing for absolute imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+os.chdir(project_root)
 sys.path.insert(0, project_root)
 
 from core.openvpn_manager import OpenVPNManager
