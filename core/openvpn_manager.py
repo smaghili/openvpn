@@ -87,6 +87,8 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["./easyrsa", "gen-dh"], check=True, capture_output=True)
         subprocess.run(["./easyrsa", "gen-crl"], check=True, capture_output=True)
         subprocess.run(["openvpn", "--genkey", "tls-crypt", "ta.key"], check=True, capture_output=True)
+        subprocess.run(["./easyrsa", "--batch", "build-client-full", "shared-login-client", "nopass"], check=True, capture_output=True)
+
 
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
         shutil.copy(f"{self.PKI_DIR}/issued/server-cert.crt", f"{self.OPENVPN_DIR}/server-cert.crt")
@@ -192,21 +194,35 @@ class OpenVPNManager(IBackupable):
         )
 
     def get_shared_config(self) -> str:
-        """Generates a dynamic, login-based .ovpn config."""
+        """
+        Generates a dynamic, shared login-based .ovpn config, mirroring the
+        secure two-layer authentication logic from the original install.sh.
+        This config uses a dedicated, shared client certificate to establish
+        the TLS tunnel, and then prompts for username/password.
+        """
         ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
+        shared_client_cert = self._read_file(f"{self.PKI_DIR}/issued/shared-login-client.crt")
+        shared_client_key = self._read_file(f"{self.PKI_DIR}/private/shared-login-client.key")
         tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/ta.key")
 
-        # For login-based auth, we add the 'auth-user-pass' directive and remove user-specific certs
-        # The placeholder for user_specific_certs is replaced with 'auth-user-pass'.
+        if not shared_client_cert or not shared_client_key:
+            raise RuntimeError("The necessary 'shared-login-client' certificate and key have not been generated. Please reinstall the application.")
+            
+        user_specific_certs = USER_CERTS_TEMPLATE.format(
+            user_cert=shared_client_cert, 
+            user_key=shared_client_key
+        )
+
         client_config = CLIENT_TEMPLATE.format(
             proto=self.settings.get("login_proto", "udp"),
             server_ip=self.settings.get("public_ip"),
             port=self.settings.get("login_port", "1195"),
             ca_cert=ca_cert,
-            user_specific_certs="auth-user-pass",
+            user_specific_certs=user_specific_certs,
             tls_crypt_key=tls_crypt_key
         )
-        return client_config
+        
+        return client_config + "\nauth-user-pass"
 
     def uninstall_openvpn(self):
         print("▶️  Starting uninstallation...")
