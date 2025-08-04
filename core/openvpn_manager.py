@@ -3,7 +3,7 @@ import subprocess
 import shutil
 import json
 from .backup_interface import IBackupable
-from config.shared_config import SHARED_CONFIG
+from config.shared_config import CLIENT_TEMPLATE, USER_CERTS_TEMPLATE
 
 
 class OpenVPNManager(IBackupable):
