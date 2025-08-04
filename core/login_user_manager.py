@@ -28,8 +28,8 @@ class LoginUserManager(IBackupable):
             # Set the user's password using chpasswd
             subprocess.run(
                 ["chpasswd"],
-                input=f"{username}:{password}",
-                text=True, check=True, capture_output=True
+                input=f"{username}:{password}".encode('utf-8'),
+                check=True, capture_output=True
             )
         except subprocess.CalledProcessError as e:
             # Provide a more helpful error message if the user already exists
