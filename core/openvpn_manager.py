@@ -333,6 +333,7 @@ verb 3
         return f"""port {self.settings["login_port"]}
 proto {self.settings["login_proto"]}
 dev tun1
+topology subnet
 ca {self.OPENVPN_DIR}/ca.crt
 cert {self.OPENVPN_DIR}/server-cert.crt
 key {self.OPENVPN_DIR}/server-cert.key
@@ -353,6 +354,7 @@ keepalive 10 120
 # CRL verification
 crl-verify {self.OPENVPN_DIR}/crl.pem
 tls-crypt {self.OPENVPN_DIR}/ta.key
+cipher {self.settings.get("cipher", "AES-256-GCM")}
 ncp-ciphers {cipher_config}
 tls-server
 tls-version-min 1.2
