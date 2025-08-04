@@ -79,8 +79,9 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["./easyrsa", "--batch", "build-ca", "nopass"], check=True)
 
         # Generate server certificate and key
+        # Note: The commonName for the server is set directly here.
         subprocess.run(
-            ["./easyrsa", "--batch", f"--req-cn=server-cert", "build-server-full", "server-cert", "nopass"],
+            ["./easyrsa", "--batch", "build-server-full", "server-cert", "nopass"],
             check=True
         )
         # Generate Diffie-Hellman parameters
@@ -202,10 +203,14 @@ forward-zone:
     # --- User Management ---
 
     def create_user_certificate(self, username: str):
-        """Generates a certificate for a new user."""
+        """
+        Generates a certificate for a new user.
+        The commonName for the certificate is taken from the 'username' argument.
+        """
         os.chdir(self.EASYRSA_DIR)
+        # In modern Easy-RSA, the common name is the primary argument, and --req-cn is not needed.
         subprocess.run(
-            ["./easyrsa", "--batch", f"--req-cn={username}", "build-client-full", username, "nopass"],
+            ["./easyrsa", "--batch", "build-client-full", username, "nopass"],
             check=True
         )
 
