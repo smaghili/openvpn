@@ -112,8 +112,11 @@ class OpenVPNManager(IBackupable):
         """Sets up iptables rules for NAT and saves them."""
         print("[4/7] Setting up firewall rules...")
         net_interface = self._get_primary_interface()
-        nat_rule = f"-A POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE"
-        subprocess.run(f"iptables -I {nat_rule.split(' ', 1)[1]}", shell=True, check=True)
+        nat_rule = f"-t nat -A POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE"
+        
+        insert_rule = nat_rule.replace("-A", "-I")
+        subprocess.run(f"iptables {insert_rule}", shell=True, check=True)
+        
         os.makedirs(os.path.dirname(self.FIREWALL_RULES_V4), exist_ok=True)
         subprocess.run(f"iptables-save > {self.FIREWALL_RULES_V4}", shell=True, check=True)
 
@@ -124,6 +127,7 @@ class OpenVPNManager(IBackupable):
         with open("/etc/sysctl.conf", "r+") as f:
             content = f.read()
             if "net.ipv4.ip_forward=1" not in content:
+                f.seek(0, 2) # Go to the end of the file
                 f.write("\nnet.ipv4.ip_forward=1\n")
         subprocess.run(["sysctl", "-p"], check=True, capture_output=True)
 
