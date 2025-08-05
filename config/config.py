@@ -10,20 +10,18 @@ from dataclasses import dataclass, field
 from core.types import IPAddress, Port, InstallSettings
 from core.exceptions import ConfigurationError, ValidationError
 from config.env_loader import get_config_value
+from config.paths import VPNPaths
 
 @dataclass
 class VPNConfig:
     """Central configuration class for VPN Manager."""
     
-    # Directory paths - all based on PROJECT_ROOT for consistency
-    OPENVPN_DIR: str = field(default_factory=lambda: os.path.join(
-        get_config_value("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))), 
-        "openvpn_data"
-    ))
-    SERVER_CONFIG_DIR: str = field(init=False)
-    EASYRSA_DIR: str = field(init=False)
-    PKI_DIR: str = field(init=False)
-    DATABASE_FILE: str = field(init=False)
+    # Directory paths - all loaded from environment variables
+    OPENVPN_DIR: str = field(default_factory=VPNPaths.get_database_dir)
+    SERVER_CONFIG_DIR: str = field(default_factory=VPNPaths.get_openvpn_server_dir)
+    EASYRSA_DIR: str = field(default_factory=VPNPaths.get_easyrsa_dir)
+    PKI_DIR: str = field(default_factory=VPNPaths.get_pki_dir)
+    DATABASE_FILE: str = field(default_factory=VPNPaths.get_database_file)
     SETTINGS_FILE: str = field(init=False)
     
     # Network defaults
@@ -53,11 +51,7 @@ class VPNConfig:
     
     def __post_init__(self):
         """Initialize computed fields after dataclass creation."""
-        self.SERVER_CONFIG_DIR = f"{self.OPENVPN_DIR}/server"
-        self.EASYRSA_DIR = f"{self.OPENVPN_DIR}/easy-rsa"
-        self.PKI_DIR = f"{self.EASYRSA_DIR}/pki"
-        self.DATABASE_FILE = f"{self.OPENVPN_DIR}/vpn_manager.db"
-        self.SETTINGS_FILE = f"{self.OPENVPN_DIR}/settings.json"
+        self.SETTINGS_FILE = os.path.join(self.OPENVPN_DIR, "settings.json")
     
     @staticmethod
     def validate_username(username: str) -> str:

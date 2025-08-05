@@ -5,12 +5,11 @@ from core.types import DatabaseResult, DatabaseRow
 from core.exceptions import DatabaseError
 from config.env_loader import get_config_value
 
-# Define the standard, absolute path for the database file.
-# This ensures its location is predictable and independent of the script's working directory.
-# Database will be stored in PROJECT_ROOT/openvpn_data for consistency
-project_root = get_config_value("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-DATABASE_DIR = os.path.join(project_root, "openvpn_data")
-DATABASE_FILE = os.path.join(DATABASE_DIR, "vpn_manager.db")
+# Use VPNPaths for consistent path management
+from config.paths import VPNPaths
+
+DATABASE_DIR = VPNPaths.get_database_dir()
+DATABASE_FILE = VPNPaths.get_database_file()
 
 class Database:
     """

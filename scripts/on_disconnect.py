@@ -1,17 +1,29 @@
 #!/usr/bin/env python3
+"""
+OpenVPN disconnection script with database logging.
+Uses environment variables for all paths.
+"""
 import os
 import sys
-import datetime
+import sqlite3
+from datetime import datetime
 
-# Add project root to path for module imports
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+def load_env_vars():
+    """Load environment variables from environment.env file."""
+    env_file = os.path.join(os.path.dirname(__file__), '..', 'environment.env')
+    if os.path.exists(env_file):
+        with open(env_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key] = value
 
-# Load environment configuration first
-from config.env_loader import get_config_value
+def get_log_file():
+    return os.environ.get('OPENVPN_LOG_FILE', '/var/log/openvpn/traffic_monitor.log')
 
-from data.db import Database
+def get_database_file():
+    return os.environ.get('DATABASE_FILE', '/root/openvpn/openvpn_data/vpn_manager.db')
 
 def update_traffic_usage():
     """
@@ -23,58 +35,93 @@ def update_traffic_usage():
     - bytes_sent: Bytes sent during the session.
     - bytes_received: Bytes received during the session.
     """
-    log_file = get_config_value("OPENVPN_LOG_FILE", "/var/log/openvpn/traffic_monitor.log")
+    # Load environment variables first
+    load_env_vars()
+    
+    log_file = get_log_file()
     log_dir = os.path.dirname(log_file)
-    os.makedirs(log_dir, exist_ok=True)
+    
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except Exception:
+        pass
+    
     username = os.environ.get("common_name")
     bytes_sent = int(os.environ.get("bytes_sent", 0))
     bytes_received = int(os.environ.get("bytes_received", 0))
+    timestamp = datetime.now().isoformat()
 
     if not username:
         sys.exit(0)
 
     total_session_bytes = bytes_sent + bytes_received
     if total_session_bytes == 0:
+        try:
+            with open(log_file, "a") as f:
+                f.write(f"{timestamp} - INFO: User '{username}' disconnected (no traffic)\n")
+        except:
+            pass
         sys.exit(0)
 
     try:
-        db = Database()
+        # Direct database connection to avoid circular imports
+        db_file = get_database_file()
         
-        # Get user_id from username
-        user_result = db.execute_query("SELECT id FROM users WHERE username = ?", (username,))
-        if not user_result:
+        if not os.path.exists(db_file):
+            # If database doesn't exist, just log to file
+            with open(log_file, "a") as f:
+                f.write(f"{timestamp} - INFO: User '{username}' disconnected. Sent: {bytes_sent}, Received: {bytes_received} (no database)\n")
             sys.exit(0)
-        user_id = user_result[0]['id']
+        
+        conn = sqlite3.connect(db_file)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Get user ID from username
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+        user_row = cursor.fetchone()
+        
+        if not user_row:
+            conn.close()
+            with open(log_file, "a") as f:
+                f.write(f"{timestamp} - INFO: User '{username}' disconnected. Sent: {bytes_sent}, Received: {bytes_received} (user not in database)\n")
+            sys.exit(0)
+        
+        user_id = user_row['id']
 
         # Use transaction to ensure atomicity
-        db.execute_query("BEGIN TRANSACTION")
+        cursor.execute("BEGIN TRANSACTION")
         
         try:
             # 1. Update the cumulative usage in the user_quotas table
-            update_query = "UPDATE user_quotas SET bytes_used = bytes_used + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-            db.execute_query(update_query, (total_session_bytes, user_id))
+            cursor.execute("UPDATE user_quotas SET bytes_used = bytes_used + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?", 
+                          (total_session_bytes, user_id))
 
             # 2. Log the session details into traffic_logs for historical analysis
-            log_query = "INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)"
-            db.execute_query(log_query, (user_id, bytes_sent, bytes_received))
+            cursor.execute("INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)", 
+                          (user_id, bytes_sent, bytes_received))
             
             # Commit the transaction
-            db.execute_query("COMMIT")
+            cursor.execute("COMMIT")
             
             # Log successful update
-            timestamp = datetime.datetime.now().isoformat()
             with open(log_file, "a") as f:
                 f.write(f"{timestamp} - INFO: Updated usage for user '{username}': +{total_session_bytes} bytes\n")
                 
         except Exception as e:
             # Rollback on any error
-            db.execute_query("ROLLBACK")
+            cursor.execute("ROLLBACK")
             raise e
+        finally:
+            conn.close()
 
     except Exception as e:
-        timestamp = datetime.datetime.now().isoformat()
-        with open(log_file, "a") as f:
-            f.write(f"{timestamp} - ERROR in on_disconnect for user '{username}': {e}\n")
+        # Log error but don't fail
+        try:
+            with open(log_file, "a") as f:
+                f.write(f"{timestamp} - ERROR in on_disconnect for user '{username}': {e}\n")
+        except:
+            pass
     
     sys.exit(0)
 

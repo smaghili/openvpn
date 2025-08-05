@@ -1,18 +1,29 @@
 #!/usr/bin/env python3
+"""
+OpenVPN connection script with quota checking.
+Uses environment variables for all paths.
+"""
 import os
 import sys
+import sqlite3
+from datetime import datetime
 
-# This is crucial for the script to find other modules in the project
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+def load_env_vars():
+    """Load environment variables from environment.env file."""
+    env_file = os.path.join(os.path.dirname(__file__), '..', 'environment.env')
+    if os.path.exists(env_file):
+        with open(env_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key] = value
 
-# Load environment configuration first
-from config.env_loader import get_config_value
+def get_log_file():
+    return os.environ.get('OPENVPN_LOG_FILE', '/var/log/openvpn/traffic_monitor.log')
 
-# It's better to import after setting the path
-from data.db import Database
-from data.user_repository import UserRepository
+def get_database_file():
+    return os.environ.get('DATABASE_FILE', '/root/openvpn/openvpn_data/vpn_manager.db')
 
 def check_user_quota():
     """
@@ -21,46 +32,78 @@ def check_user_quota():
     Username is in the 'common_name' environment variable.
     Exits with code 1 (failure) if quota is exceeded, 0 (success) otherwise.
     """
-    log_file = get_config_value("OPENVPN_LOG_FILE", "/var/log/openvpn/traffic_monitor.log")
+    # Load environment variables first
+    load_env_vars()
+    
+    log_file = get_log_file()
     log_dir = os.path.dirname(log_file)
-    os.makedirs(log_dir, exist_ok=True)
+    
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except Exception:
+        pass
+    
     username = os.environ.get("common_name")
+    timestamp = datetime.now().isoformat()
 
     if not username:
-        # Allow connection if no username is passed, but this is unusual.
         sys.exit(0)
 
     try:
-        db = Database()
-        user_repo = UserRepository(db)
+        # Direct database connection to avoid circular imports
+        db_file = get_database_file()
         
-        user = user_repo.find_user_by_username(username)
-        if not user:
-            # If user is not in our database, let OpenVPN decide.
+        if not os.path.exists(db_file):
+            # If database doesn't exist, allow connection
+            with open(log_file, "a") as f:
+                f.write(f"{timestamp} - INFO: User '{username}' connected (no database found)\n")
             sys.exit(0)
-            
-        quota_status = user_repo.get_user_quota_status(user['id'])
         
-        if quota_status:
-            quota_bytes = quota_status.get('quota_bytes', 0)
-            bytes_used = quota_status.get('bytes_used', 0)
-
-            # A quota of 0 means unlimited traffic.
+        conn = sqlite3.connect(db_file)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Get user ID
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+        user_row = cursor.fetchone()
+        
+        if not user_row:
+            # User not in database, allow connection
+            conn.close()
+            with open(log_file, "a") as f:
+                f.write(f"{timestamp} - INFO: User '{username}' connected (not in database)\n")
+            sys.exit(0)
+        
+        user_id = user_row['id']
+        
+        # Check quota
+        cursor.execute("SELECT quota_bytes, bytes_used FROM user_quotas WHERE user_id = ?", (user_id,))
+        quota_row = cursor.fetchone()
+        
+        if quota_row:
+            quota_bytes = quota_row['quota_bytes']
+            bytes_used = quota_row['bytes_used']
+            
+            # A quota of 0 means unlimited traffic
             if quota_bytes > 0 and bytes_used >= quota_bytes:
+                conn.close()
                 with open(log_file, "a") as f:
-                    f.write(f"INFO: User '{username}' connection rejected, quota exceeded.\n")
-                # Exit with 1 to tell OpenVPN to reject the connection
+                    f.write(f"{timestamp} - REJECT: User '{username}' quota exceeded ({bytes_used}/{quota_bytes} bytes)\n")
                 sys.exit(1)
+        
+        conn.close()
+        with open(log_file, "a") as f:
+            f.write(f"{timestamp} - INFO: User '{username}' connected (quota OK)\n")
+        sys.exit(0)
 
     except Exception as e:
         # In case of any script error, log it and allow the connection
-        # to prevent service disruption from script bugs.
-        with open(log_file, "a") as f:
-            f.write(f"ERROR in on_connect for user '{username}': {e}\n")
+        try:
+            with open(log_file, "a") as f:
+                f.write(f"{timestamp} - ERROR in on_connect for user '{username}': {e}\n")
+        except:
+            pass
         sys.exit(0)
-
-    # If all checks pass, exit with 0 to allow the connection.
-    sys.exit(0)
 
 if __name__ == "__main__":
     check_user_quota()

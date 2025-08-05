@@ -28,8 +28,9 @@ elif CHECK_INTERVAL > 60:
 LOG_FILE = get_config_value("OPENVPN_LOG_FILE", "/var/log/openvpn/traffic_monitor.log")
 MAX_LOG_SIZE = get_int_config("MAX_LOG_SIZE", 10485760)  # 10MB default
 
-# Get project root dynamically
-PROJECT_ROOT = get_config_value("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Use VPNPaths for consistent path management
+from config.paths import VPNPaths
+PROJECT_ROOT = VPNPaths.get_project_root()
 
 class OpenVPNMonitor:
     def __init__(self, host, port):

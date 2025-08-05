@@ -22,3 +22,19 @@ class UserProtocol:
     status: str
     created_at: str
     updated_at: str
+
+@dataclass
+class UserQuota:
+    id: int
+    user_id: int
+    quota_bytes: int
+    bytes_used: int
+    updated_at: str
+
+@dataclass
+class TrafficLog:
+    id: int
+    user_id: int
+    bytes_sent: int
+    bytes_received: int
+    log_timestamp: str

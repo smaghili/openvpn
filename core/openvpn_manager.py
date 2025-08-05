@@ -168,8 +168,9 @@ class OpenVPNManager(IBackupable):
             os.makedirs(path, exist_ok=True)
             shutil.chown(path, user="nobody", group="nogroup")
         
-        # CCD directory should be in the same location as other OpenVPN configs
-        ccd_dir = os.path.join(self.OPENVPN_DIR, "ccd")
+        # CCD directory should be in the OpenVPN system directory
+        from config.paths import VPNPaths
+        ccd_dir = VPNPaths.get_ccd_dir()
         os.makedirs(ccd_dir, exist_ok=True)
         shutil.chown(ccd_dir, user="nobody", group="nogroup")
 
@@ -238,12 +239,11 @@ class OpenVPNManager(IBackupable):
 
     def _create_monitor_service_file(self) -> None:
         """Creates the systemd service file for the monitor with dynamic paths."""
-        # Load environment configuration
+        # Use VPNPaths for consistent path management
+        from config.paths import VPNPaths
         from config.env_loader import get_config_value
         
-        # Get project root from environment variable or fallback to relative path
-        project_root = get_config_value("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-        
+        project_root = VPNPaths.get_project_root()
         management_port = get_config_value("OPENVPN_MANAGEMENT_PORT", "7505")
         
         service_content = f"""[Unit]
@@ -455,7 +455,9 @@ tls-version-min 1.2
         self._start_openvpn_services(silent=True)
 
     def _get_base_config(self) -> str:
-        # This method remains unchanged
+        # Use VPNPaths for all certificate and key paths
+        from config.paths import VPNPaths
+        
         dns_lines = {
             "1": "",
             "2": f'push "dhcp-option DNS 10.8.0.1"',
@@ -469,16 +471,16 @@ port {{port}}
 proto {{proto}}
 dev tun
 topology subnet
-ca {self.OPENVPN_DIR}/ca.crt
-cert {self.OPENVPN_DIR}/server-cert.crt
-key {self.OPENVPN_DIR}/server-cert.key
+ca {VPNPaths.get_ca_cert()}
+cert {VPNPaths.get_server_cert()}
+key {VPNPaths.get_server_key()}
 dh none
 ecdh-curve prime256v1
-crl-verify {self.OPENVPN_DIR}/crl.pem
-tls-crypt {self.OPENVPN_DIR}/tls-crypt.key
+crl-verify {VPNPaths.get_crl_file()}
+tls-crypt {VPNPaths.get_tls_crypt_key()}
 server 10.8.0.0 255.255.255.0
-ifconfig-pool-persist /var/run/openvpn/ipp.txt
-status /var/log/openvpn/openvpn-status.log
+ifconfig-pool-persist {VPNPaths.get_run_dir()}/ipp.txt
+status {VPNPaths.get_status_file()}
 push "redirect-gateway def1 bypass-dhcp"
 {dns_lines}
 keepalive 10 120
@@ -492,7 +494,9 @@ verb 3
 """
 
     def _get_login_config(self) -> str:
-        # This method remains unchanged
+        # Use VPNPaths for all certificate and key paths
+        from config.paths import VPNPaths
+        
         dns_lines = {
             "1": "",
             "2": f'push "dhcp-option DNS 10.9.0.1"',
@@ -508,13 +512,13 @@ verb 3
 proto {self.settings["login_proto"]}
 dev tun1
 topology subnet
-ca {self.OPENVPN_DIR}/ca.crt
-cert {self.OPENVPN_DIR}/server-cert.crt
-key {self.OPENVPN_DIR}/server-cert.key
+ca {VPNPaths.get_ca_cert()}
+cert {VPNPaths.get_server_cert()}
+key {VPNPaths.get_server_key()}
 dh none
 ecdh-curve prime256v1
 server 10.9.0.0 255.255.255.0
-ifconfig-pool-persist ipp-login.txt
+ifconfig-pool-persist {VPNPaths.get_run_dir()}/ipp-login.txt
 
 # PAM authentication
 plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so openvpn
@@ -526,14 +530,14 @@ push "redirect-gateway def1 bypass-dhcp"
 keepalive 10 120
 
 # CRL verification
-crl-verify {self.OPENVPN_DIR}/crl.pem
-tls-crypt {self.OPENVPN_DIR}/tls-crypt.key
+crl-verify {VPNPaths.get_crl_file()}
+tls-crypt {VPNPaths.get_tls_crypt_key()}
 cipher {self.settings.get("cipher", "AES-256-GCM")}
 ncp-ciphers {cipher_config}
 tls-server
 tls-version-min 1.2
 tls-cipher {cc_cipher_config}
-client-config-dir {self.OPENVPN_DIR}/ccd
+client-config-dir {VPNPaths.get_ccd_dir()}
 user nobody
 group nogroup
 persist-key
@@ -544,16 +548,10 @@ verb 3
 
     def _get_monitoring_config(self) -> str:
         """Returns the config lines needed for traffic monitoring with dynamic paths."""
-        # Load environment configuration
+        from config.paths import VPNPaths
         from config.env_loader import get_config_value
-        
-        # Get project root from environment variable or fallback to relative path  
-        project_root = get_config_value("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-        
-        on_connect_script = os.path.join(project_root, 'scripts', 'on_connect.py')
-        on_disconnect_script = os.path.join(project_root, 'scripts', 'on_disconnect.py')
-        
-        # Get management port from environment or use default
+        on_connect_script = VPNPaths.get_on_connect_script()
+        on_disconnect_script = VPNPaths.get_on_disconnect_script()
         management_port = get_config_value("OPENVPN_MANAGEMENT_PORT", "7505")
         
         return f"""
