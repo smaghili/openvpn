@@ -3,6 +3,7 @@ from .db import Database
 from core.types import Username, UserData, DatabaseResult
 from core.exceptions import DatabaseError, UserNotFoundError
 import hashlib
+import os
 
 class UserRepository:
     def __init__(self, db: Database) -> None:
@@ -10,7 +11,6 @@ class UserRepository:
         self._create_tables_if_not_exist()
 
     def _create_tables_if_not_exist(self) -> None:
-        import os
         schema_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'database.sql')
         if os.path.exists(schema_file):
             with open(schema_file, 'r') as f:
@@ -50,13 +50,31 @@ class UserRepository:
             WHERE u.username = ?
             """
             params = (username,)
-            return self.db.execute_query(query, params)
+            # This was returning a list, changed to return one item
+            result = self.db.execute_query(query, params)
+            return result[0] if result else None
+    
+    def find_user_by_username(self, username: Username) -> Optional[Dict[str, Any]]:
+        """Finds a user by username from the users table only."""
+        query = "SELECT * FROM users WHERE username = ?"
+        result = self.db.execute_query(query, (username,))
+        return result[0] if result else None
 
-    def get_all_users(self) -> List[Dict[str, Any]]:
+    def get_all_users_with_details(self) -> List[Dict[str, Any]]:
+        """Retrieves all users with their protocol and quota information."""
         query = """
-        SELECT u.username, u.status, u.created_at, up.auth_type, up.protocol
+        SELECT 
+            u.id,
+            u.username, 
+            u.status, 
+            u.created_at, 
+            up.auth_type, 
+            up.protocol,
+            uq.quota_bytes,
+            uq.bytes_used
         FROM users u
         LEFT JOIN user_protocols up ON u.id = up.user_id
+        LEFT JOIN user_quotas uq ON u.id = uq.user_id
         ORDER BY u.username, up.auth_type
         """
         return self.db.execute_query(query)
@@ -65,27 +83,24 @@ class UserRepository:
         query = "DELETE FROM users WHERE username = ?"
         self.db.execute_query(query, (username,))
 
-    def get_user_certificate_config(self, username: Username) -> Optional[str]:
-        user_data = self.get_user_by_username(username, 'certificate')
-        if not user_data or not user_data.get('cert_pem'):
-            return None
-        from core.openvpn_manager import OpenVPNManager
-        from config.shared_config import CLIENT_TEMPLATE, USER_CERTS_TEMPLATE
-        
-        openvpn_manager = OpenVPNManager()
-        ca_cert = openvpn_manager._read_file(f"{openvpn_manager.OPENVPN_DIR}/ca.crt")
-        tls_crypt_key = openvpn_manager._read_file(f"{openvpn_manager.OPENVPN_DIR}/tls-crypt.key")
-        
-        user_specific_certs = USER_CERTS_TEMPLATE.format(
-            user_cert=user_data['cert_pem'],
-            user_key=user_data['key_pem']
-        )
-        
-        return CLIENT_TEMPLATE.format(
-            proto=openvpn_manager.settings.get("cert_proto", "udp"),
-            server_ip=openvpn_manager.settings.get("public_ip"),
-            port=openvpn_manager.settings.get("cert_port", "1194"),
-            ca_cert=ca_cert,
-            user_specific_certs=user_specific_certs,
-            tls_crypt_key=tls_crypt_key
-        )
+    # --- New methods for quota management ---
+
+    def set_user_quota(self, user_id: int, quota_gb: float) -> None:
+        """Sets or updates the data quota for a user in bytes."""
+        quota_bytes = int(quota_gb * 1024 * 1024 * 1024)
+        query = """
+        INSERT INTO user_quotas (user_id, quota_bytes) VALUES (?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET quota_bytes = excluded.quota_bytes;
+        """
+        self.db.execute_query(query, (user_id, quota_bytes))
+
+    def get_user_quota_status(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Retrieves a user's quota and current usage."""
+        query = """
+        SELECT u.username, q.quota_bytes, q.bytes_used
+        FROM user_quotas q
+        JOIN users u ON u.id = q.user_id
+        WHERE q.user_id = ?
+        """
+        result = self.db.execute_query(query, (user_id,))
+        return result[0] if result else None

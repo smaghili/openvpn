@@ -5,6 +5,7 @@ from core.login_user_manager import LoginUserManager
 from data.db import DATABASE_FILE
 from core.backup_interface import IBackupable
 from core.types import Username, Password, ConfigData, UserData
+from config.shared_config import CLIENT_TEMPLATE, USER_CERTS_TEMPLATE
 from core.exceptions import (
     UserAlreadyExistsError, 
     UserNotFoundError, 
@@ -20,13 +21,35 @@ class UserService(IBackupable):
         self.openvpn_manager = openvpn_manager
         self.login_manager = login_manager
 
-    def create_user(self, username: Username, password: Optional[Password] = None) -> ConfigData:
+    def _generate_user_certificate_config(self, username: Username) -> Optional[str]:
+        """Generates the OpenVPN client configuration for a user based on their certificate."""
+        user_data = self.user_repo.get_user_by_username(username, 'certificate')
+        if not user_data or not user_data.get('cert_pem'):
+            return None
+
+        ca_cert = self.openvpn_manager._read_file(f"{self.openvpn_manager.OPENVPN_DIR}/ca.crt")
+        tls_crypt_key = self.openvpn_manager._read_file(f"{self.openvpn_manager.OPENVPN_DIR}/tls-crypt.key")
+        
+        user_specific_certs = USER_CERTS_TEMPLATE.format(
+            user_cert=user_data['cert_pem'],
+            user_key=user_data['key_pem']
+        )
+        
+        return CLIENT_TEMPLATE.format(
+            proto=self.openvpn_manager.settings.get("cert_proto", "udp"),
+            server_ip=self.openvpn_manager.settings.get("public_ip"),
+            port=self.openvpn_manager.settings.get("cert_port", "1194"),
+            ca_cert=ca_cert,
+            user_specific_certs=user_specific_certs,
+            tls_crypt_key=tls_crypt_key
+        )
+
+    def create_user(self, username: Username, password: Optional[Password] = None) -> Optional[ConfigData]:
         password_hash = None
         if password:
             password_hash = hashlib.sha256(password.encode()).hexdigest()
         
-        existing_user = self.user_repo.get_user_by_username(username)
-        if existing_user:
+        if self.user_repo.find_user_by_username(username):
             raise UserAlreadyExistsError(username)
         
         try:
@@ -50,14 +73,13 @@ class UserService(IBackupable):
             self.login_manager.add_user(username, password)
             self.user_repo.add_user_protocol(user_id, "openvpn", "login")
         
-        client_config = self.user_repo.get_user_certificate_config(username)
+        client_config = self._generate_user_certificate_config(username)
         
         print(f"✅ User '{username}' created successfully")
         return client_config
 
     def remove_user(self, username: Username, silent: bool = False) -> None:
-        db_user_records = self.user_repo.get_user_by_username(username)
-        if not db_user_records:
+        if not self.user_repo.find_user_by_username(username):
             raise UserNotFoundError(username)
 
         if not silent:
@@ -70,14 +92,35 @@ class UserService(IBackupable):
         if not silent:
             print(f"✅ User '{username}' removed successfully.")
 
-    def get_all_users(self) -> List[Dict[str, Any]]:
-        return self.user_repo.get_all_users()
+    def get_all_users_with_status(self) -> List[Dict[str, Any]]:
+        return self.user_repo.get_all_users_with_details()
 
     def get_user_config(self, username: Username) -> Optional[ConfigData]:
-        return self.user_repo.get_user_certificate_config(username)
+        return self._generate_user_certificate_config(username)
         
     def get_shared_config(self) -> ConfigData:
         return self.openvpn_manager.get_shared_config()
+
+    # --- New methods for Quota Management ---
+
+    def set_quota_for_user(self, username: Username, quota_gb: float) -> None:
+        """Sets the data quota for a specific user."""
+        user = self.user_repo.find_user_by_username(username)
+        if not user:
+            raise UserNotFoundError(username)
+        
+        self.user_repo.set_user_quota(user['id'], quota_gb)
+        print(f"✅ Quota for user '{username}' set to {quota_gb} GB (0 for unlimited).")
+
+    def get_user_status(self, username: Username) -> Optional[Dict[str, Any]]:
+        """Gets the detailed status including quota and usage for a user."""
+        user = self.user_repo.find_user_by_username(username)
+        if not user:
+            raise UserNotFoundError(username)
+        
+        return self.user_repo.get_user_quota_status(user['id'])
+
+    # --- Backup and Restore ---
 
     def get_backup_assets(self) -> List[str]:
         if os.path.exists(DATABASE_FILE):

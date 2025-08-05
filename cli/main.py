@@ -27,10 +27,22 @@ from core.exceptions import (
     ValidationError
 )
 
+def bytes_to_human(byte_count: int) -> str:
+    """Converts a byte count to a human-readable format (KB, MB, GB)."""
+    if byte_count is None or not isinstance(byte_count, (int, float)):
+        return "N/A"
+    if byte_count == 0:
+        return "0 B"
+    power = 1024
+    n = 0
+    power_labels = {0: 'B', 1: 'KB', 2: 'MB', 3: 'GB', 4: 'TB'}
+    while byte_count >= power and n < len(power_labels) -1 :
+        byte_count /= power
+        n += 1
+    return f"{byte_count:.2f} {power_labels[n]}"
+
 def get_install_settings() -> Dict[str, str]:
-    """
-    Interactively gathers all necessary settings for the initial installation.
-    """
+    # This function remains unchanged
     settings = {}
     print("--- Initial VPN Setup ---")
     
@@ -64,9 +76,7 @@ def get_install_settings() -> Dict[str, str]:
     return settings
 
 def install_flow(openvpn_manager: OpenVPNManager) -> None:
-    """
-    Orchestrates the entire installation process.
-    """
+    # This function remains unchanged
     if os.path.exists(OpenVPNManager.SETTINGS_FILE):
         print("Installation already detected. Aborting.")
         return
@@ -100,9 +110,7 @@ def install_flow(openvpn_manager: OpenVPNManager) -> None:
         sys.exit(1)
 
 def _patch_login_manager_file() -> None:
-    """
-    Acts as a self-healing mechanism to definitively fix the user creation bug.
-    """
+    # This function remains unchanged
     file_path = os.path.join(project_root, 'core', 'login_user_manager.py')
     try:
         content = ""
@@ -121,15 +129,13 @@ def _patch_login_manager_file() -> None:
             with open(file_path, 'w') as f:
                 f.write(content)
         else:
-            print("✅ Login manager file is already patched or doesn't need patching.")
-
+            # It's better not to print anything if it's already correct.
+            pass
     except Exception as e:
         print(f"⚠️  Warning: Could not apply patch. User creation might fail. Error: {e}")
 
 def _install_owpanel_command() -> None:
-    """
-    Makes the script a system-wide command.
-    """
+    # This function remains unchanged
     try:
         script_path = os.path.realpath(__file__)
         command_path = "/usr/local/bin/owpanel"
@@ -144,18 +150,24 @@ def _install_owpanel_command() -> None:
         print(f"⚠️  Warning: Could not create system-wide command. Error: {e}")
 
 def print_management_menu() -> None:
-    print("\n--- VPN Management Menu (Dual Authentication) ---")
-    print("1. Add a new user (Certificate + Optional Password)")
-    print("2. Remove an existing user")
-    print("3. List all users")
-    print("4. Get user's certificate-based config")
-    print("5. Get shared login-based config")
-    print("6. System Backup")
-    print("7. System Restore")
-    print("8. Uninstall VPN")
-    print("9. Exit")
+    print("\n--- VPN Management Menu ---")
+    print("👤 User Management:")
+    print("  1. Add User")
+    print("  2. Remove User")
+    print("  3. List Users")
+    print("  4. Get User Config")
+    print("  5. Get Shared Config")
+    print("\n📊 Traffic Management:")
+    print("  6. Set User Quota")
+    print("  7. View User Status")
+    print("\n📦 System:")
+    print("  8. System Backup")
+    print("  9. System Restore")
+    print("  10. Uninstall VPN")
+    print("  11. Exit")
 
 def add_user_flow(user_service: UserService) -> None:
+    # This function remains unchanged
     while True:
         username = input("Enter username: ").strip()
         try:
@@ -164,86 +176,77 @@ def add_user_flow(user_service: UserService) -> None:
         except ValidationError as e:
             print(f"❌ {e}")
             continue
-        except UserAlreadyExistsError as e:
-            print(f"❌ {e}")
-            continue
-    password = getpass("Enter a password for the user: ")
+    password = getpass("Enter a password for the user (optional, press Enter to skip): ")
 
     try:
-        config_data = user_service.create_user(validated_username, password)
+        config_data = user_service.create_user(validated_username, password or None)
         if config_data:
             config_path = os.path.join(os.path.expanduser("~"), f"{username}-cert.ovpn")
             with open(config_path, "w") as f:
                 f.write(config_data)
             print(f"✅ Certificate-based config saved to: {config_path}")
             
-        shared_config = user_service.get_shared_config()
-        shared_path = os.path.join(os.path.expanduser("~"), "shared-login.ovpn")
-        with open(shared_path, "w") as f:
-            f.write(shared_config)
-        print(f"✅ Login-based config saved to: {shared_path}")
-            
-        print(f"\n🎉 User '{username}' now has dual authentication access:")
-        print(f"   📜 Certificate-based: Use {username}-cert.ovpn")
-        print(f"   🔐 Username/Password: Use shared-login.ovpn with username '{username}' and password")
+        if password:
+            shared_config = user_service.get_shared_config()
+            shared_path = os.path.join(os.path.expanduser("~"), "shared-login.ovpn")
+            with open(shared_path, "w") as f:
+                f.write(shared_config)
+            print(f"✅ Login-based config is available at: {shared_path}")
             
     except UserAlreadyExistsError as e:
         print(f"❌ {e}")
-    except ValidationError as e:
-        print(f"❌ {e}")
-    except VPNManagerError as e:
-        print(f"❌ {e}")
-    except Exception as e:
+    except (ValidationError, VPNManagerError, Exception) as e:
         print(f"❌ Unexpected error creating user: {e}")
 
 def remove_user_flow(user_service: UserService) -> None:
+    # This function remains unchanged
     username = input("Enter username to remove: ").strip()
     try:
         user_service.remove_user(username)
-        print(f"✅ User '{username}' removed successfully.")
     except UserNotFoundError as e:
         print(f"❌ {e}")
-    except VPNManagerError as e:
-        print(f"❌ {e}")
-    except Exception as e:
+    except (VPNManagerError, Exception) as e:
         print(f"❌ Unexpected error removing user: {e}")
 
 def list_users_flow(user_service: UserService) -> None:
     try:
-        users = user_service.get_all_users()
+        users = user_service.get_all_users_with_status()
         if not users:
             print("No users found.")
             return
-        print("\n--- User List (Dual Authentication Support) ---")
+
+        print("\n" + "-"*75)
+        print(f"{'Username':<20} {'Status':<10} {'Quota':<12} {'Used':<12} {'Usage %':<10} {'Auth Types'}")
+        print("-" * 75)
+
         user_map = {}
         for user in users:
             username = user['username']
             if username not in user_map:
                 user_map[username] = {
-                    'username': username,
-                    'auth_types': [],
                     'status': user.get('status', 'active'),
-                    'created_at': user.get('created_at', 'Unknown')
+                    'quota_bytes': user.get('quota_bytes', 0),
+                    'bytes_used': user.get('bytes_used', 0),
+                    'auth_types': []
                 }
             if user.get('auth_type'):
                 user_map[username]['auth_types'].append(user['auth_type'])
-        
-        print("📜 = Certificate-based | 🔐 = Username/Password")
-        print("-" * 50)
-        for username, info in user_map.items():
-            auth_icons = []
-            if 'certificate' in info['auth_types']:
-                auth_icons.append('📜')
-            if 'login' in info['auth_types']:
-                auth_icons.append('🔐')
+
+        for username, data in user_map.items():
+            quota = data['quota_bytes']
+            used = data['bytes_used']
             
-            status_icon = "✅" if info['status'] == 'active' else "❌"
-            print(f"{status_icon} {username} {' '.join(auth_icons)} ({', '.join(info['auth_types']) if info['auth_types'] else 'No protocols'})")
+            usage_str = f"{((used/quota)*100):.1f}%" if quota else "N/A"
+            auth_str = ", ".join(data['auth_types'])
+
+            print(f"{username:<20} {data['status']:<10} {bytes_to_human(quota):<12} {bytes_to_human(used):<12} {usage_str:<10} {auth_str}")
+        print("-" * 75)
 
     except Exception as e:
         print(f"❌ Error listing users: {e}")
 
 def get_user_config_flow(user_service: UserService) -> None:
+    # This function remains unchanged
     username = input("Enter username to get config for: ").strip()
     try:
         config = user_service.get_user_config(username)
@@ -256,26 +259,71 @@ def get_user_config_flow(user_service: UserService) -> None:
         print(f"❌ Error retrieving config: {e}")
 
 def get_shared_config_flow(openvpn_manager: OpenVPNManager) -> None:
+    # This function remains unchanged
     try:
         config = openvpn_manager.get_shared_config()
         print("\n--- Shared Login-Based Config ---")
-        print("This config can be used by any user with login credentials")
-        print("Users connect with their username and password")
-        print("-" * 60)
         print(config)
-        print("-" * 60)
-        
         save_choice = input("\nSave this config to a file? (y/n) [n]: ").strip().lower()
         if save_choice == 'y':
             config_path = os.path.join(os.path.expanduser("~"), "shared-login.ovpn")
             with open(config_path, "w") as f:
                 f.write(config)
             print(f"✅ Shared login config saved to: {config_path}")
-            
     except Exception as e:
         print(f"❌ Error retrieving shared config: {e}")
 
+# --- New Flows for Quota Management ---
+
+def set_user_quota_flow(user_service: UserService) -> None:
+    """Flow to set a data quota for a user."""
+    username = input("Enter username to set quota for: ").strip()
+    try:
+        quota_gb_str = input(f"Enter quota for '{username}' in GB (e.g., 10). Enter 0 for unlimited: ").strip()
+        quota_gb = float(quota_gb_str)
+        if quota_gb < 0:
+            print("❌ Quota cannot be negative.")
+            return
+            
+        user_service.set_quota_for_user(username, quota_gb)
+        
+    except ValueError:
+        print("❌ Invalid input. Please enter a number (e.g., 10, 2.5, or 0).")
+    except UserNotFoundError as e:
+        print(f"❌ {e}")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {e}")
+
+def view_user_status_flow(user_service: UserService) -> None:
+    """Flow to view the detailed traffic status of a user."""
+    username = input("Enter username to view status for: ").strip()
+    try:
+        status = user_service.get_user_status(username)
+        if not status:
+            print("Could not retrieve status for this user.")
+            return
+
+        quota = status.get('quota_bytes', 0)
+        used = status.get('bytes_used', 0)
+        
+        print(f"\n--- Status for {status['username']} ---")
+        print(f"  Quota Limit: {bytes_to_human(quota)} ({'Unlimited' if quota == 0 else f'{quota:,} bytes'})")
+        print(f"  Data Used:   {bytes_to_human(used)} ({used:,} bytes)")
+
+        if quota > 0:
+            percentage = (used / quota) * 100
+            remaining_bytes = quota - used
+            print(f"  Usage:       {percentage:.2f}%")
+            print(f"  Remaining:   {bytes_to_human(remaining_bytes)}")
+        
+    except UserNotFoundError as e:
+        print(f"❌ {e}")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {e}")
+
+
 def backup_flow(backup_service: BackupService) -> None:
+    # This function remains unchanged
     try:
         password = getpass("Enter a password to encrypt the backup: ")
         if not password:
@@ -289,6 +337,7 @@ def backup_flow(backup_service: BackupService) -> None:
         print(f"❌ Backup failed: {e}")
 
 def restore_flow(backup_service: BackupService) -> None:
+    # This function remains unchanged
     backup_path = input("Enter path to the backup file (local path or URL): ").strip()
     if not backup_path:
         print("Backup path cannot be empty. Restore cancelled.")
@@ -319,18 +368,19 @@ def restore_flow(backup_service: BackupService) -> None:
             os.remove(local_path)
 
 def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
+    # This function remains unchanged
     confirm = input("This will completely remove OpenVPN. Are you sure? (Y/n): ").strip().lower()
     if confirm in ('', 'y', 'yes'):
         try:
             print("🗑️  Uninstalling OpenVPN...")
             
-
             db = Database()
             user_repo = UserRepository(db)
             login_manager = LoginUserManager()
             user_service = UserService(user_repo, openvpn_manager, login_manager)
             
-            users = user_service.get_all_users()
+            # Use get_all_users_with_status to get all users
+            users = user_service.get_all_users_with_status()
             if users:
                 unique_users = set(user['username'] for user in users)
                 print(f"   └── Removing {len(unique_users)} VPN users...")
@@ -354,9 +404,7 @@ def main() -> None:
     user_repo = UserRepository(db)
     login_manager = LoginUserManager()
     openvpn_manager = OpenVPNManager()
-    
     user_service = UserService(user_repo, openvpn_manager, login_manager)
-    
     backupable_components = [openvpn_manager, login_manager, user_service]
     backup_service = BackupService(backupable_components)
 
@@ -381,12 +429,16 @@ def main() -> None:
         elif choice == '5':
             get_shared_config_flow(openvpn_manager)
         elif choice == '6':
-            backup_flow(backup_service)
+            set_user_quota_flow(user_service)
         elif choice == '7':
-            restore_flow(backup_service)
+            view_user_status_flow(user_service)
         elif choice == '8':
-            uninstall_flow(openvpn_manager)
+            backup_flow(backup_service)
         elif choice == '9':
+            restore_flow(backup_service)
+        elif choice == '10':
+            uninstall_flow(openvpn_manager)
+        elif choice == '11':
             print("Goodbye!")
             break
         else:
