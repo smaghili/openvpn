@@ -193,11 +193,12 @@ class OpenVPNManager(IBackupable):
         os.makedirs(ccd_dir, exist_ok=True)
         shutil.chown(ccd_dir, user="nobody", group="nogroup")
 
-        monitoring_config = self._get_monitoring_config()
+        # Remove this line as we're using specific configs now
 
         print("   └── Generating certificate-based server config...")
         base_config = self._get_base_config()
-        cert_config = base_config.format(port=self.settings["cert_port"], proto=self.settings["cert_proto"], extra_auth="") + monitoring_config
+        cert_monitoring_config = self._get_monitoring_config(service_type="cert")
+        cert_config = base_config.format(port=self.settings["cert_port"], proto=self.settings["cert_proto"], extra_auth="") + cert_monitoring_config
         # Write to /etc/openvpn/server/server-cert.conf for systemd service
         os.makedirs("/etc/openvpn/server", exist_ok=True)
         with open("/etc/openvpn/server/server-cert.conf", "w") as f:
@@ -211,15 +212,16 @@ class OpenVPNManager(IBackupable):
 
         print("   └── Generating login-based server config...")
         login_config = self._get_login_config()
+        login_monitoring_config = self._get_monitoring_config(service_type="login")
         # Write to /etc/openvpn/server/server-login.conf for systemd service
         with open("/etc/openvpn/server/server-login.conf", "w") as f:
-            f.write(login_config + monitoring_config)
+            f.write(login_config + login_monitoring_config)
         # Also write to legacy location for compatibility
         with open("/etc/openvpn/server-login.conf", "w") as f:
-            f.write(login_config + monitoring_config)
+            f.write(login_config + login_monitoring_config)
         # Also write to config directory for management
         with open(f"{self.SERVER_CONFIG_DIR}/server-login.conf", "w") as f:
-            f.write(login_config + monitoring_config)
+            f.write(login_config + login_monitoring_config)
         print("   ✅ Server configurations created with monitoring hooks")
 
     def _setup_firewall_rules(self) -> None:
@@ -577,10 +579,15 @@ persist-tun
 status /var/log/openvpn/status-login.log
 verb 3"""
 
-    def _get_monitoring_config(self) -> str:
+    def _get_monitoring_config(self, service_type: str = "cert") -> str:
         """Returns the config lines needed for traffic monitoring with dynamic paths."""
         from config.env_loader import get_config_value
-        management_port = get_config_value("OPENVPN_MANAGEMENT_PORT", "7505")
+        
+        # Use different ports for different services
+        if service_type == "login":
+            management_port = get_config_value("OPENVPN_MANAGEMENT_PORT_LOGIN", "7506")
+        else:
+            management_port = get_config_value("OPENVPN_MANAGEMENT_PORT", "7505")
         
         return f"""
 # --- Traffic Monitoring Config ---
