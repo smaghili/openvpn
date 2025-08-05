@@ -579,17 +579,15 @@ verb 3"""
 
     def _get_monitoring_config(self) -> str:
         """Returns the config lines needed for traffic monitoring with dynamic paths."""
-        from config.paths import VPNPaths
         from config.env_loader import get_config_value
-        on_connect_script = VPNPaths.get_on_connect_script()
-        on_disconnect_script = VPNPaths.get_on_disconnect_script()
         management_port = get_config_value("OPENVPN_MANAGEMENT_PORT", "7505")
         
         return f"""
 # --- Traffic Monitoring Config ---
-script-security 2
-client-connect {on_connect_script}
-client-disconnect {on_disconnect_script}
+# Scripts temporarily disabled for initial setup
+# script-security 2
+# client-connect /root/openvpn/scripts/on_connect.py
+# client-disconnect /root/openvpn/scripts/on_disconnect.py
 management 127.0.0.1 {management_port}
 """
 
