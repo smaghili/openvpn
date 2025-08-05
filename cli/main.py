@@ -73,10 +73,9 @@ def install_flow(openvpn_manager: OpenVPNManager) -> None:
 
     raw_settings = get_install_settings()
     
-    # Validate settings using our configuration system
     try:
         validated_settings = config.validate_install_settings(raw_settings)
-        settings = raw_settings  # Keep original format for compatibility
+        settings = raw_settings
     except ConfigurationError as e:
         print(f"❌ Configuration error: {e}")
         return
@@ -165,7 +164,6 @@ def add_user_flow(user_service: UserService) -> None:
     while True:
         username = input("Enter username: ").strip()
         try:
-            # Use configuration validation
             validated_username = config.validate_username(username)
             break
         except ValidationError as e:
@@ -338,21 +336,25 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
     confirm = input("This will completely remove OpenVPN. Are you sure? (Y/n): ").strip().lower()
     if confirm in ('', 'y', 'yes'):
         try:
-            # Remove all users first (silently)
+            print("🗑️  Uninstalling OpenVPN...")
+            
+
             db = Database()
             user_repo = UserRepository(db)
             login_manager = LoginUserManager()
             user_service = UserService(user_repo, openvpn_manager, login_manager)
             
             users = user_service.get_all_users()
-            unique_users = set()
-            for user in users:
-                unique_users.add(user['username'])
+            if users:
+                unique_users = set(user['username'] for user in users)
+                print(f"   └── Removing {len(unique_users)} VPN users...")
+                for username in unique_users:
+                    user_service.remove_user(username, silent=True)
             
-            for username in unique_users:
-                user_service.remove_user(username, silent=True)
-            
+            print("   └── Stopping services and cleaning up...")
             openvpn_manager.uninstall_openvpn(silent=True)
+            print("✅ OpenVPN completely removed")
+            
             sys.exit(0)
         except Exception as e:
             print(f"❌ Uninstallation failed: {e}")

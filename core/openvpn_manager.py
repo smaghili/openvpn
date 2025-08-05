@@ -22,7 +22,7 @@ class OpenVPNManager(IBackupable):
     This class now persists its settings to a JSON file for stateful operation.
     """
 
-    # Use configuration from config module
+
     OPENVPN_DIR = config.OPENVPN_DIR
     SERVER_CONFIG_DIR = config.SERVER_CONFIG_DIR
     EASYRSA_DIR = config.EASYRSA_DIR
@@ -69,12 +69,28 @@ class OpenVPNManager(IBackupable):
         packages = ["openvpn", "easy-rsa", "iptables-persistent", "openssl", "ca-certificates", "curl", "libpam-pwquality"]
         if self.settings.get("dns") == "2":
             packages.append("unbound")
-        subprocess.run(["apt-get", "update"], check=True)
-        subprocess.run(["apt-get", "install", "-y"] + packages, check=True)
+        
+        print("   └── Updating package lists...")
+        subprocess.run(["apt-get", "update"], check=True, capture_output=True)
+        
+
+        print("   └── Configuring firewall persistence...")
+        subprocess.run(["debconf-set-selections"], input="iptables-persistent iptables-persistent/autosave_v4 boolean true\n", 
+                      text=True, check=True, capture_output=True)
+        subprocess.run(["debconf-set-selections"], input="iptables-persistent iptables-persistent/autosave_v6 boolean true\n", 
+                      text=True, check=True, capture_output=True)
+        
+        print(f"   └── Installing {len(packages)} packages...")
+        env = os.environ.copy()
+        env["DEBIAN_FRONTEND"] = "noninteractive"
+        subprocess.run(["apt-get", "install", "-y"] + packages, check=True, capture_output=True, env=env)
+        print("   ✅ Prerequisites installed")
 
     def _setup_pki(self) -> None:
         """Initializes the PKI and generates an initial Certificate Revocation List."""
         print("[2/7] Setting up Public Key Infrastructure (PKI)...")
+        
+        print("   └── Preparing Easy-RSA environment...")
         if os.path.exists(self.EASYRSA_DIR):
              shutil.rmtree(self.EASYRSA_DIR)
         shutil.copytree("/usr/share/easy-rsa/", self.EASYRSA_DIR)
@@ -83,79 +99,104 @@ class OpenVPNManager(IBackupable):
 
         os.chdir(self.EASYRSA_DIR)
         
-        # Create a 'vars' file to configure Easy-RSA with modern settings
+
         with open("vars", "w") as f:
             f.write('set_var EASYRSA_ALGO "ec"\n')
             f.write('set_var EASYRSA_CURVE "prime256v1"\n')
 
-        # Generate random server identifiers like install.sh
+
         import random
         import string
         server_cn = f"cn_{''.join(random.choices(string.ascii_letters + string.digits, k=16))}"
         server_name = f"server_{''.join(random.choices(string.ascii_letters + string.digits, k=16))}"
         
+        print("   └── Initializing PKI structure...")
         subprocess.run(["./easyrsa", "init-pki"], check=True, capture_output=True)
+        
+        print("   └── Generating Certificate Authority...")
         subprocess.run(["./easyrsa", "--batch", f"--req-cn={server_cn}", "build-ca", "nopass"], check=True, capture_output=True, env={**os.environ, "EASYRSA_CA_EXPIRE": "3650"})
+        
+        print("   └── Creating server certificate...")
         subprocess.run(["./easyrsa", "--batch", "build-server-full", server_name, "nopass"], check=True, capture_output=True, env={**os.environ, "EASYRSA_CERT_EXPIRE": "3650"})
+        
+        print("   └── Generating certificate revocation list...")
         subprocess.run(["./easyrsa", "gen-crl"], check=True, capture_output=True, env={**os.environ, "EASYRSA_CRL_DAYS": "3650"})
+        
+        print("   └── Creating TLS encryption key...")
         subprocess.run(["openvpn", "--genkey", "--secret", "/etc/openvpn/tls-crypt.key"], check=True, capture_output=True)
 
-
+        print("   └── Installing certificates...")
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
         shutil.copy(f"{self.PKI_DIR}/private/ca.key", self.OPENVPN_DIR)
         shutil.copy(f"{self.PKI_DIR}/issued/{server_name}.crt", f"{self.OPENVPN_DIR}/server-cert.crt")
         shutil.copy(f"{self.PKI_DIR}/private/{server_name}.key", f"{self.OPENVPN_DIR}/server-cert.key")
         shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR)
         os.chmod(f"{self.OPENVPN_DIR}/crl.pem", 0o644)
+        print("   ✅ PKI setup complete")
 
     def _generate_server_configs(self) -> None:
         print("[3/7] Generating server configurations...")
+        
+        print("   └── Creating directory structure...")
         os.makedirs(self.SERVER_CONFIG_DIR, exist_ok=True)
         
         for path in ["/var/log/openvpn", "/var/run/openvpn", "/etc/openvpn/ccd"]:
             os.makedirs(path, exist_ok=True)
             shutil.chown(path, user="nobody", group="nogroup")
 
+        print("   └── Generating certificate-based server config...")
         base_config = self._get_base_config()
         cert_config = base_config.format(port=self.settings["cert_port"], proto=self.settings["cert_proto"], extra_auth="")
         with open(f"{self.SERVER_CONFIG_DIR}/server-cert.conf", "w") as f:
             f.write(cert_config)
 
+        print("   └── Generating login-based server config...")
         login_config = self._get_login_config()
         with open(f"{self.SERVER_CONFIG_DIR}/server-login.conf", "w") as f:
             f.write(login_config)
+        print("   ✅ Server configurations created")
 
     def _setup_firewall_rules(self) -> None:
         print("[4/7] Setting up firewall rules...")
-        net_interface = self._get_primary_interface()
         
-        # Certificate-based server (10.8.0.0/24)
+        print(f"   └── Detecting network interface...")
+        net_interface = self._get_primary_interface()
+        print(f"   └── Using interface: {net_interface}")
+        
+        print("   └── Configuring NAT rules for certificate-based VPN...")
         check_command = f"iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE"
         if subprocess.run(check_command, shell=True, capture_output=True, text=True).returncode != 0:
             subprocess.run(f"iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o {net_interface} -j MASQUERADE", shell=True, check=True)
         
-        # Login-based server (10.9.0.0/24)
+        print("   └── Configuring NAT rules for login-based VPN...")
         check_command = f"iptables -t nat -C POSTROUTING -s 10.9.0.0/24 -o {net_interface} -j MASQUERADE"
         if subprocess.run(check_command, shell=True, capture_output=True, text=True).returncode != 0:
             subprocess.run(f"iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o {net_interface} -j MASQUERADE", shell=True, check=True)
         
+        print("   └── Saving firewall rules...")
         os.makedirs(os.path.dirname(self.FIREWALL_RULES_V4), exist_ok=True)
         subprocess.run(f"iptables-save > {self.FIREWALL_RULES_V4}", shell=True, check=True)
+        print("   ✅ Firewall rules configured")
 
     def _enable_ip_forwarding(self) -> None:
         print("[5/7] Enabling IP forwarding...")
+        print("   └── Configuring kernel parameters...")
         with open("/etc/sysctl.conf", "r+") as f:
             content = f.read()
             if "net.ipv4.ip_forward=1" not in content:
                 f.seek(0, 2)
                 f.write("\nnet.ipv4.ip_forward=1\n")
+        print("   └── Applying kernel parameters...")
         subprocess.run(["sysctl", "-p"], check=True, capture_output=True)
+        print("   ✅ IP forwarding enabled")
 
     def _setup_pam(self) -> None:
         print("[6/7] Configuring PAM for OpenVPN...")
+        print("   └── Setting up username/password authentication...")
         pam_config = "auth required pam_unix.so shadow nodelay\naccount required pam_unix.so\n"
         with open("/etc/pam.d/openvpn", "w") as f:
             f.write(pam_config)
+        print("   ✅ PAM authentication configured")
 
     def _setup_unbound(self) -> None:
         # Implementation for Unbound setup
@@ -165,18 +206,28 @@ class OpenVPNManager(IBackupable):
         """Enables and starts the two OpenVPN systemd services."""
         if not silent:
             print("[7/7] Starting OpenVPN services...")
+            print("   └── Reloading systemd daemon...")
         
-        # On modern systems, a restart is often required if the service fails to start initially.
-        # We try to restart instead of just starting.
-        commands = [
-            ["systemctl", "daemon-reload"],
-            ["systemctl", "enable", "openvpn-server@server-cert"],
-            ["systemctl", "enable", "openvpn-server@server-login"],
-            ["systemctl", "restart", "openvpn-server@server-cert"],
-            ["systemctl", "restart", "openvpn-server@server-login"]
-        ]
-        for cmd in commands:
-             subprocess.run(cmd, check=True, capture_output=silent)
+
+        subprocess.run(["systemctl", "daemon-reload"], check=True, capture_output=True)        
+        if not silent:
+            print("   └── Enabling certificate-based VPN service...")
+        subprocess.run(["systemctl", "enable", "openvpn-server@server-cert"], check=True, capture_output=True)
+        
+        if not silent:
+            print("   └── Enabling login-based VPN service...")
+        subprocess.run(["systemctl", "enable", "openvpn-server@server-login"], check=True, capture_output=True)
+        
+        if not silent:
+            print("   └── Starting certificate-based VPN service...")
+        subprocess.run(["systemctl", "restart", "openvpn-server@server-cert"], check=True, capture_output=True)
+        
+        if not silent:
+            print("   └── Starting login-based VPN service...")
+        subprocess.run(["systemctl", "restart", "openvpn-server@server-login"], check=True, capture_output=True)
+        
+        if not silent:
+            print("   ✅ OpenVPN services started and enabled")
 
     def create_user_certificate(self, username: Username) -> None:
         os.chdir(self.EASYRSA_DIR)
@@ -290,13 +341,11 @@ tls-version-min 1.2
 
     def pre_restore(self) -> None:
         """Stops OpenVPN services before a restore operation."""
-        print("Stopping OpenVPN services for restore...")
         subprocess.run(["systemctl", "stop", "openvpn-server@server-cert"], check=False, capture_output=True)
         subprocess.run(["systemctl", "stop", "openvpn-server@server-login"], check=False, capture_output=True)
 
     def post_restore(self) -> None:
         """Restarts OpenVPN services after a restore and reloads state."""
-        print("Reloading settings and restarting OpenVPN services...")
         self._load_settings() 
         self._start_openvpn_services(silent=True)
 

@@ -13,7 +13,7 @@ class LoginUserManager(IBackupable):
     It also provides system user files for backup/restore.
     """
 
-    # These are the critical files that define system users and groups.
+
     SYSTEM_USER_FILES = ["/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow"]
 
     def add_user(self, username: Username, password: Password) -> None:
@@ -21,25 +21,20 @@ class LoginUserManager(IBackupable):
         Adds a new system user with a non-interactive shell.
         This user is intended for services like VPN, not for direct SSH login.
         """
-        print(f"... Adding system user '{username}' for login authentication")
         try:
-            # Create the user with /usr/sbin/nologin to prevent shell access
             subprocess.run(
                 ["useradd", "-M", "-s", "/usr/sbin/nologin", username],
                 check=True, capture_output=True
             )
-            # Set the user's password using chpasswd
-            
             subprocess.run(
                 ["chpasswd"],
                 input=f"{username}:{password}".encode('utf-8'),
                 check=True, capture_output=True
             )
         except subprocess.CalledProcessError as e:
-            # Provide a more helpful error message if the user already exists
             stderr_text = e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else str(e.stderr)
             if "already exists" in stderr_text.lower():
-                print(f"      -> Warning: System user '{username}' already exists. Skipping creation.")
+                print(f"⚠️  Warning: System user '{username}' already exists")
             else:
                 raise RuntimeError(f"Failed to add system user '{username}': {stderr_text}")
 
@@ -49,17 +44,14 @@ class LoginUserManager(IBackupable):
         Standard output and error are redirected to DEVNULL to suppress messages.
         """
         try:
-            # userdel will fail if the user doesn't exist, which is fine.
-            # We redirect stdout and stderr to os.devnull to keep the output clean.
             subprocess.run(
                 ["userdel", "-r", username],
                 check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
         except Exception:
-            # We don't want to stop the main process for any reason here.
             pass
 
-    # --- IBackupable Interface Implementation ---
+
 
     def get_backup_assets(self) -> List[str]:
         """Returns the list of critical system user files for backup."""
@@ -77,13 +69,10 @@ class LoginUserManager(IBackupable):
         Ensures correct, secure permissions on the restored system user files.
         This is a critical security step.
         """
-        print("... Setting secure permissions for restored system user files...")
         for f_path in self.SYSTEM_USER_FILES:
             if os.path.exists(f_path):
-                # Default owner is root:root
                 shutil.chown(f_path, "root", "root")
-                # Set standard secure permissions
                 if "shadow" in f_path or "gshadow" in f_path:
-                    os.chmod(f_path, 0o640)  # Readable by root and group shadow
+                    os.chmod(f_path, 0o640)
                 else:
-                    os.chmod(f_path, 0o644)  # Readable by all, writable by root
+                    os.chmod(f_path, 0o644)

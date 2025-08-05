@@ -7,7 +7,6 @@ from typing import Dict, List, Optional, Union, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
-# Type aliases for better readability
 Username = str
 Password = str
 FilePath = str
@@ -59,9 +58,7 @@ class UserData:
     cert_pem: Optional[str] = None
     key_pem: Optional[str] = None
 
-# Database query result type
+
 DatabaseRow = Dict[str, Any]
 DatabaseResult = List[DatabaseRow]
-
-# Configuration dictionary type
 ConfigDict = Dict[str, Union[str, int, bool]]

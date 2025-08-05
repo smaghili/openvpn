@@ -25,7 +25,7 @@ class BackupService:
         4. Encrypts the tarball with a password.
         5. Cleans up temporary files.
         """
-        print("📦 Creating system-wide backup...")
+        print("📦 Creating backup...")
         backup_path = os.path.expanduser(backup_dir)
         os.makedirs(backup_path, exist_ok=True)
         
@@ -33,17 +33,12 @@ class BackupService:
         os.makedirs(tmp_dir, exist_ok=True)
 
         try:
-            # 1. Gather all assets from all services
             all_assets = []
             for service in self.services:
                 all_assets.extend(service.get_backup_assets())
 
-            # 2. Copy assets to the temporary directory
             for asset_path in all_assets:
                 if os.path.exists(asset_path):
-                    # To preserve the directory structure (e.g., /etc/openvpn), we need to handle paths carefully.
-                    # We will copy the contents into a structure inside tmp_dir that mimics the root.
-                    # Example: /etc/openvpn/server.conf -> /tmp/backup_tmp/etc/openvpn/server.conf
                     dest_path = os.path.join(tmp_dir, asset_path.lstrip('/'))
                     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
@@ -51,37 +46,30 @@ class BackupService:
                         shutil.copytree(asset_path, dest_path, dirs_exist_ok=True)
                     else:
                         shutil.copy2(asset_path, dest_path)
-                else:
-                    print(f"⚠️  Warning: Asset not found and will be skipped: {asset_path}")
 
-            # 3. Create a compressed tarball
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             tar_filename = f"system_backup_{timestamp}.tar.gz"
             tar_path = os.path.join(backup_path, tar_filename)
-            print(f"🗜️ Compressing assets into {tar_filename}...")
+            
             with tarfile.open(tar_path, "w:gz") as tar:
-                tar.add(tmp_dir, arcname='/') # Add contents preserving the structure from root
+                tar.add(tmp_dir, arcname='/')
 
-            # 4. Encrypt the tarball
-            print("🔒 Encrypting backup file...")
             gpg_filename = f"{tar_path}.gpg"
             gpg_command = [
                 "gpg", "--batch", "--yes", "-c",
-                "--passphrase-fd", "0", # Read passphrase from stdin
+                "--passphrase-fd", "0",
                 "-o", gpg_filename,
                 tar_path
             ]
-            # Use Popen to securely pass the password via stdin
             process = subprocess.Popen(gpg_command, stdin=subprocess.PIPE, text=True)
             process.communicate(input=password)
             if process.returncode != 0:
                 raise RuntimeError("GPG encryption failed.")
 
-            # 5. Clean up
             os.remove(tar_path)
             shutil.rmtree(tmp_dir)
             
-            print(f"✅ Backup successful! Encrypted file saved to: {gpg_filename}")
+            print(f"✅ Backup created: {gpg_filename}")
             return gpg_filename
         
         except Exception as e:
@@ -97,7 +85,7 @@ class BackupService:
         3. Replaces system files with the backup contents.
         4. Calls the post-restore hook for all services (e.g., to set permissions and restart daemons).
         """
-        print("🔄 Restoring system from backup...")
+        print("🔄 Restoring from backup...")
         gpg_path = os.path.expanduser(gpg_path)
         if not os.path.exists(gpg_path):
             raise FileNotFoundError(f"Backup file not found: {gpg_path}")
@@ -110,11 +98,9 @@ class BackupService:
         tar_path = os.path.join(tmp_dir, "backup.tar.gz")
 
         try:
-            # 1. Decrypt the backup file securely
-            print("🔑 Decrypting backup...")
             gpg_command = [
                 "gpg", "--batch", "--yes", "--decrypt",
-                "--passphrase-fd", "0", # Read passphrase from stdin
+                "--passphrase-fd", "0",
                 "-o", tar_path,
                 gpg_path
             ]
@@ -125,24 +111,16 @@ class BackupService:
                     raise ValueError("Decryption failed. Incorrect password.")
                 raise RuntimeError(f"GPG decryption failed: {stderr}")
 
-            # 2. Call pre-restore hooks
-            print("⚙️ Preparing system for restore (stopping services)...")
             for service in self.services:
                 service.pre_restore()
 
-            # 3. Extract the tarball to the root directory
-            print("📦 Extracting and restoring files to / ...")
             with tarfile.open(tar_path, "r:gz") as tar:
-                # This is a critical step: extract directly to the root filesystem.
-                # This requires running the script as root.
                 tar.extractall(path="/")
 
-            # 4. Call post-restore hooks
-            print("🚀 Finalizing restore (restarting services)...")
             for service in self.services:
                 service.post_restore()
 
-            print("✅ Restore successful! System is back online.")
+            print("✅ Restore completed successfully")
         
         finally:
             if os.path.exists(tmp_dir):

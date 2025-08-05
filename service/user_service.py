@@ -21,13 +21,10 @@ class UserService(IBackupable):
         self.login_manager = login_manager
 
     def create_user(self, username: Username, password: Optional[Password] = None) -> ConfigData:
-        print(f"Creating user '{username}' with dual authentication support...")
-        
         password_hash = None
         if password:
             password_hash = hashlib.sha256(password.encode()).hexdigest()
         
-        # Check if user already exists
         existing_user = self.user_repo.get_user_by_username(username)
         if existing_user:
             raise UserAlreadyExistsError(username)
@@ -55,7 +52,7 @@ class UserService(IBackupable):
         
         client_config = self.user_repo.get_user_certificate_config(username)
         
-        print(f"✅ User '{username}' created successfully with dual authentication.")
+        print(f"✅ User '{username}' created successfully")
         return client_config
 
     def remove_user(self, username: Username, silent: bool = False) -> None:
@@ -92,6 +89,5 @@ class UserService(IBackupable):
 
     def post_restore(self) -> None:
         if os.path.exists(DATABASE_FILE):
-            print("... Setting permissions for application database...")
             os.chown(DATABASE_FILE, 0, 0)
             os.chmod(DATABASE_FILE, 0o600)

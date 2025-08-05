@@ -28,7 +28,7 @@ class VPNConfig:
     DEFAULT_PROTOCOL: str = "udp"
     DEFAULT_CIPHER: str = "AES-256-GCM"
     DEFAULT_CERT_SIZE: str = "2048"
-    DEFAULT_DNS: str = "3"  # Cloudflare
+    DEFAULT_DNS: str = "3"
     
     # Certificate settings
     CERT_EXPIRE_DAYS: int = 3650
@@ -116,13 +116,12 @@ class VPNConfig:
     def get_dns_config(self, dns_choice: str) -> str:
         """Get DNS configuration based on choice."""
         dns_configs = {
-            "1": "",  # System DNS
-            "2": f'push "dhcp-option DNS 10.8.0.1"',  # Unbound
-            "3": 'push "dhcp-option DNS 1.1.1.1"\npush "dhcp-option DNS 1.0.0.1"',  # Cloudflare
-            "4": 'push "dhcp-option DNS 8.8.8.8"\npush "dhcp-option DNS 8.8.4.4"',  # Google
-            "5": 'push "dhcp-option DNS 94.140.14.14"\npush "dhcp-option DNS 94.140.15.15"'  # AdGuard
+            "1": "",
+            "2": f'push "dhcp-option DNS 10.8.0.1"',
+            "3": 'push "dhcp-option DNS 1.1.1.1"\npush "dhcp-option DNS 1.0.0.1"',
+            "4": 'push "dhcp-option DNS 8.8.8.8"\npush "dhcp-option DNS 8.8.4.4"',
+            "5": 'push "dhcp-option DNS 94.140.14.14"\npush "dhcp-option DNS 94.140.15.15"'
         }
         return dns_configs.get(dns_choice, dns_configs["3"])
 
-# Global configuration instance
 config = VPNConfig()
