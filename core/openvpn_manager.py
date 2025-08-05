@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from .backup_interface import IBackupable
 from config.shared_config import CLIENT_TEMPLATE, USER_CERTS_TEMPLATE
 from config.config import VPNConfig, config
+from config.constants import OpenVPNConstants, ConfigurablePaths
 from core.types import Username, ConfigData, InstallSettings
 from core.exceptions import (
     InstallationError, 
@@ -175,13 +176,10 @@ class OpenVPNManager(IBackupable):
             # Set proper permissions
             os.chmod(openvpn_scripts_dir, 0o755)
 
-        # Create required directories using configurable paths
-        from config.env_loader import get_config_value
-        
-        # System directories (these stay in /var for system compliance)
+        # Create required system directories
         system_dirs = [
-            get_config_value("VAR_LOG_OPENVPN", "/var/log/openvpn"),
-            get_config_value("VAR_RUN_OPENVPN", "/var/run/openvpn")
+            OpenVPNConstants.VAR_LOG_OPENVPN,
+            OpenVPNConstants.VAR_RUN_OPENVPN
         ]
         
         for path in system_dirs:
@@ -189,10 +187,8 @@ class OpenVPNManager(IBackupable):
             shutil.chown(path, user="nobody", group="nogroup")
         
         # CCD directory should be in the OpenVPN system directory
-        from config.paths import VPNPaths
-        ccd_dir = VPNPaths.get_ccd_dir()
-        os.makedirs(ccd_dir, exist_ok=True)
-        shutil.chown(ccd_dir, user="nobody", group="nogroup")
+        os.makedirs(OpenVPNConstants.CCD_DIR, exist_ok=True)
+        shutil.chown(OpenVPNConstants.CCD_DIR, user="nobody", group="nogroup")
 
         # Remove this line as we're using specific configs now
 
@@ -515,8 +511,8 @@ ecdh-curve prime256v1
 crl-verify crl.pem
 tls-crypt tls-crypt.key
 server 10.8.0.0 255.255.255.0
-ifconfig-pool-persist {VPNPaths.get_run_dir()}/ipp.txt
-status {VPNPaths.get_status_file()}
+ifconfig-pool-persist {OpenVPNConstants.VAR_RUN_OPENVPN}/ipp.txt
+status /var/log/openvpn/openvpn-status.log
 push "redirect-gateway def1 bypass-dhcp"
 {dns_lines}
 keepalive 10 120
@@ -529,8 +525,7 @@ verb 3
 {{extra_auth}}"""
 
     def _get_login_config(self) -> str:
-        # Use VPNPaths for all certificate and key paths
-        from config.paths import VPNPaths
+        # Generate login-based server configuration
         
         dns_lines = {
             "1": "",
@@ -553,7 +548,7 @@ key server-cert.key
 dh none
 ecdh-curve prime256v1
 server 10.9.0.0 255.255.255.0
-ifconfig-pool-persist {VPNPaths.get_run_dir()}/ipp-login.txt
+ifconfig-pool-persist {OpenVPNConstants.VAR_RUN_OPENVPN}/ipp-login.txt
 
 # PAM authentication
 plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so openvpn
@@ -572,7 +567,7 @@ ncp-ciphers {cipher_config}
 tls-server
 tls-version-min 1.2
 tls-cipher {cc_cipher_config}
-client-config-dir {VPNPaths.get_ccd_dir()}
+client-config-dir {OpenVPNConstants.CCD_DIR}
 user nobody
 group nogroup
 persist-key
@@ -582,13 +577,12 @@ verb 3"""
 
     def _get_monitoring_config(self, service_type: str = "cert") -> str:
         """Returns the config lines needed for traffic monitoring with dynamic paths."""
-        from config.env_loader import get_config_value
         
         # Use different ports for different services
         if service_type == "login":
-            management_port = get_config_value("OPENVPN_MANAGEMENT_PORT_LOGIN", "7506")
+            management_port = OpenVPNConstants.MANAGEMENT_PORT_LOGIN
         else:
-            management_port = get_config_value("OPENVPN_MANAGEMENT_PORT", "7505")
+            management_port = OpenVPNConstants.MANAGEMENT_PORT_CERT
         
         return f"""
 # --- Traffic Monitoring Config ---

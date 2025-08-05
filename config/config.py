@@ -9,19 +9,18 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
 from core.types import IPAddress, Port, InstallSettings
 from core.exceptions import ConfigurationError, ValidationError
-from config.env_loader import get_config_value
-from config.paths import VPNPaths
+from config.constants import OpenVPNConstants, ConfigurablePaths
 
 @dataclass
 class VPNConfig:
     """Central configuration class for VPN Manager."""
     
-    # Directory paths - all loaded from environment variables
-    OPENVPN_DIR: str = field(default_factory=VPNPaths.get_database_dir)
-    SERVER_CONFIG_DIR: str = field(default_factory=VPNPaths.get_openvpn_server_dir)
-    EASYRSA_DIR: str = field(default_factory=VPNPaths.get_easyrsa_dir)
-    PKI_DIR: str = field(default_factory=VPNPaths.get_pki_dir)
-    DATABASE_FILE: str = field(default_factory=VPNPaths.get_database_file)
+    # Directory paths
+    OPENVPN_DIR: str = field(default_factory=ConfigurablePaths.get_database_dir)
+    SERVER_CONFIG_DIR: str = OpenVPNConstants.SERVER_CONFIG_DIR
+    EASYRSA_DIR: str = OpenVPNConstants.EASYRSA_DIR
+    PKI_DIR: str = OpenVPNConstants.PKI_DIR
+    DATABASE_FILE: str = field(default_factory=ConfigurablePaths.get_database_file)
     SETTINGS_FILE: str = field(init=False)
     
     # Network defaults
