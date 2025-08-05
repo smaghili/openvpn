@@ -20,18 +20,14 @@ function check_root() {
 function install_deployment() {
     echo "▶️  Starting VPN Manager deployment..."
     check_root
-
-    # 1. Install minimal system dependencies
     echo "[1/4] Installing base system packages (git, python3-venv)..."
     apt-get update
     apt-get install -y git python3-venv
 
-    # 2. Clone or Update the project repository
     echo "[2/4] Syncing project files from repository..."
     if [ -d "$PROJECT_DIR" ]; then
         echo "      -> Project directory exists. Fetching latest version..."
         cd "$PROJECT_DIR"
-        # Reset any local changes to ensure a clean pull
         git reset --hard HEAD
         git pull origin main
     else
@@ -39,13 +35,10 @@ function install_deployment() {
         git clone "$REPO_URL" "$PROJECT_DIR"
         cd "$PROJECT_DIR"
     fi
-
-    # 3. Set up Python virtual environment and install dependencies
     echo "[3/4] Setting up Python environment..."
     if [ ! -d "venv" ]; then
         python3 -m venv venv
     fi
-    # Use 'source' or '.' to activate the venv. The '.' is more portable.
     . "venv/bin/activate"
     pip install --upgrade pip
     if [ -f "requirements.txt" ]; then
@@ -54,20 +47,11 @@ function install_deployment() {
         echo "      -> WARNING: requirements.txt not found. Dependencies may be missing."
     fi
 
-    # 4. Set project root environment variable and hand over control
     echo "[4/4] Launching the application's main installer..."
     echo "--------------------------------------------------------"
-    # Set the PROJECT_ROOT environment variable to current directory
     export PROJECT_ROOT="$(pwd)"
     echo "      -> Project root set to: $PROJECT_ROOT"
-    
-    # We must use the python from the venv but run it with sudo
-    # so that it has the necessary permissions for system-wide changes.
-    # The -m flag runs the package as a script, ensuring correct module resolution.
     sudo PROJECT_ROOT="$PROJECT_ROOT" "venv/bin/python" -m cli.main
-
-    echo "--------------------------------------------------------"
-    echo "✅ Deployment script finished. The application has now taken over."
 }
 
 function remove_project_files() {
