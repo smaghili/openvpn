@@ -62,7 +62,7 @@ class OpenVPNManager(IBackupable):
         self._start_openvpn_services()
         
         self._save_settings()
-        print("✅ OpenVPN installation phase completed and settings saved.")
+
 
     def _install_prerequisites(self) -> None:
         print("[1/7] Installing prerequisites...")

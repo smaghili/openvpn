@@ -93,8 +93,7 @@ def install_flow(openvpn_manager: OpenVPNManager) -> None:
         openvpn_manager.install_openvpn(settings)
         _patch_login_manager_file()
         _install_owpanel_command()
-        print("\n✅ Installation completed successfully!")
-        print("You can now manage users from the main menu.")
+
         print("From now on, you can run the panel from anywhere by typing: owpanel")
     except Exception as e:
         print(f"\n❌ Installation failed: {e}")
@@ -104,9 +103,7 @@ def _patch_login_manager_file() -> None:
     """
     Acts as a self-healing mechanism to definitively fix the user creation bug.
     """
-    print("▶️  Applying critical patch for user authentication...")
     file_path = os.path.join(project_root, 'core', 'login_user_manager.py')
-    
     try:
         content = ""
         if os.path.exists(file_path):
@@ -123,9 +120,8 @@ def _patch_login_manager_file() -> None:
             content = buggy_pattern.sub(correct_code, content)
             with open(file_path, 'w') as f:
                 f.write(content)
-            print("✅ Patch applied successfully.")
         else:
-            print("✅ Authentication module is already up-to-date.")
+            print("✅ Login manager file is already patched or doesn't need patching.")
 
     except Exception as e:
         print(f"⚠️  Warning: Could not apply patch. User creation might fail. Error: {e}")
@@ -134,7 +130,6 @@ def _install_owpanel_command() -> None:
     """
     Makes the script a system-wide command.
     """
-    print("▶️  Registering 'owpanel' command...")
     try:
         script_path = os.path.realpath(__file__)
         command_path = "/usr/local/bin/owpanel"
@@ -144,7 +139,7 @@ def _install_owpanel_command() -> None:
         if os.path.lexists(command_path):
             os.remove(command_path)
         os.symlink(script_path, command_path)
-        print("✅ 'owpanel' command registered successfully.")
+
     except Exception as e:
         print(f"⚠️  Warning: Could not create system-wide command. Error: {e}")
 
@@ -174,12 +169,7 @@ def add_user_flow(user_service: UserService) -> None:
             continue
 
     print(f"\n📜 Certificate-based authentication will be enabled for '{username}'")
-    create_login = input(f"🔐 Also enable password login for '{username}'? (y/n) [y]: ").strip().lower()
-    create_login = create_login if create_login else 'y'
-    
-    password = None
-    if create_login == 'y':
-        password = getpass("Enter a password for the user: ")
+    password = getpass("Enter a password for the user: ")
 
     try:
         config_data = user_service.create_user(validated_username, password)
@@ -189,17 +179,15 @@ def add_user_flow(user_service: UserService) -> None:
                 f.write(config_data)
             print(f"✅ Certificate-based config saved to: {config_path}")
             
-        if password:
-            shared_config = user_service.get_shared_config()
-            shared_path = os.path.join(os.path.expanduser("~"), f"{username}-login.ovpn")
-            with open(shared_path, "w") as f:
-                f.write(shared_config)
-            print(f"✅ Login-based config saved to: {shared_path}")
+        shared_config = user_service.get_shared_config()
+        shared_path = os.path.join(os.path.expanduser("~"), "shared-login.ovpn")
+        with open(shared_path, "w") as f:
+            f.write(shared_config)
+        print(f"✅ Login-based config saved to: {shared_path}")
             
         print(f"\n🎉 User '{username}' now has dual authentication access:")
         print(f"   📜 Certificate-based: Use {username}-cert.ovpn")
-        if password:
-            print(f"   🔐 Username/Password: Use {username}-login.ovpn with username '{username}' and password")
+        print(f"   🔐 Username/Password: Use shared-login.ovpn with username '{username}' and password")
             
     except UserAlreadyExistsError as e:
         print(f"❌ {e}")
