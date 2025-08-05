@@ -156,23 +156,24 @@ class OpenVPNManager(IBackupable):
         print("   └── Creating directory structure...")
         os.makedirs(self.SERVER_CONFIG_DIR, exist_ok=True)
         
-        # Set proper permissions for scripts directory so 'nobody' user can access them
+        # Copy scripts to /etc/openvpn/scripts/ for better access
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
         scripts_dir = os.path.join(project_root, 'scripts')
+        openvpn_scripts_dir = "/etc/openvpn/scripts"
         
         if os.path.exists(scripts_dir):
-            # Make scripts directory and files readable by all users (including 'nobody')
-            os.chmod(scripts_dir, 0o755)
-            for script_name in os.listdir(scripts_dir):
-                script_path = os.path.join(scripts_dir, script_name)
-                os.chmod(script_path, 0o755)
+            print("   └── Setting up monitoring scripts...")
+            os.makedirs(openvpn_scripts_dir, exist_ok=True)
             
-            # Also ensure the project root and parent directories are accessible
-            os.chmod(project_root, 0o755)
-            # Make /root directory accessible (this is needed for 'nobody' to reach the scripts)
-            parent_dir = os.path.dirname(project_root)
-            if parent_dir == '/root':
-                os.chmod(parent_dir, 0o755)
+            # Copy scripts to OpenVPN directory
+            for script_name in ['on_connect.py', 'on_disconnect.py']:
+                source_script = os.path.join(scripts_dir, script_name)
+                if os.path.exists(source_script):
+                    shutil.copy(source_script, os.path.join(openvpn_scripts_dir, script_name))
+                    os.chmod(os.path.join(openvpn_scripts_dir, script_name), 0o755)
+            
+            # Set proper permissions
+            os.chmod(openvpn_scripts_dir, 0o755)
 
         # Create required directories using configurable paths
         from config.env_loader import get_config_value
@@ -592,8 +593,8 @@ verb 3"""
         return f"""
 # --- Traffic Monitoring Config ---
 script-security 2
-client-connect /root/openvpn/scripts/on_connect.py
-client-disconnect /root/openvpn/scripts/on_disconnect.py
+client-connect /etc/openvpn/scripts/on_connect.py
+client-disconnect /etc/openvpn/scripts/on_disconnect.py
 management 127.0.0.1 {management_port}
 """
 
