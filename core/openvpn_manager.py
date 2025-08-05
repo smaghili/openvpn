@@ -123,12 +123,19 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["openvpn", "--genkey", "--secret", "/etc/openvpn/tls-crypt.key"], check=True, capture_output=True)
 
         print("   └── Installing certificates...")
+        # Copy to /etc/openvpn/ (system directory) 
+        shutil.copy(f"{self.PKI_DIR}/ca.crt", "/etc/openvpn/")
+        shutil.copy(f"{self.PKI_DIR}/private/ca.key", "/etc/openvpn/")
+        shutil.copy(f"{self.PKI_DIR}/issued/{server_name}.crt", "/etc/openvpn/server-cert.crt")
+        shutil.copy(f"{self.PKI_DIR}/private/{server_name}.key", "/etc/openvpn/server-cert.key")
+        shutil.copy(f"{self.PKI_DIR}/crl.pem", "/etc/openvpn/")
+        os.chmod("/etc/openvpn/crl.pem", 0o644)
+        
+        # Also copy to data directory for backup
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
-        shutil.copy(f"{self.PKI_DIR}/private/ca.key", self.OPENVPN_DIR)
         shutil.copy(f"{self.PKI_DIR}/issued/{server_name}.crt", f"{self.OPENVPN_DIR}/server-cert.crt")
         shutil.copy(f"{self.PKI_DIR}/private/{server_name}.key", f"{self.OPENVPN_DIR}/server-cert.key")
         shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR)
-        os.chmod(f"{self.OPENVPN_DIR}/crl.pem", 0o644)
         print("   ✅ PKI setup complete")
 
     def _generate_server_configs(self) -> None:
@@ -179,11 +186,19 @@ class OpenVPNManager(IBackupable):
         print("   └── Generating certificate-based server config...")
         base_config = self._get_base_config()
         cert_config = base_config.format(port=self.settings["cert_port"], proto=self.settings["cert_proto"], extra_auth="") + monitoring_config
+        # Write to /etc/openvpn/server.conf for systemd service
+        with open("/etc/openvpn/server.conf", "w") as f:
+            f.write(cert_config)
+        # Also write to config directory for management
         with open(f"{self.SERVER_CONFIG_DIR}/server-cert.conf", "w") as f:
             f.write(cert_config)
 
         print("   └── Generating login-based server config...")
         login_config = self._get_login_config()
+        # Write to /etc/openvpn/server-login.conf for systemd service
+        with open("/etc/openvpn/server-login.conf", "w") as f:
+            f.write(login_config + monitoring_config)
+        # Also write to config directory for management
         with open(f"{self.SERVER_CONFIG_DIR}/server-login.conf", "w") as f:
             f.write(login_config + monitoring_config)
         print("   ✅ Server configurations created with monitoring hooks")
@@ -330,10 +345,10 @@ WantedBy=multi-user.target
 
     def generate_user_config(self, username: Username) -> ConfigData:
         # This method remains unchanged
-        ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
+        ca_cert = self._read_file("/etc/openvpn/ca.crt")
         user_cert = self._extract_certificate(f"{self.PKI_DIR}/issued/{username}.crt")
         user_key = self._read_file(f"{self.PKI_DIR}/private/{username}.key")
-        tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/tls-crypt.key")
+        tls_crypt_key = self._read_file("/etc/openvpn/tls-crypt.key")
 
         user_specific_certs = USER_CERTS_TEMPLATE.format(user_cert=user_cert, user_key=user_key)
         
@@ -348,7 +363,7 @@ WantedBy=multi-user.target
 
     def get_shared_config(self) -> ConfigData:
         # This method remains unchanged
-        ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
+        ca_cert = self._read_file("/etc/openvpn/ca.crt")
         
         if not os.path.exists(f"{self.PKI_DIR}/issued/main.crt"):
             os.chdir(self.EASYRSA_DIR)
@@ -356,7 +371,7 @@ WantedBy=multi-user.target
         
         main_cert = self._extract_certificate(f"{self.PKI_DIR}/issued/main.crt")
         main_key = self._read_file(f"{self.PKI_DIR}/private/main.key")
-        tls_crypt_key = self._read_file(f"{self.OPENVPN_DIR}/tls-crypt.key")
+        tls_crypt_key = self._read_file("/etc/openvpn/tls-crypt.key")
 
         if not main_cert or not main_key:
             raise RuntimeError("Main certificate not found. Please reinstall.")
@@ -466,18 +481,17 @@ tls-version-min 1.2
             "5": 'push "dhcp-option DNS 94.140.14.14"\npush "dhcp-option DNS 94.140.15.15"'
         }.get(self.settings.get("dns", "3"), "")
 
-        return f"""
-port {{port}}
+        return f"""port {{port}}
 proto {{proto}}
 dev tun
 topology subnet
-ca {VPNPaths.get_ca_cert()}
-cert {VPNPaths.get_server_cert()}
-key {VPNPaths.get_server_key()}
+ca ca.crt
+cert server-cert.crt
+key server-cert.key
 dh none
 ecdh-curve prime256v1
-crl-verify {VPNPaths.get_crl_file()}
-tls-crypt {VPNPaths.get_tls_crypt_key()}
+crl-verify crl.pem
+tls-crypt tls-crypt.key
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist {VPNPaths.get_run_dir()}/ipp.txt
 status {VPNPaths.get_status_file()}
@@ -489,9 +503,10 @@ user nobody
 group nogroup
 persist-key
 persist-tun
+client-connect {VPNPaths.get_on_connect_script()}
+client-disconnect {VPNPaths.get_on_disconnect_script()}
 verb 3
-{{extra_auth}}
-"""
+{{extra_auth}}"""
 
     def _get_login_config(self) -> str:
         # Use VPNPaths for all certificate and key paths
@@ -512,9 +527,9 @@ verb 3
 proto {self.settings["login_proto"]}
 dev tun1
 topology subnet
-ca {VPNPaths.get_ca_cert()}
-cert {VPNPaths.get_server_cert()}
-key {VPNPaths.get_server_key()}
+ca ca.crt
+cert server-cert.crt
+key server-cert.key
 dh none
 ecdh-curve prime256v1
 server 10.9.0.0 255.255.255.0
@@ -530,21 +545,22 @@ push "redirect-gateway def1 bypass-dhcp"
 keepalive 10 120
 
 # CRL verification
-crl-verify {VPNPaths.get_crl_file()}
-tls-crypt {VPNPaths.get_tls_crypt_key()}
+crl-verify crl.pem
+tls-crypt tls-crypt.key
 cipher {self.settings.get("cipher", "AES-256-GCM")}
 ncp-ciphers {cipher_config}
 tls-server
 tls-version-min 1.2
 tls-cipher {cc_cipher_config}
 client-config-dir {VPNPaths.get_ccd_dir()}
+client-connect {VPNPaths.get_on_connect_script()}
+client-disconnect {VPNPaths.get_on_disconnect_script()}
 user nobody
 group nogroup
 persist-key
 persist-tun
 status /var/log/openvpn/status-login.log
-verb 3
-"""
+verb 3"""
 
     def _get_monitoring_config(self) -> str:
         """Returns the config lines needed for traffic monitoring with dynamic paths."""
