@@ -54,13 +54,17 @@ function install_deployment() {
         echo "      -> WARNING: requirements.txt not found. Dependencies may be missing."
     fi
 
-    # 4. Hand over control to the Python application installer
+    # 4. Set project root environment variable and hand over control
     echo "[4/4] Launching the application's main installer..."
     echo "--------------------------------------------------------"
+    # Set the PROJECT_ROOT environment variable to current directory
+    export PROJECT_ROOT="$(pwd)"
+    echo "      -> Project root set to: $PROJECT_ROOT"
+    
     # We must use the python from the venv but run it with sudo
     # so that it has the necessary permissions for system-wide changes.
     # The -m flag runs the package as a script, ensuring correct module resolution.
-    sudo "venv/bin/python" -m cli.main
+    sudo PROJECT_ROOT="$PROJECT_ROOT" "venv/bin/python" -m cli.main
 
     echo "--------------------------------------------------------"
     echo "✅ Deployment script finished. The application has now taken over."

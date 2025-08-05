@@ -210,7 +210,9 @@ class OpenVPNManager(IBackupable):
         # Load environment configuration
         from config.env_loader import get_config_value
         
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        # Get project root from environment variable or fallback to relative path
+        project_root = get_config_value("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+        
         management_port = get_config_value("OPENVPN_MANAGEMENT_PORT", "7505")
         
         service_content = f"""[Unit]
@@ -514,8 +516,9 @@ verb 3
         # Load environment configuration
         from config.env_loader import get_config_value
         
-        # Get the absolute path to the project's root directory dynamically
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        # Get project root from environment variable or fallback to relative path  
+        project_root = get_config_value("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+        
         on_connect_script = os.path.join(project_root, 'scripts', 'on_connect.py')
         on_disconnect_script = os.path.join(project_root, 'scripts', 'on_disconnect.py')
         
