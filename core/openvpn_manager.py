@@ -503,9 +503,6 @@ user nobody
 group nogroup
 persist-key
 persist-tun
-script-security 2
-client-connect "{VPNPaths.get_on_connect_script()}"
-client-disconnect "{VPNPaths.get_on_disconnect_script()}"
 verb 3
 {{extra_auth}}"""
 
@@ -554,9 +551,6 @@ tls-server
 tls-version-min 1.2
 tls-cipher {cc_cipher_config}
 client-config-dir {VPNPaths.get_ccd_dir()}
-script-security 2
-client-connect "{VPNPaths.get_on_connect_script()}"
-client-disconnect "{VPNPaths.get_on_disconnect_script()}"
 user nobody
 group nogroup
 persist-key
