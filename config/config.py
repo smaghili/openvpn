@@ -9,13 +9,17 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
 from core.types import IPAddress, Port, InstallSettings
 from core.exceptions import ConfigurationError, ValidationError
+from config.env_loader import get_config_value
 
 @dataclass
 class VPNConfig:
     """Central configuration class for VPN Manager."""
     
-    # Directory paths
-    OPENVPN_DIR: str = "/etc/openvpn"
+    # Directory paths - all based on PROJECT_ROOT for consistency
+    OPENVPN_DIR: str = field(default_factory=lambda: os.path.join(
+        get_config_value("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))), 
+        "openvpn_data"
+    ))
     SERVER_CONFIG_DIR: str = field(init=False)
     EASYRSA_DIR: str = field(init=False)
     PKI_DIR: str = field(init=False)

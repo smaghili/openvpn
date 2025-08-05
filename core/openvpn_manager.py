@@ -132,15 +132,46 @@ class OpenVPNManager(IBackupable):
         print("   ✅ PKI setup complete")
 
     def _generate_server_configs(self) -> None:
-        # This method remains unchanged
         print("[3/7] Generating server configurations...")
         
         print("   └── Creating directory structure...")
         os.makedirs(self.SERVER_CONFIG_DIR, exist_ok=True)
         
-        for path in ["/var/log/openvpn", "/var/run/openvpn", "/etc/openvpn/ccd"]:
+        # Set proper permissions for scripts directory so 'nobody' user can access them
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        scripts_dir = os.path.join(project_root, 'scripts')
+        
+        if os.path.exists(scripts_dir):
+            # Make scripts directory and files readable by all users (including 'nobody')
+            os.chmod(scripts_dir, 0o755)
+            for script_name in os.listdir(scripts_dir):
+                script_path = os.path.join(scripts_dir, script_name)
+                os.chmod(script_path, 0o755)
+            
+            # Also ensure the project root and parent directories are accessible
+            os.chmod(project_root, 0o755)
+            # Make /root directory accessible (this is needed for 'nobody' to reach the scripts)
+            parent_dir = os.path.dirname(project_root)
+            if parent_dir == '/root':
+                os.chmod(parent_dir, 0o755)
+
+        # Create required directories using configurable paths
+        from config.env_loader import get_config_value
+        
+        # System directories (these stay in /var for system compliance)
+        system_dirs = [
+            get_config_value("VAR_LOG_OPENVPN", "/var/log/openvpn"),
+            get_config_value("VAR_RUN_OPENVPN", "/var/run/openvpn")
+        ]
+        
+        for path in system_dirs:
             os.makedirs(path, exist_ok=True)
             shutil.chown(path, user="nobody", group="nogroup")
+        
+        # CCD directory should be in the same location as other OpenVPN configs
+        ccd_dir = os.path.join(self.OPENVPN_DIR, "ccd")
+        os.makedirs(ccd_dir, exist_ok=True)
+        shutil.chown(ccd_dir, user="nobody", group="nogroup")
 
         monitoring_config = self._get_monitoring_config()
 
@@ -502,7 +533,7 @@ ncp-ciphers {cipher_config}
 tls-server
 tls-version-min 1.2
 tls-cipher {cc_cipher_config}
-client-config-dir /etc/openvpn/ccd
+client-config-dir {self.OPENVPN_DIR}/ccd
 user nobody
 group nogroup
 persist-key
