@@ -167,8 +167,6 @@ def add_user_flow(user_service: UserService) -> None:
         except UserAlreadyExistsError as e:
             print(f"❌ {e}")
             continue
-
-    print(f"\n📜 Certificate-based authentication will be enabled for '{username}'")
     password = getpass("Enter a password for the user: ")
 
     try:
