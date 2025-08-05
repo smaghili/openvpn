@@ -121,6 +121,10 @@ class OpenVPNManager(IBackupable):
         
         print("   └── Creating TLS encryption key...")
         subprocess.run(["openvpn", "--genkey", "--secret", "/etc/openvpn/tls-crypt.key"], check=True, capture_output=True)
+        # Copy to server directory as well
+        if os.path.exists("/etc/openvpn/tls-crypt.key"):
+            os.makedirs("/etc/openvpn/server", exist_ok=True)
+            shutil.copy("/etc/openvpn/tls-crypt.key", "/etc/openvpn/server/")
 
         print("   └── Installing certificates...")
         # Copy to /etc/openvpn/ (system directory) 
@@ -130,6 +134,14 @@ class OpenVPNManager(IBackupable):
         shutil.copy(f"{self.PKI_DIR}/private/{server_name}.key", "/etc/openvpn/server-cert.key")
         shutil.copy(f"{self.PKI_DIR}/crl.pem", "/etc/openvpn/")
         os.chmod("/etc/openvpn/crl.pem", 0o644)
+        
+        # Copy to /etc/openvpn/server/ (for systemd service)
+        os.makedirs("/etc/openvpn/server", exist_ok=True)
+        shutil.copy(f"{self.PKI_DIR}/ca.crt", "/etc/openvpn/server/")
+        shutil.copy(f"{self.PKI_DIR}/issued/{server_name}.crt", "/etc/openvpn/server/server-cert.crt")
+        shutil.copy(f"{self.PKI_DIR}/private/{server_name}.key", "/etc/openvpn/server/server-cert.key")
+        shutil.copy(f"{self.PKI_DIR}/crl.pem", "/etc/openvpn/server/")
+        os.chmod("/etc/openvpn/server/crl.pem", 0o644)
         
         # Also copy to data directory for backup
         shutil.copy(f"{self.PKI_DIR}/ca.crt", self.OPENVPN_DIR)
@@ -186,7 +198,11 @@ class OpenVPNManager(IBackupable):
         print("   └── Generating certificate-based server config...")
         base_config = self._get_base_config()
         cert_config = base_config.format(port=self.settings["cert_port"], proto=self.settings["cert_proto"], extra_auth="") + monitoring_config
-        # Write to /etc/openvpn/server-cert.conf for systemd service
+        # Write to /etc/openvpn/server/server-cert.conf for systemd service
+        os.makedirs("/etc/openvpn/server", exist_ok=True)
+        with open("/etc/openvpn/server/server-cert.conf", "w") as f:
+            f.write(cert_config)
+        # Also write to legacy location for compatibility
         with open("/etc/openvpn/server-cert.conf", "w") as f:
             f.write(cert_config)
         # Also write to config directory for management
@@ -195,7 +211,10 @@ class OpenVPNManager(IBackupable):
 
         print("   └── Generating login-based server config...")
         login_config = self._get_login_config()
-        # Write to /etc/openvpn/server-login.conf for systemd service
+        # Write to /etc/openvpn/server/server-login.conf for systemd service
+        with open("/etc/openvpn/server/server-login.conf", "w") as f:
+            f.write(login_config + monitoring_config)
+        # Also write to legacy location for compatibility
         with open("/etc/openvpn/server-login.conf", "w") as f:
             f.write(login_config + monitoring_config)
         # Also write to config directory for management
