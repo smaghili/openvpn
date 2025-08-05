@@ -430,35 +430,84 @@ tls-version-min 1.2
         return config
 
     def uninstall_openvpn(self, silent: bool = False) -> None:
-        """Stops and removes all services and files, including the monitor."""
+        """Completely removes all OpenVPN services, files, and processes."""
         if not silent:
-            print("▶️  Starting uninstallation...")
+            print("▶️  Starting complete uninstallation...")
 
+        if not silent:
+            print("   └── Force killing all OpenVPN processes...")
+        subprocess.run(["killall", "-9", "openvpn"], check=False, capture_output=True)
+
+        if not silent:
+            print("   └── Stopping and disabling services...")
         services_to_stop = [
             "openvpn-monitor",
-            "openvpn-server@server-cert",
-            "openvpn-server@server-login"
+            "openvpn-server@server-cert", 
+            "openvpn-server@server-login",
+            "openvpn@server"
         ]
         for service in services_to_stop:
             subprocess.run(["systemctl", "stop", service], check=False, capture_output=True)
             subprocess.run(["systemctl", "disable", service], check=False, capture_output=True)
 
+        if not silent:
+            print("   └── Removing service files...")
         monitor_service_file = "/etc/systemd/system/openvpn-monitor.service"
         if os.path.exists(monitor_service_file):
             os.remove(monitor_service_file)
         subprocess.run(["systemctl", "daemon-reload"], check=False, capture_output=True)
 
-        if os.path.exists(self.SETTINGS_FILE):
-             os.remove(self.SETTINGS_FILE)
-        if os.path.exists(self.OPENVPN_DIR):
-            shutil.rmtree(self.OPENVPN_DIR)
-        if os.path.exists("/etc/pam.d/openvpn"):
-            os.remove("/etc/pam.d/openvpn")
-        if os.path.exists(self.FIREWALL_RULES_V4):
-            os.remove(self.FIREWALL_RULES_V4)
-        for path in ["/var/log/openvpn", "/var/run/openvpn"]:
+        if not silent:
+            print("   └── Cleaning configuration files...")
+        config_paths = [
+            self.SETTINGS_FILE,
+            "/etc/openvpn/server-cert.conf",
+            "/etc/openvpn/server-login.conf", 
+            "/etc/openvpn/server/server-cert.conf",
+            "/etc/openvpn/server/server-login.conf",
+            "/etc/pam.d/openvpn",
+            self.FIREWALL_RULES_V4
+        ]
+        for path in config_paths:
+            if os.path.exists(path):
+                os.remove(path)
+
+        if not silent:
+            print("   └── Removing directories...")
+        directories_to_remove = [
+            self.OPENVPN_DIR,
+            "/etc/openvpn/easy-rsa",
+            "/etc/openvpn/server", 
+            "/etc/openvpn/ccd",
+            "/etc/openvpn/scripts",
+            "/var/log/openvpn",
+            "/var/run/openvpn"
+        ]
+        for path in directories_to_remove:
             if os.path.exists(path):
                 shutil.rmtree(path)
+
+        if not silent:
+            print("   └── Removing certificate files...")
+        cert_files = [
+            "/etc/openvpn/ca.crt",
+            "/etc/openvpn/ca.key", 
+            "/etc/openvpn/server-cert.crt",
+            "/etc/openvpn/server-cert.key",
+            "/etc/openvpn/crl.pem",
+            "/etc/openvpn/tls-crypt.key"
+        ]
+        for path in cert_files:
+            if os.path.exists(path):
+                os.remove(path)
+
+        if not silent:
+            print("   └── Final process cleanup...")
+        subprocess.run(["fuser", "-k", "7505/tcp"], check=False, capture_output=True)
+        subprocess.run(["fuser", "-k", "7506/tcp"], check=False, capture_output=True)
+
+        if not silent:
+            print("   └── Removing packages...")
         packages = ["openvpn", "easy-rsa", "iptables-persistent"]
         if os.path.exists("/etc/unbound"):
             packages.append("unbound")
@@ -466,7 +515,7 @@ tls-version-min 1.2
         subprocess.run(["apt-get", "autoremove", "-y"], check=True, capture_output=True)
         
         if not silent:
-            print("✅ Uninstallation complete.")
+            print("✅ Complete uninstallation finished. All ports freed.")
 
     def get_backup_assets(self) -> List[str]:
         # This method remains unchanged
