@@ -258,8 +258,9 @@ tls-version-min 1.2
         
         return config
 
-    def uninstall_openvpn(self) -> None:
-        print("▶️  Starting uninstallation...")
+    def uninstall_openvpn(self, silent: bool = False) -> None:
+        if not silent:
+            print("▶️  Starting uninstallation...")
         subprocess.run(["systemctl", "stop", "openvpn-server@server-cert"], check=False, capture_output=True)
         subprocess.run(["systemctl", "stop", "openvpn-server@server-login"], check=False, capture_output=True)
         subprocess.run(["systemctl", "disable", "openvpn-server@server-cert"], check=False, capture_output=True)
@@ -280,7 +281,8 @@ tls-version-min 1.2
             packages.append("unbound")
         subprocess.run(["apt-get", "remove", "--purge", "-y"] + packages, check=True, capture_output=True)
         subprocess.run(["apt-get", "autoremove", "-y"], check=True, capture_output=True)
-        print("✅ Uninstallation complete.")
+        if not silent:
+            print("✅ Uninstallation complete.")
 
     def get_backup_assets(self) -> List[str]:
         """Returns the list of files essential for OpenVPN state."""

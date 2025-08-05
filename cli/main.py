@@ -335,11 +335,10 @@ def restore_flow(backup_service: BackupService) -> None:
             os.remove(local_path)
 
 def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
-    confirm = input("This will completely remove OpenVPN. Are you sure? (y/n): ").strip().lower()
-    if confirm == 'y':
+    confirm = input("This will completely remove OpenVPN. Are you sure? (Y/n): ").strip().lower()
+    if confirm in ('', 'y', 'yes'):
         try:
-            # Remove all users first
-            print("🗑️  Removing all VPN users...")
+            # Remove all users first (silently)
             db = Database()
             user_repo = UserRepository(db)
             login_manager = LoginUserManager()
@@ -351,11 +350,9 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
                 unique_users.add(user['username'])
             
             for username in unique_users:
-                print(f"   Removing user: {username}")
-                user_service.remove_user(username)
+                user_service.remove_user(username, silent=True)
             
-            openvpn_manager.uninstall_openvpn()
-            print("✅ Uninstallation completed successfully. Exiting now.")
+            openvpn_manager.uninstall_openvpn(silent=True)
             sys.exit(0)
         except Exception as e:
             print(f"❌ Uninstallation failed: {e}")

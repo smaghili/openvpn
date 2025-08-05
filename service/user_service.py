@@ -58,18 +58,20 @@ class UserService(IBackupable):
         print(f"✅ User '{username}' created successfully with dual authentication.")
         return client_config
 
-    def remove_user(self, username: Username) -> None:
+    def remove_user(self, username: Username, silent: bool = False) -> None:
         db_user_records = self.user_repo.get_user_by_username(username)
         if not db_user_records:
             raise UserNotFoundError(username)
 
-        print(f"Removing user '{username}'...")
+        if not silent:
+            print(f"Removing user '{username}'...")
         
         self.openvpn_manager.revoke_user_certificate(username)
         self.login_manager.remove_user(username)
         self.user_repo.remove_user(username)
         
-        print(f"✅ User '{username}' removed successfully.")
+        if not silent:
+            print(f"✅ User '{username}' removed successfully.")
 
     def get_all_users(self) -> List[Dict[str, Any]]:
         return self.user_repo.get_all_users()
