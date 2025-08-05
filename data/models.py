@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from typing import Optional
+from core.types import Username
 
 @dataclass
 class User:
     id: int
-    username: str
+    username: Username
     password_hash: Optional[str]
     status: str
     created_at: str

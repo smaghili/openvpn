@@ -4,6 +4,7 @@ import sys
 import re
 from getpass import getpass
 import urllib.request
+from typing import Dict, Any, Optional
 
 real_script_path = os.path.realpath(__file__)
 project_root = os.path.abspath(os.path.join(os.path.dirname(real_script_path), '..'))
@@ -16,8 +17,17 @@ from service.user_service import UserService
 from data.db import Database
 from data.user_repository import UserRepository
 from core.backup_service import BackupService
+from config.config import VPNConfig, config
+from core.types import Username, InstallSettings
+from core.exceptions import (
+    VPNManagerError, 
+    UserAlreadyExistsError, 
+    UserNotFoundError, 
+    ConfigurationError,
+    ValidationError
+)
 
-def get_install_settings():
+def get_install_settings() -> Dict[str, str]:
     """
     Interactively gathers all necessary settings for the initial installation.
     """
@@ -53,7 +63,7 @@ def get_install_settings():
 
     return settings
 
-def install_flow(openvpn_manager: OpenVPNManager):
+def install_flow(openvpn_manager: OpenVPNManager) -> None:
     """
     Orchestrates the entire installation process.
     """
@@ -61,7 +71,15 @@ def install_flow(openvpn_manager: OpenVPNManager):
         print("Installation already detected. Aborting.")
         return
 
-    settings = get_install_settings()
+    raw_settings = get_install_settings()
+    
+    # Validate settings using our configuration system
+    try:
+        validated_settings = config.validate_install_settings(raw_settings)
+        settings = raw_settings  # Keep original format for compatibility
+    except ConfigurationError as e:
+        print(f"❌ Configuration error: {e}")
+        return
     
     print("\nStarting installation with the following settings:")
     for key, value in settings.items():
@@ -83,7 +101,7 @@ def install_flow(openvpn_manager: OpenVPNManager):
         print(f"\n❌ Installation failed: {e}")
         sys.exit(1)
 
-def _patch_login_manager_file():
+def _patch_login_manager_file() -> None:
     """
     Acts as a self-healing mechanism to definitively fix the user creation bug.
     """
@@ -113,7 +131,7 @@ def _patch_login_manager_file():
     except Exception as e:
         print(f"⚠️  Warning: Could not apply patch. User creation might fail. Error: {e}")
 
-def _install_owpanel_command():
+def _install_owpanel_command() -> None:
     """
     Makes the script a system-wide command.
     """
@@ -131,7 +149,7 @@ def _install_owpanel_command():
     except Exception as e:
         print(f"⚠️  Warning: Could not create system-wide command. Error: {e}")
 
-def print_management_menu():
+def print_management_menu() -> None:
     print("\n--- VPN Management Menu (Dual Authentication) ---")
     print("1. Add a new user (Certificate + Optional Password)")
     print("2. Remove an existing user")
@@ -143,18 +161,19 @@ def print_management_menu():
     print("8. Uninstall VPN")
     print("9. Exit")
 
-def add_user_flow(user_service: UserService):
-    username_pattern = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]{1,31}$")
-
+def add_user_flow(user_service: UserService) -> None:
     while True:
         username = input("Enter username: ").strip()
-        if not username_pattern.match(username):
-            print("❌ Invalid username.")
+        try:
+            # Use configuration validation
+            validated_username = config.validate_username(username)
+            break
+        except ValidationError as e:
+            print(f"❌ {e}")
             continue
-        if user_service.user_repo.get_user_by_username(username):
-            print(f"❌ User '{username}' already exists.")
+        except UserAlreadyExistsError as e:
+            print(f"❌ {e}")
             continue
-        break
 
     print(f"\n📜 Certificate-based authentication will be enabled for '{username}'")
     create_login = input(f"🔐 Also enable password login for '{username}'? (y/n) [y]: ").strip().lower()
@@ -165,7 +184,7 @@ def add_user_flow(user_service: UserService):
         password = getpass("Enter a password for the user: ")
 
     try:
-        config_data = user_service.create_user(username, password)
+        config_data = user_service.create_user(validated_username, password)
         if config_data:
             config_path = os.path.join(os.path.expanduser("~"), f"{username}-cert.ovpn")
             with open(config_path, "w") as f:
@@ -184,17 +203,28 @@ def add_user_flow(user_service: UserService):
         if password:
             print(f"   🔐 Username/Password: Use {username}-login.ovpn with username '{username}' and password")
             
+    except UserAlreadyExistsError as e:
+        print(f"❌ {e}")
+    except ValidationError as e:
+        print(f"❌ {e}")
+    except VPNManagerError as e:
+        print(f"❌ {e}")
     except Exception as e:
-        print(f"❌ Error creating user: {e}")
+        print(f"❌ Unexpected error creating user: {e}")
 
-def remove_user_flow(user_service: UserService):
+def remove_user_flow(user_service: UserService) -> None:
     username = input("Enter username to remove: ").strip()
     try:
         user_service.remove_user(username)
+        print(f"✅ User '{username}' removed successfully.")
+    except UserNotFoundError as e:
+        print(f"❌ {e}")
+    except VPNManagerError as e:
+        print(f"❌ {e}")
     except Exception as e:
-        print(f"❌ Error removing user: {e}")
+        print(f"❌ Unexpected error removing user: {e}")
 
-def list_users_flow(user_service: UserService):
+def list_users_flow(user_service: UserService) -> None:
     try:
         users = user_service.get_all_users()
         if not users:
@@ -229,7 +259,7 @@ def list_users_flow(user_service: UserService):
     except Exception as e:
         print(f"❌ Error listing users: {e}")
 
-def get_user_config_flow(user_service: UserService):
+def get_user_config_flow(user_service: UserService) -> None:
     username = input("Enter username to get config for: ").strip()
     try:
         config = user_service.get_user_config(username)
@@ -241,7 +271,7 @@ def get_user_config_flow(user_service: UserService):
     except Exception as e:
         print(f"❌ Error retrieving config: {e}")
 
-def get_shared_config_flow(openvpn_manager: OpenVPNManager):
+def get_shared_config_flow(openvpn_manager: OpenVPNManager) -> None:
     try:
         config = openvpn_manager.get_shared_config()
         print("\n--- Shared Login-Based Config ---")
@@ -261,7 +291,7 @@ def get_shared_config_flow(openvpn_manager: OpenVPNManager):
     except Exception as e:
         print(f"❌ Error retrieving shared config: {e}")
 
-def backup_flow(backup_service: BackupService):
+def backup_flow(backup_service: BackupService) -> None:
     try:
         password = getpass("Enter a password to encrypt the backup: ")
         if not password:
@@ -274,7 +304,7 @@ def backup_flow(backup_service: BackupService):
     except Exception as e:
         print(f"❌ Backup failed: {e}")
 
-def restore_flow(backup_service: BackupService):
+def restore_flow(backup_service: BackupService) -> None:
     backup_path = input("Enter path to the backup file (local path or URL): ").strip()
     if not backup_path:
         print("Backup path cannot be empty. Restore cancelled.")
@@ -304,7 +334,7 @@ def restore_flow(backup_service: BackupService):
         if backup_path.startswith(('http://', 'https://')) and os.path.exists(local_path):
             os.remove(local_path)
 
-def uninstall_flow(openvpn_manager: OpenVPNManager):
+def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
     confirm = input("This will completely remove OpenVPN. Are you sure? (y/n): ").strip().lower()
     if confirm == 'y':
         try:
@@ -330,7 +360,7 @@ def uninstall_flow(openvpn_manager: OpenVPNManager):
         except Exception as e:
             print(f"❌ Uninstallation failed: {e}")
 
-def main():
+def main() -> None:
     if os.geteuid() != 0:
         print("This script must be run as root.")
         sys.exit(1)

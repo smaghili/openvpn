@@ -3,7 +3,9 @@ import shutil
 import subprocess
 import tarfile
 from datetime import datetime
+from typing import List
 from .backup_interface import IBackupable
+from core.exceptions import BackupError, RestoreError
 
 class BackupService:
     """
@@ -11,10 +13,10 @@ class BackupService:
     It is completely protocol-agnostic and relies on the IBackupable interface.
     """
 
-    def __init__(self, backupable_services: list[IBackupable]):
+    def __init__(self, backupable_services: List[IBackupable]) -> None:
         self.services = backupable_services
 
-    def create_backup(self, password: str, backup_dir: str = "~/"):
+    def create_backup(self, password: str, backup_dir: str = "~/") -> str:
         """
         Creates a complete, encrypted backup of all registered services.
         1. Gathers all asset paths from the services.
@@ -87,7 +89,7 @@ class BackupService:
                 shutil.rmtree(tmp_dir)
             raise RuntimeError(f"Backup creation failed: {e}")
 
-    def restore_system(self, gpg_path: str, password: str):
+    def restore_system(self, gpg_path: str, password: str) -> None:
         """
         Restores the entire system from an encrypted backup.
         1. Calls the pre-restore hook for all services (e.g., to stop daemons).

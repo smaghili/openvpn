@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import List
 
 class IBackupable(ABC):
     """
@@ -8,7 +9,7 @@ class IBackupable(ABC):
     """
 
     @abstractmethod
-    def get_backup_assets(self) -> list[str]:
+    def get_backup_assets(self) -> List[str]:
         """
         Returns a list of absolute paths to files or directories
         that are essential for this service's state.
@@ -19,7 +20,7 @@ class IBackupable(ABC):
         pass
 
     @abstractmethod
-    def pre_restore(self):
+    def pre_restore(self) -> None:
         """
         A hook to be called before the restore process begins.
         This is the appropriate place to stop services to prevent file conflicts.
@@ -27,7 +28,7 @@ class IBackupable(ABC):
         pass
 
     @abstractmethod
-    def post_restore(self):
+    def post_restore(self) -> None:
         """
         A hook to be called after the restore process has successfully completed.
         This is the appropriate place to set file permissions and restart services.

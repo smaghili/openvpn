@@ -1,5 +1,8 @@
 import sqlite3
 import os
+from typing import List, Dict, Any, Tuple, Optional
+from core.types import DatabaseResult, DatabaseRow
+from core.exceptions import DatabaseError
 
 # Define the standard, absolute path for the database file.
 # This ensures its location is predictable and independent of the script's working directory.
@@ -10,7 +13,7 @@ class Database:
     """
     Handles all low-level interactions with the SQLite database.
     """
-    def __init__(self, db_file=DATABASE_FILE):
+    def __init__(self, db_file: str = DATABASE_FILE) -> None:
         """
         Initializes the database connection.
 
@@ -20,9 +23,9 @@ class Database:
         self.db_file = db_file
         # Ensure the directory for the database exists before connecting.
         os.makedirs(os.path.dirname(self.db_file), exist_ok=True)
-        self.conn = None
+        self.conn: Optional[sqlite3.Connection] = None
 
-    def connect(self):
+    def connect(self) -> None:
         """Establishes a connection to the database."""
         try:
             # The check_same_thread=False is important for applications
@@ -30,16 +33,15 @@ class Database:
             self.conn = sqlite3.connect(self.db_file, check_same_thread=False)
             self.conn.row_factory = sqlite3.Row
         except sqlite3.Error as e:
-            print(f"Error connecting to database: {e}")
-            raise
+            raise DatabaseError(f"Failed to connect to database: {e}")
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Closes the database connection."""
         if self.conn:
             self.conn.close()
             self.conn = None
 
-    def execute_query(self, query, params=()):
+    def execute_query(self, query: str, params: Tuple = ()) -> DatabaseResult:
         """
         Executes a given SQL query (e.g., SELECT, INSERT, UPDATE, DELETE).
         For queries that modify data, this method handles commit and rollback.
@@ -57,7 +59,7 @@ class Database:
             cursor.execute(query, params)
 
             if query.strip().upper().startswith("SELECT"):
-                result = [dict(row) for row in cursor.fetchall()]
+                result: DatabaseResult = [dict(row) for row in cursor.fetchall()]
                 return result
             else:
                 self.conn.commit()
@@ -65,13 +67,11 @@ class Database:
         except sqlite3.Error as e:
             if self.conn:
                 self.conn.rollback()
-            print(f"Database query failed: {e}")
-            # Re-raise the exception to allow higher-level modules to handle it.
-            raise
+            raise DatabaseError(f"Database query failed: {e}")
         finally:
             self.disconnect()
 
-    def execute_script(self, script: str):
+    def execute_script(self, script: str) -> None:
         """
         Executes a multi-statement SQL script.
 
@@ -86,7 +86,6 @@ class Database:
         except sqlite3.Error as e:
             if self.conn:
                 self.conn.rollback()
-            print(f"Database script execution failed: {e}")
-            raise
+            raise DatabaseError(f"Database script execution failed: {e}")
         finally:
             self.disconnect()

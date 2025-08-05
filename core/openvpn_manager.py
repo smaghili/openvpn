@@ -2,8 +2,17 @@ import os
 import subprocess
 import shutil
 import json
+from typing import Dict, Any, List, Optional
 from .backup_interface import IBackupable
 from config.shared_config import CLIENT_TEMPLATE, USER_CERTS_TEMPLATE
+from config.config import VPNConfig, config
+from core.types import Username, ConfigData, InstallSettings
+from core.exceptions import (
+    InstallationError, 
+    CertificateGenerationError, 
+    ServiceError, 
+    ConfigurationError
+)
 
 
 class OpenVPNManager(IBackupable):
@@ -13,18 +22,19 @@ class OpenVPNManager(IBackupable):
     This class now persists its settings to a JSON file for stateful operation.
     """
 
-    OPENVPN_DIR = "/etc/openvpn"
-    SERVER_CONFIG_DIR = f"{OPENVPN_DIR}/server"
-    EASYRSA_DIR = f"{OPENVPN_DIR}/easy-rsa"
-    PKI_DIR = f"{EASYRSA_DIR}/pki"
-    FIREWALL_RULES_V4 = "/etc/iptables/rules.v4"
-    SETTINGS_FILE = f"{OPENVPN_DIR}/settings.json"
+    # Use configuration from config module
+    OPENVPN_DIR = config.OPENVPN_DIR
+    SERVER_CONFIG_DIR = config.SERVER_CONFIG_DIR
+    EASYRSA_DIR = config.EASYRSA_DIR
+    PKI_DIR = config.PKI_DIR
+    FIREWALL_RULES_V4 = config.FIREWALL_RULES_V4
+    SETTINGS_FILE = config.SETTINGS_FILE
     
-    def __init__(self):
-        self.settings = {}
+    def __init__(self) -> None:
+        self.settings: Dict[str, Any] = {}
         self._load_settings()
 
-    def _load_settings(self):
+    def _load_settings(self) -> None:
         if os.path.exists(self.SETTINGS_FILE):
             try:
                 with open(self.SETTINGS_FILE, 'r') as f:
@@ -32,12 +42,12 @@ class OpenVPNManager(IBackupable):
             except (json.JSONDecodeError, IOError) as e:
                 print(f"⚠️  Warning: Could not load settings file: {e}")
 
-    def _save_settings(self):
+    def _save_settings(self) -> None:
         os.makedirs(self.OPENVPN_DIR, exist_ok=True)
         with open(self.SETTINGS_FILE, 'w') as f:
             json.dump(self.settings, f, indent=4)
 
-    def install_openvpn(self, settings: dict):
+    def install_openvpn(self, settings: Dict[str, Any]) -> None:
         print("▶️  Starting OpenVPN installation...")
         self.settings = settings
         
@@ -54,7 +64,7 @@ class OpenVPNManager(IBackupable):
         self._save_settings()
         print("✅ OpenVPN installation phase completed and settings saved.")
 
-    def _install_prerequisites(self):
+    def _install_prerequisites(self) -> None:
         print("[1/7] Installing prerequisites...")
         packages = ["openvpn", "easy-rsa", "iptables-persistent", "openssl", "ca-certificates", "curl", "libpam-pwquality"]
         if self.settings.get("dns") == "2":
@@ -62,7 +72,7 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["apt-get", "update"], check=True)
         subprocess.run(["apt-get", "install", "-y"] + packages, check=True)
 
-    def _setup_pki(self):
+    def _setup_pki(self) -> None:
         """Initializes the PKI and generates an initial Certificate Revocation List."""
         print("[2/7] Setting up Public Key Infrastructure (PKI)...")
         if os.path.exists(self.EASYRSA_DIR):
@@ -98,7 +108,7 @@ class OpenVPNManager(IBackupable):
         shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR)
         os.chmod(f"{self.OPENVPN_DIR}/crl.pem", 0o644)
 
-    def _generate_server_configs(self):
+    def _generate_server_configs(self) -> None:
         print("[3/7] Generating server configurations...")
         os.makedirs(self.SERVER_CONFIG_DIR, exist_ok=True)
         
@@ -115,7 +125,7 @@ class OpenVPNManager(IBackupable):
         with open(f"{self.SERVER_CONFIG_DIR}/server-login.conf", "w") as f:
             f.write(login_config)
 
-    def _setup_firewall_rules(self):
+    def _setup_firewall_rules(self) -> None:
         print("[4/7] Setting up firewall rules...")
         net_interface = self._get_primary_interface()
         
@@ -132,7 +142,7 @@ class OpenVPNManager(IBackupable):
         os.makedirs(os.path.dirname(self.FIREWALL_RULES_V4), exist_ok=True)
         subprocess.run(f"iptables-save > {self.FIREWALL_RULES_V4}", shell=True, check=True)
 
-    def _enable_ip_forwarding(self):
+    def _enable_ip_forwarding(self) -> None:
         print("[5/7] Enabling IP forwarding...")
         with open("/etc/sysctl.conf", "r+") as f:
             content = f.read()
@@ -141,17 +151,17 @@ class OpenVPNManager(IBackupable):
                 f.write("\nnet.ipv4.ip_forward=1\n")
         subprocess.run(["sysctl", "-p"], check=True, capture_output=True)
 
-    def _setup_pam(self):
+    def _setup_pam(self) -> None:
         print("[6/7] Configuring PAM for OpenVPN...")
         pam_config = "auth required pam_unix.so shadow nodelay\naccount required pam_unix.so\n"
         with open("/etc/pam.d/openvpn", "w") as f:
             f.write(pam_config)
 
-    def _setup_unbound(self):
+    def _setup_unbound(self) -> None:
         # Implementation for Unbound setup
         pass
 
-    def _start_openvpn_services(self, silent=False):
+    def _start_openvpn_services(self, silent: bool = False) -> None:
         """Enables and starts the two OpenVPN systemd services."""
         if not silent:
             print("[7/7] Starting OpenVPN services...")
@@ -168,11 +178,11 @@ class OpenVPNManager(IBackupable):
         for cmd in commands:
              subprocess.run(cmd, check=True, capture_output=silent)
 
-    def create_user_certificate(self, username: str):
+    def create_user_certificate(self, username: Username) -> None:
         os.chdir(self.EASYRSA_DIR)
         subprocess.run(["./easyrsa", "--batch", "build-client-full", username, "nopass"], check=True, capture_output=True)
 
-    def revoke_user_certificate(self, username: str):
+    def revoke_user_certificate(self, username: Username) -> None:
         cert_path = f"{self.PKI_DIR}/issued/{username}.crt"
         if not os.path.exists(cert_path):
             return
@@ -182,7 +192,7 @@ class OpenVPNManager(IBackupable):
         shutil.copy(f"{self.PKI_DIR}/crl.pem", self.OPENVPN_DIR)
         self._start_openvpn_services(silent=True)
 
-    def generate_user_config(self, username: str) -> str:
+    def generate_user_config(self, username: Username) -> ConfigData:
         ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
         user_cert = self._extract_certificate(f"{self.PKI_DIR}/issued/{username}.crt")
         user_key = self._read_file(f"{self.PKI_DIR}/private/{username}.key")
@@ -199,7 +209,7 @@ class OpenVPNManager(IBackupable):
             tls_crypt_key=tls_crypt_key
         )
 
-    def get_shared_config(self) -> str:
+    def get_shared_config(self) -> ConfigData:
         ca_cert = self._read_file(f"{self.OPENVPN_DIR}/ca.crt")
         
         if not os.path.exists(f"{self.PKI_DIR}/issued/main.crt"):
@@ -248,7 +258,7 @@ tls-version-min 1.2
         
         return config
 
-    def uninstall_openvpn(self):
+    def uninstall_openvpn(self) -> None:
         print("▶️  Starting uninstallation...")
         subprocess.run(["systemctl", "stop", "openvpn-server@server-cert"], check=False, capture_output=True)
         subprocess.run(["systemctl", "stop", "openvpn-server@server-login"], check=False, capture_output=True)
@@ -272,17 +282,17 @@ tls-version-min 1.2
         subprocess.run(["apt-get", "autoremove", "-y"], check=True, capture_output=True)
         print("✅ Uninstallation complete.")
 
-    def get_backup_assets(self) -> list[str]:
+    def get_backup_assets(self) -> List[str]:
         """Returns the list of files essential for OpenVPN state."""
         return [self.SETTINGS_FILE, self.EASYRSA_DIR]
 
-    def pre_restore(self):
+    def pre_restore(self) -> None:
         """Stops OpenVPN services before a restore operation."""
         print("Stopping OpenVPN services for restore...")
         subprocess.run(["systemctl", "stop", "openvpn-server@server-cert"], check=False, capture_output=True)
         subprocess.run(["systemctl", "stop", "openvpn-server@server-login"], check=False, capture_output=True)
 
-    def post_restore(self):
+    def post_restore(self) -> None:
         """Restarts OpenVPN services after a restore and reloads state."""
         print("Reloading settings and restarting OpenVPN services...")
         self._load_settings() 
