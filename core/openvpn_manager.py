@@ -186,8 +186,8 @@ class OpenVPNManager(IBackupable):
         print("   └── Generating certificate-based server config...")
         base_config = self._get_base_config()
         cert_config = base_config.format(port=self.settings["cert_port"], proto=self.settings["cert_proto"], extra_auth="") + monitoring_config
-        # Write to /etc/openvpn/server.conf for systemd service
-        with open("/etc/openvpn/server.conf", "w") as f:
+        # Write to /etc/openvpn/server-cert.conf for systemd service
+        with open("/etc/openvpn/server-cert.conf", "w") as f:
             f.write(cert_config)
         # Also write to config directory for management
         with open(f"{self.SERVER_CONFIG_DIR}/server-cert.conf", "w") as f:
