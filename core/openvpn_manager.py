@@ -591,10 +591,9 @@ verb 3"""
         
         return f"""
 # --- Traffic Monitoring Config ---
-# Scripts temporarily disabled for initial setup
-# script-security 2
-# client-connect /root/openvpn/scripts/on_connect.py
-# client-disconnect /root/openvpn/scripts/on_disconnect.py
+script-security 2
+client-connect /root/openvpn/scripts/on_connect.py
+client-disconnect /root/openvpn/scripts/on_disconnect.py
 management 127.0.0.1 {management_port}
 """
 
