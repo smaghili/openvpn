@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import os
 import sys
-from flask import Flask, send_from_directory, send_file, request, make_response
+import hmac
+from flask import Flask, send_from_directory, send_file, request, make_response, jsonify
 from flask_cors import CORS
 import mimetypes
 import gzip
@@ -42,6 +43,37 @@ def create_app() -> Flask:
     @app.route('/api/health')
     def health_check():
         return {'status': 'healthy', 'message': 'OpenVPN Manager API is running'}
+    
+    @app.route('/api/auth/login', methods=['POST'])
+    def login():
+        """Authenticate with API key and return success status."""
+        data = request.get_json()
+        if not data or 'api_key' not in data:
+            return jsonify({
+                'error': 'API key required',
+                'message': 'Please provide api_key in request body'
+            }), 400
+        
+        provided_key = data['api_key']
+        expected_key = os.environ.get('OPENVPN_API_KEY')
+        
+        if not expected_key:
+            return jsonify({
+                'error': 'API not configured',
+                'message': 'API key not configured on server'
+            }), 500
+        
+        if not hmac.compare_digest(provided_key.encode(), expected_key.encode()):
+            return jsonify({
+                'error': 'Invalid API key',
+                'message': 'The provided API key is invalid'
+            }), 401
+        
+        return jsonify({
+            'success': True,
+            'message': 'Authentication successful',
+            'token': provided_key  # Use API key as token
+        })
     
     # Frontend routes - serve static files
     @app.route('/')

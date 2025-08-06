@@ -421,6 +421,10 @@ def main() -> None:
         install_flow(openvpn_manager)
         if not os.path.exists(OpenVPNManager.SETTINGS_FILE):
              sys.exit(0)
+        # If INSTALL_ONLY environment variable is set, exit after installation
+        if os.environ.get('INSTALL_ONLY'):
+            print("Installation completed. Exiting as requested.")
+            sys.exit(0)
 
     try:
         while True:

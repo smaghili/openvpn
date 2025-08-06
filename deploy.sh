@@ -55,7 +55,7 @@ function install_deployment() {
     # Ensure CLI script has execute permissions before launching
     chmod +x cli/main.py api/app.py scripts/*.py 2>/dev/null || true
     
-    sudo PROJECT_ROOT="$PROJECT_ROOT" "venv/bin/python" -m cli.main
+    sudo PROJECT_ROOT="$PROJECT_ROOT" INSTALL_ONLY=1 "venv/bin/python" -m cli.main
     
     echo ""
     echo "✅ CLI and OpenVPN installation completed!"
@@ -169,17 +169,9 @@ EOF
     echo "================================================================"
     echo ""
     echo "🌐 WEB PANEL ACCESS:"
-    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}' || echo 'YOUR_SERVER_IP')
+    SERVER_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo 'YOUR_SERVER_IP')
     echo "   URL: http://$SERVER_IP:5000"
     echo "   API Key: $API_KEY"
-    echo ""
-    echo "📋 CLI MANAGEMENT:"
-    echo "   Command: cd $PWD && source venv/bin/activate && python -m cli.main"
-    echo ""
-    echo "🔧 SYSTEM MONITORING:"
-    echo "   API Logs: journalctl -u openvpn-api -f"
-    echo "   Monitor Logs: journalctl -u openvpn-monitor -f"
-    echo "   OpenVPN Status: systemctl status openvpn-server@*"
     echo ""
     echo "✅ Both CLI and Web Panel are now fully functional!"
     echo "   All CLI operations are available through the web interface."
