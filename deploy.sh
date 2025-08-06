@@ -23,7 +23,11 @@ print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 check_root() {
-    [ "$EUID" -ne 0 ] && { print_error "This script must be run with root privileges. Please use 'sudo'."; exit 1; }
+    if [ "$(id -u)" -ne 0 ]; then
+        print_error "This script must be run with root privileges. Please use 'sudo'."
+        exit 1
+    fi
+    print_success "Root privileges confirmed"
 }
 
 install_system_packages() {
@@ -31,13 +35,14 @@ install_system_packages() {
     export DEBIAN_FRONTEND=noninteractive
     
     print_status "Updating package lists..."
-    if ! apt-get update -qq; then
+    if ! apt-get update -qq 2>&1; then
         print_error "Failed to update package lists"
         exit 1
     fi
+    print_success "Package lists updated"
     
     print_status "Installing required packages..."
-    if ! apt-get install -y -qq git python3 python3-pip python3-venv curl sqlite3 ufw systemd; then
+    if ! apt-get install -y -qq git python3 python3-pip python3-venv curl sqlite3 ufw systemd 2>&1; then
         print_error "Failed to install system packages"
         exit 1
     fi
