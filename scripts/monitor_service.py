@@ -175,48 +175,37 @@ class OpenVPNMonitor:
             return connected_users
             
         try:
-            if "CLIENT_LIST" not in status_output:
-                self._log("No CLIENT_LIST section found in status output")
-                return connected_users
+            self._log(f"DEBUG: Raw status output (first 200 chars): {repr(status_output[:200])}")
             
-            sections = status_output.split("CLIENT_LIST")
-            if len(sections) < 2:
-                return connected_users
-                
-            client_data = sections[1]
-            end_markers = ["ROUTING_TABLE", "GLOBAL_STATS", "HEADER,ROUTING_TABLE", "END"]
-            for marker in end_markers:
-                if marker in client_data:
-                    client_data = client_data.split(marker)[0]
-                    break
-            
-            lines = [line.strip() for line in client_data.strip().split('\n') if line.strip()]
-            
-            if lines and ('Common Name' in lines[0] or 'Real Address' in lines[0]):
-                lines = lines[1:]
+            # Parse line by line looking for CLIENT_LIST entries
+            lines = [line.strip() for line in status_output.strip().split('\n') if line.strip()]
             
             for line in lines:
-                if not line or line.startswith('#') or line.startswith('HEADER'):
+                if not line or line.startswith('#') or line.startswith('TITLE') or line.startswith('TIME'):
                     continue
                     
-                parts = [p.strip() for p in line.split(',')]
-                if len(parts) >= 7 and parts[0] == 'CLIENT_LIST':
-                    try:
-                        username = parts[1].strip()
-                        if not username or username == 'UNDEF':
-                            continue
+                # Look for CLIENT_LIST entries
+                if line.startswith('CLIENT_LIST,'):
+                    parts = [p.strip() for p in line.split(',')]
+                    # Format: CLIENT_LIST,username,real_addr,virtual_addr,virtual_ipv6,bytes_received,bytes_sent,...
+                    if len(parts) >= 7:
+                        try:
+                            username = parts[1].strip()
+                            if not username or username == 'UNDEF':
+                                continue
+                                
+                            bytes_received = int(parts[5])
+                            bytes_sent = int(parts[6])
                             
-                        bytes_received = int(parts[5])
-                        bytes_sent = int(parts[6])
-                        
-                        connected_users[username] = {
-                            'bytes_received': bytes_received, 
-                            'bytes_sent': bytes_sent
-                        }
-                        
-                    except (ValueError, IndexError) as e:
-                        self._log(f"Error parsing line '{line}': {e}")
-                        continue
+                            connected_users[username] = {
+                                'bytes_received': bytes_received, 
+                                'bytes_sent': bytes_sent
+                            }
+                            self._log(f"Found user {username}: {bytes_received} received, {bytes_sent} sent")
+                            
+                        except (ValueError, IndexError) as e:
+                            self._log(f"Error parsing CLIENT_LIST line '{line}': {e}")
+                            continue
                         
         except Exception as e:
             self._log(f"Error parsing status output: {e}")
