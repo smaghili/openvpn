@@ -101,7 +101,6 @@ def install_flow(openvpn_manager: OpenVPNManager) -> None:
 
     try:
         openvpn_manager.install_openvpn(settings)
-        _patch_login_manager_file()
         _install_owpanel_command()
 
         print("From now on, you can run the panel from anywhere by typing: owpanel")
@@ -109,30 +108,7 @@ def install_flow(openvpn_manager: OpenVPNManager) -> None:
         print(f"\n❌ Installation failed: {e}")
         sys.exit(1)
 
-def _patch_login_manager_file() -> None:
-    # This function remains unchanged
-    file_path = os.path.join(project_root, 'core', 'login_user_manager.py')
-    try:
-        content = ""
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
-                content = f.read()
-        else:
-            print(f"⚠️  Warning: Could not find login_user_manager.py at {file_path}. Cannot apply patch.")
-            return
 
-        buggy_pattern = re.compile(r'input=f"\{username\}:\{password\}",\s*text=True,', re.DOTALL)
-        correct_code = "input=f\"{username}:{password}\".encode('utf-8'),"
-        
-        if buggy_pattern.search(content):
-            content = buggy_pattern.sub(correct_code, content)
-            with open(file_path, 'w') as f:
-                f.write(content)
-        else:
-            # It's better not to print anything if it's already correct.
-            pass
-    except Exception as e:
-        print(f"⚠️  Warning: Could not apply patch. User creation might fail. Error: {e}")
 
 def _install_owpanel_command() -> None:
     # This function remains unchanged

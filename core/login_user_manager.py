@@ -28,7 +28,8 @@ class LoginUserManager(IBackupable):
             )
             subprocess.run(
                 ["chpasswd"],
-                input=f"{username}:{password}".encode('utf-8'),
+                input=f"{username}:{password}",
+                text=True,
                 check=True, capture_output=True
             )
         except subprocess.CalledProcessError as e:

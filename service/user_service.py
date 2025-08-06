@@ -12,8 +12,8 @@ from core.exceptions import (
     CertificateGenerationError,
     DatabaseError
 )
+import bcrypt
 import os
-import hashlib
 
 class UserService(IBackupable):
     def __init__(self, user_repo: UserRepository, openvpn_manager: OpenVPNManager, login_manager: LoginUserManager) -> None:
@@ -47,7 +47,8 @@ class UserService(IBackupable):
     def create_user(self, username: Username, password: Optional[Password] = None) -> Optional[ConfigData]:
         password_hash = None
         if password:
-            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            salt = bcrypt.gensalt()
+            password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
         
         if self.user_repo.find_user_by_username(username):
             raise UserAlreadyExistsError(username)
