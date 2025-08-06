@@ -115,6 +115,37 @@ setup_python_environment() {
     print_success "Python environment configured"
 }
 
+install_openvpn_via_cli() {
+    print_status "Running OpenVPN installation via CLI..."
+    cd /opt/$PROJECT_DIR
+    
+    # Run the CLI installer for OpenVPN setup
+    print_status "Installing OpenVPN Server (certificate-based)..."
+    ./venv/bin/python -m cli.main --install-cert-server >/dev/null 2>&1 || {
+        print_status "Running interactive OpenVPN installation..."
+        echo -e "1\n1\ny\n" | ./venv/bin/python -m cli.main || true
+    }
+    
+    print_status "Installing OpenVPN Server (username/password-based)..."  
+    ./venv/bin/python -m cli.main --install-login-server >/dev/null 2>&1 || {
+        echo -e "1\n2\ny\n" | ./venv/bin/python -m cli.main || true
+    }
+    
+    # Verify OpenVPN installation
+    sleep 3
+    if systemctl is-active --quiet openvpn-server@server-cert 2>/dev/null; then
+        print_success "Certificate-based OpenVPN server running"
+    else
+        print_warning "Certificate-based server may need manual start"
+    fi
+    
+    if systemctl is-active --quiet openvpn-server@server-login 2>/dev/null; then
+        print_success "Login-based OpenVPN server running"  
+    else
+        print_warning "Login-based server may need manual start"
+    fi
+}
+
 setup_frontend() {
     print_status "Setting up frontend (Web Panel)..."
     cd /opt/$PROJECT_DIR
@@ -408,22 +439,23 @@ complete_installation() {
     print_status "Step 4/10: Configuring Python environment..."
     setup_python_environment
     
-    print_status "Step 5/10: Setting up database..."
+    print_status "Step 5/10: Installing OpenVPN Server via CLI..."
+    install_openvpn_via_cli
+    
+    print_status "Step 6/10: Setting up database..."
     setup_database
     
-    print_status "Step 6/10: Setting up frontend..."
+    print_status "Step 7/10: Setting up frontend..."
     setup_frontend
     
-    print_status "Step 7/10: Creating services..."
+    print_status "Step 8/10: Creating services..."
     create_services
     
-    print_status "Step 8/10: Configuring firewall..."
+    print_status "Step 9/10: Configuring firewall..."
     configure_firewall
     
-    print_status "Step 9/10: Starting services..."
+    print_status "Step 10/10: Starting services and verification..."
     generate_and_start
-    
-    print_status "Step 10/10: Verifying installation..."
     verify_and_display
 }
 
