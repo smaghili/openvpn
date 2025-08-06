@@ -17,8 +17,8 @@ from service.user_service import UserService
 from data.db import Database
 from data.user_repository import UserRepository
 from core.backup_service import BackupService
-from config.config import VPNConfig, config
-from core.types import Username, InstallSettings
+from config.config import VPNConfig, config, InstallSettings
+from core.types import Username
 from core.exceptions import (
     VPNManagerError, 
     UserAlreadyExistsError, 

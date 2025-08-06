@@ -5,9 +5,9 @@ import json
 from typing import Dict, Any, List, Optional
 from .backup_interface import IBackupable
 from config.shared_config import CLIENT_TEMPLATE, USER_CERTS_TEMPLATE
-from config.config import VPNConfig, config
+from config.config import VPNConfig, config, InstallSettings
 from config.constants import OpenVPNConstants, ConfigurablePaths
-from core.types import Username, ConfigData, InstallSettings
+from core.types import Username, ConfigData
 from core.exceptions import (
     InstallationError, 
     CertificateGenerationError, 
