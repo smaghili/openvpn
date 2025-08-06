@@ -51,6 +51,10 @@ function install_deployment() {
     echo "--------------------------------------------------------"
     export PROJECT_ROOT="$(pwd)"
     echo "      -> Project root set to: $PROJECT_ROOT"
+    
+    # Ensure CLI script has execute permissions before launching
+    chmod +x cli/main.py
+    
     sudo PROJECT_ROOT="$PROJECT_ROOT" "venv/bin/python" -m cli.main
 }
 
