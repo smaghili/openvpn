@@ -104,3 +104,86 @@ class UserRepository:
         """
         result = self.db.execute_query(query, (user_id,))
         return result[0] if result else None
+
+    def update_user_traffic(self, username: str, bytes_sent: int, bytes_received: int) -> bool:
+        """Updates user traffic usage and logs the session."""
+        try:
+            # Get user ID
+            user = self.find_user_by_username(username)
+            if not user:
+                return False
+                
+            user_id = user['id']
+            total_bytes = bytes_sent + bytes_received
+            
+            if total_bytes <= 0:
+                return True  # No traffic to record
+            
+            # Use transaction for atomicity
+            self.db.execute_query("BEGIN TRANSACTION")
+            
+            try:
+                # Update cumulative usage
+                self.db.execute_query(
+                    "UPDATE user_quotas SET bytes_used = bytes_used + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+                    (total_bytes, user_id)
+                )
+                
+                # Log session details
+                self.db.execute_query(
+                    "INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                    (user_id, bytes_sent, bytes_received)
+                )
+                
+                self.db.execute_query("COMMIT")
+                return True
+                
+            except Exception as e:
+                self.db.execute_query("ROLLBACK")
+                raise e
+                
+        except Exception:
+            return False
+
+    def get_user_id_by_username(self, username: str) -> Optional[int]:
+        """Get user ID by username."""
+        user = self.find_user_by_username(username)
+        return user['id'] if user else None
+
+    def get_traffic_summary(self) -> List[Dict[str, Any]]:
+        """Get traffic summary for all users for dashboard display."""
+        query = """
+        SELECT 
+            u.username,
+            u.status,
+            uq.quota_bytes,
+            uq.bytes_used,
+            uq.updated_at as quota_updated,
+            COALESCE(SUM(tl.bytes_sent), 0) as total_sent,
+            COALESCE(SUM(tl.bytes_received), 0) as total_received,
+            COUNT(tl.id) as session_count,
+            MAX(tl.log_timestamp) as last_activity
+        FROM users u
+        LEFT JOIN user_quotas uq ON u.id = uq.user_id
+        LEFT JOIN traffic_logs tl ON u.id = tl.user_id
+        WHERE u.status = 'active'
+        GROUP BY u.id, u.username, u.status, uq.quota_bytes, uq.bytes_used, uq.updated_at
+        ORDER BY uq.bytes_used DESC
+        """
+        return self.db.execute_query(query)
+
+    def get_recent_traffic_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get recent traffic logs for monitoring."""
+        query = """
+        SELECT 
+            tl.log_timestamp,
+            u.username,
+            tl.bytes_sent,
+            tl.bytes_received,
+            (tl.bytes_sent + tl.bytes_received) as total_bytes
+        FROM traffic_logs tl
+        JOIN users u ON tl.user_id = u.id
+        ORDER BY tl.log_timestamp DESC
+        LIMIT ?
+        """
+        return self.db.execute_query(query, (limit,))

@@ -19,12 +19,6 @@ MANAGEMENT_HOST = get_config_value("OPENVPN_MANAGEMENT_HOST", "127.0.0.1")
 CERT_MANAGEMENT_PORT = get_int_config("OPENVPN_CERT_MANAGEMENT_PORT", 7505)
 LOGIN_MANAGEMENT_PORT = get_int_config("OPENVPN_LOGIN_MANAGEMENT_PORT", 7506)
 CHECK_INTERVAL = get_int_config("MONITOR_INTERVAL", 45)
-
-# Ensure interval is within safe bounds
-if CHECK_INTERVAL < 30:
-    CHECK_INTERVAL = 30
-elif CHECK_INTERVAL > 60:
-    CHECK_INTERVAL = 60
     
 LOG_FILE = get_config_value("OPENVPN_LOG_FILE", "/var/log/openvpn/traffic_monitor.log")
 MAX_LOG_SIZE = get_int_config("MAX_LOG_SIZE", 10485760)  # 10MB default
@@ -212,7 +206,7 @@ class OpenVPNMonitor:
             
         return connected_users
 
-    def check_quotas(self):
+    def check_quotas_and_record_traffic(self):
         cert_status, login_status = self.get_combined_status()
         
         if not cert_status and not login_status:
@@ -253,6 +247,8 @@ class OpenVPNMonitor:
                 return
                 
             user_quotas = {}
+            user_last_traffic = getattr(self, '_user_last_traffic', {})
+            
             for u in all_users:
                 if u and u.get('username'):
                     user_quotas[u['username']] = {
@@ -261,28 +257,86 @@ class OpenVPNMonitor:
                         'used': u.get('bytes_used', 0)
                     }
 
-            # Check each connected user against quotas
+            # Record traffic for each connected user and check quotas
             for username, traffic in connected_users.items():
                 if username not in user_quotas:
                     continue
 
+                # Record incremental traffic since last check
+                current_total = traffic['bytes_received'] + traffic['bytes_sent']
+                last_total = user_last_traffic.get(username, 0)
+                
+                if current_total > last_total:
+                    # Calculate incremental traffic
+                    increment = current_total - last_total
+                    
+                    # Estimate sent/received ratio based on current session
+                    if current_total > 0:
+                        sent_ratio = traffic['bytes_sent'] / current_total
+                        received_ratio = traffic['bytes_received'] / current_total
+                        
+                        increment_sent = int(increment * sent_ratio)
+                        increment_received = int(increment * received_ratio)
+                    else:
+                        increment_sent = increment_received = 0
+                    
+                    # Update database with incremental traffic
+                    if increment > 0:
+                        success = self.user_repo.update_user_traffic(username, increment_sent, increment_received)
+                        if success:
+                            self._log(f"Recorded {increment} bytes for user '{username}' (sent: {increment_sent}, received: {increment_received})")
+                        else:
+                            self._log(f"Failed to record traffic for user '{username}'")
+                
+                # Update last known traffic
+                user_last_traffic[username] = current_total
+
+                # Check quota after traffic update
                 quota_info = user_quotas[username]
                 quota_bytes = quota_info.get('quota', 0)
                 
                 if quota_bytes == 0:  # Unlimited
                     continue
 
-                # Calculate total usage
-                historical_usage = quota_info.get('used', 0)
-                current_session_usage = traffic['bytes_received'] + traffic['bytes_sent']
-                total_usage = historical_usage + current_session_usage
-
-                if total_usage > quota_bytes:
-                    self._log(f"User '{username}' exceeded quota: {total_usage}/{quota_bytes} bytes")
-                    self.kill_user(username)
+                # Get updated usage from database
+                user_id = quota_info.get('id')
+                if user_id:
+                    updated_quota = self.user_repo.get_user_quota_status(user_id)
+                    if updated_quota:
+                        total_usage = updated_quota.get('bytes_used', 0)
+                        
+                        if total_usage > quota_bytes:
+                            self._log(f"User '{username}' exceeded quota: {total_usage}/{quota_bytes} bytes")
+                            self.kill_user(username)
+            
+            # Clean up disconnected users from tracking
+            self._cleanup_disconnected_users(connected_users, user_last_traffic)
+            
+            # Store last traffic data for next iteration
+            self._user_last_traffic = user_last_traffic
                     
         except Exception as e:
-            self._log(f"Error during quota check: {e}")
+            self._log(f"Error during quota check and traffic recording: {e}")
+
+    def _cleanup_disconnected_users(self, connected_users, user_last_traffic):
+        """Remove tracking data for users who are no longer connected."""
+        try:
+            disconnected_users = []
+            for username in list(user_last_traffic.keys()):
+                if username not in connected_users:
+                    disconnected_users.append(username)
+            
+            for username in disconnected_users:
+                del user_last_traffic[username]
+                self._log(f"Cleaned up tracking data for disconnected user '{username}'")
+                
+        except Exception as e:
+            self._log(f"Error during cleanup: {e}")
+
+    # Keep the old method name for backward compatibility
+    def check_quotas(self):
+        """Backward compatibility wrapper."""
+        self.check_quotas_and_record_traffic()
 
 
     def run_forever(self):
@@ -305,8 +359,8 @@ class OpenVPNMonitor:
                         # Reset failure counter on successful connection
                         consecutive_failures = 0
                 
-                # Perform quota check
-                self.check_quotas()
+                # Perform quota check and traffic recording
+                self.check_quotas_and_record_traffic()
                 consecutive_failures = 0  # Reset on successful operation
                 
             except KeyboardInterrupt:
