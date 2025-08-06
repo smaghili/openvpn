@@ -111,18 +111,23 @@ def install_flow(openvpn_manager: OpenVPNManager) -> None:
 
 
 def _install_owpanel_command() -> None:
-    """Creates a system-wide command for the OpenVPN panel with proper permissions."""
+    """Creates a system-wide owpanel command that always works."""
     try:
         script_path = os.path.realpath(__file__)
         command_path = "/usr/local/bin/owpanel"
-        os.chmod(script_path, 0o755)
+        
+        wrapper_content = f"""#!/bin/bash
+SCRIPT="{script_path}"
+[ ! -x "$SCRIPT" ] && chmod +x "$SCRIPT" 2>/dev/null
+exec python3 "$SCRIPT" "$@"
+"""
+        
         if os.path.lexists(command_path):
             os.remove(command_path)
-        os.symlink(script_path, command_path)
-        if os.path.exists(script_path):
-            current_permissions = os.stat(script_path).st_mode
-            if not (current_permissions & 0o111):
-                os.chmod(script_path, 0o755)
+        with open(command_path, 'w') as f:
+            f.write(wrapper_content)
+        os.chmod(command_path, 0o755)
+        os.chmod(script_path, 0o755)
 
     except Exception as e:
         print(f"⚠️  Warning: Could not create system-wide command. Error: {e}")
