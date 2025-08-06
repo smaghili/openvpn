@@ -88,21 +88,15 @@ setup_python_environment() {
         fi
     fi
     
-    print_status "Activating virtual environment..."
-    if ! source venv/bin/activate; then
-        print_error "Failed to activate virtual environment"
-        exit 1
-    fi
-    
     print_status "Upgrading pip..."
-    if ! pip install --upgrade pip -q >/dev/null 2>&1; then
+    if ! ./venv/bin/pip install --upgrade pip -q >/dev/null 2>&1; then
         print_error "Failed to upgrade pip"
         exit 1
     fi
     
     if [ -f "requirements.txt" ]; then
         print_status "Installing Python dependencies..."
-        if ! pip install -r requirements.txt -q >/dev/null 2>&1; then
+        if ! ./venv/bin/pip install -r requirements.txt -q >/dev/null 2>&1; then
             print_error "Failed to install Python dependencies"
             exit 1
         fi
@@ -448,66 +442,28 @@ uninstall_system() {
 }
 
 main_menu() {
-    clear
     echo ""
-    echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}                                                      ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}    ${GREEN}🚀 OpenVPN Manager - Deployment Tool${NC}            ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}       ${YELLOW}Complete VPN Management Solution${NC}               ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}                                                      ${BLUE}║${NC}"
-    echo -e "${BLUE}╠══════════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC}                                                      ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}  ${GREEN}1)${NC} 🔧 Complete Installation                        ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}     ${YELLOW}   (CLI + REST API + Web Panel)${NC}                 ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}                                                      ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}  ${RED}2)${NC} 🗑️  Uninstall System                            ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}                                                      ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}  ${YELLOW}3)${NC} 📊 View Service Status                        ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}                                                      ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}  ${BLUE}4)${NC} 🚪 Exit                                        ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}                                                      ${BLUE}║${NC}"
-    echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${NC}"
+    echo "========================================="
+    echo "   OpenVPN Manager Deployment Tool"
+    echo "========================================="
+    echo "1) Complete Installation (CLI + API + Web Panel)"
+    echo "2) Uninstall System"
+    echo "3) View Service Status"
+    echo "4) Exit"
     echo ""
-    echo -e "${GREEN}Select an option [1-4]:${NC} "
-    read -r choice
+    read -p "Select an option [1-4]: " choice
     
     case $choice in
-        1) 
-            print_success "Starting complete installation..."
-            sleep 1
-            complete_installation 
-            ;;
-        2) 
-            uninstall_system 
-            ;;
+        1) complete_installation ;;
+        2) uninstall_system ;;
         3) 
-            print_status "📊 Checking service status..."
-            echo ""
-            if systemctl status ${API_SERVICE_NAME} --no-pager -l >/dev/null 2>&1; then
-                print_success "✅ OpenVPN API Service:"
-                systemctl status ${API_SERVICE_NAME} --no-pager -l | head -8
-            else
-                print_warning "⚠️  OpenVPN API service not found or not running"
-            fi
-            echo ""
-            if systemctl status ${MONITOR_SERVICE_NAME} --no-pager -l >/dev/null 2>&1; then
-                print_success "✅ Traffic Monitor Service:"
-                systemctl status ${MONITOR_SERVICE_NAME} --no-pager -l | head -8
-            else
-                print_warning "⚠️  Traffic monitor service not found or not running"
-            fi
-            echo ""
-            read -p "Press Enter to return to menu..." && main_menu
+            print_status "Service Status:"
+            systemctl status ${API_SERVICE_NAME} --no-pager -l 2>/dev/null || echo "Flask app service not found"
+            systemctl status ${MONITOR_SERVICE_NAME} --no-pager -l 2>/dev/null || echo "Monitor service not found"
+            main_menu
             ;;
-        4) 
-            print_success "👋 Thanks for using OpenVPN Manager!"
-            exit 0 
-            ;;
-        *) 
-            print_error "❌ Invalid option. Please select 1-4."
-            sleep 2
-            main_menu 
-            ;;
+        4) print_status "Exiting..."; exit 0 ;;
+        *) print_error "Invalid option. Please try again."; main_menu ;;
     esac
 }
 
