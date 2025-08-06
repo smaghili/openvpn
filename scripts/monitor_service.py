@@ -175,45 +175,39 @@ class OpenVPNMonitor:
             return connected_users
             
         try:
-            # Look for CLIENT LIST section
-            if "CLIENT LIST" not in status_output:
-                self._log("No CLIENT LIST section found in status output")
+            if "CLIENT_LIST" not in status_output:
+                self._log("No CLIENT_LIST section found in status output")
                 return connected_users
             
-            sections = status_output.split("CLIENT LIST")
+            sections = status_output.split("CLIENT_LIST")
             if len(sections) < 2:
                 return connected_users
                 
-            # Get the client section
             client_data = sections[1]
-            
-            # Find the end of client list (usually ROUTING TABLE or GLOBAL STATS)
-            end_markers = ["ROUTING TABLE", "GLOBAL STATS", "END"]
+            end_markers = ["ROUTING_TABLE", "GLOBAL_STATS", "HEADER,ROUTING_TABLE", "END"]
             for marker in end_markers:
                 if marker in client_data:
                     client_data = client_data.split(marker)[0]
                     break
             
-            # Parse each line
             lines = [line.strip() for line in client_data.strip().split('\n') if line.strip()]
             
-            # Skip header line if it exists
             if lines and ('Common Name' in lines[0] or 'Real Address' in lines[0]):
                 lines = lines[1:]
             
             for line in lines:
-                if not line or line.startswith('#'):
+                if not line or line.startswith('#') or line.startswith('HEADER'):
                     continue
                     
                 parts = [p.strip() for p in line.split(',')]
-                if len(parts) >= 4:
+                if len(parts) >= 7 and parts[0] == 'CLIENT_LIST':
                     try:
-                        username = parts[0].strip()
+                        username = parts[1].strip()
                         if not username or username == 'UNDEF':
                             continue
                             
-                        bytes_received = int(parts[2])
-                        bytes_sent = int(parts[3])
+                        bytes_received = int(parts[5])
+                        bytes_sent = int(parts[6])
                         
                         connected_users[username] = {
                             'bytes_received': bytes_received, 
