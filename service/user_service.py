@@ -27,8 +27,8 @@ class UserService(IBackupable):
         if not user_data or not user_data.get('cert_pem'):
             return None
 
-        ca_cert = self.openvpn_manager._read_file(f"{self.openvpn_manager.OPENVPN_DIR}/ca.crt")
-        tls_crypt_key = self.openvpn_manager._read_file(f"{self.openvpn_manager.OPENVPN_DIR}/tls-crypt.key")
+        ca_cert = self.openvpn_manager._read_file("/etc/openvpn/ca.crt")
+        tls_crypt_key = self.openvpn_manager._read_file("/etc/openvpn/tls-crypt.key")
         
         user_specific_certs = USER_CERTS_TEMPLATE.format(
             user_cert=user_data['cert_pem'],

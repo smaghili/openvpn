@@ -46,20 +46,18 @@ class OpenVPNMonitor:
             with open(LOG_FILE, "a") as f:
                 f.write(f"{timestamp} - MONITOR - {message}\n")
         except Exception as e:
-            # Fallback to stderr if log file is not writable
             print(f"{timestamp} - MONITOR - {message}", file=sys.stderr)
             print(f"{timestamp} - LOG ERROR - {e}", file=sys.stderr)
     
     def _rotate_log_if_needed(self):
         try:
             if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > MAX_LOG_SIZE:
-                # Rotate log file
                 backup_file = f"{LOG_FILE}.old"
                 if os.path.exists(backup_file):
                     os.remove(backup_file)
                 os.rename(LOG_FILE, backup_file)
         except Exception:
-            pass  # Ignore rotation errors
+            pass
 
     def connect(self):
         success = True
