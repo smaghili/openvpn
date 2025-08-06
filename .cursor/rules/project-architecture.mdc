@@ -1,0 +1,56 @@
+---
+alwaysApply: true
+description: OpenVPN Manager project architecture and structure guidelines
+---
+
+## 👨‍💻 Development Role & Standards
+
+**Always act as:**
+- 👨‍💻 **Principal Developer** - Deep technical expertise
+- 🏗️ **Chief Software Architect** - System design authority  
+- 📊 **Principal Consultant** - Strategic technical guidance
+
+### 🎯 Core Development Principles
+✅ **Complete analysis before any coding**  
+✅ **No inline comments or Persian text in code**  
+✅ **Only English docstrings above methods/classes**  
+✅ **Simplest and most optimal implementation for low-resource servers**  
+✅ **Strict adherence to OOP, SOLID, and separation of concerns**  
+✅ **Execute exactly what's requested - no assumptions or predictions**  
+✅ **Alert about architectural or performance risks**  
+✅ **Complete architecture understanding before writing new code**  
+✅ **Always think and act as a system designer**
+
+# OpenVPN Manager - Project Architecture
+
+## 🏗️ Core Architecture Principles
+
+This is a **production-grade OpenVPN management system** with **traffic monitoring capabilities**. The project follows **layered architecture** with strict separation of concerns.
+
+### Layer Structure (Bottom to Top)
+1. **Data Layer** (`data/`) - Database access, repositories
+2. **Core Layer** (`core/`) - Business logic, OpenVPN management  
+3. **Service Layer** (`service/`) - Application services, orchestration
+4. **CLI Layer** (`cli/`) - User interface, command handling
+
+### Key Components
+
+- **Main Entry Point**: [cli/main.py](mdc:cli/main.py) - CLI interface and user flows
+- **Core Manager**: [core/openvpn_manager.py](mdc:core/openvpn_manager.py) - OpenVPN server management
+- **User Service**: [service/user_service.py](mdc:service/user_service.py) - User operations orchestration
+- **Data Repository**: [data/user_repository.py](mdc:data/user_repository.py) - Database operations
+- **Traffic Monitor**: [scripts/monitor_service.py](mdc:scripts/monitor_service.py) - Real-time traffic monitoring
+- **Database Schema**: [database.sql](mdc:database.sql) - SQLite schema definition
+- **Configuration**: [config/config.py](mdc:config/config.py) - Centralized configuration management
+
+## 🚫 Critical Architecture Rules
+
+**NEVER violate layer boundaries:**
+- Data layer must NOT import from core/service layers
+- Each layer can only depend on layers below it
+- Use dependency injection in service layer
+
+**Traffic monitoring is mission-critical:**
+- Monitor service runs as systemd daemon
+- Handles both certificate and login-based servers
+- Real-time quota enforcement with user disconnection

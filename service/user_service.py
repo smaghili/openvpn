@@ -121,6 +121,24 @@ class UserService(IBackupable):
         
         return self.user_repo.get_user_quota_status(user['id'])
 
+    def change_user_password(self, username: Username, new_password: Password) -> None:
+        """Changes the password for an existing user in both database and system."""
+        user = self.user_repo.find_user_by_username(username)
+        if not user:
+            raise UserNotFoundError(username)
+        
+        if not user.get('password_hash'):
+            raise ValidationError(f"User '{username}' does not have password authentication enabled")
+        
+        salt = bcrypt.gensalt()
+        password_hash = bcrypt.hashpw(new_password.encode('utf-8'), salt).decode('utf-8')
+        
+        self.user_repo.update_user_password(username, password_hash)
+        
+        self.login_manager.change_user_password(username, new_password)
+        
+        print(f"✅ Password changed successfully for user '{username}'")
+
     # --- Backup and Restore ---
 
     def get_backup_assets(self) -> List[str]:

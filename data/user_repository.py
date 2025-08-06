@@ -83,6 +83,14 @@ class UserRepository:
         query = "DELETE FROM users WHERE username = ?"
         self.db.execute_query(query, (username,))
 
+    def update_user_password(self, username: Username, password_hash: str) -> None:
+        """Updates the password hash for an existing user."""
+        query = "UPDATE users SET password_hash = ? WHERE username = ?"
+        result = self.db.execute_query(query, (password_hash, username))
+        
+        if not result and not self.find_user_by_username(username):
+            raise UserNotFoundError(username)
+
     # --- New methods for quota management ---
 
     def set_user_quota(self, user_id: int, quota_gb: float) -> None:

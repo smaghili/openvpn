@@ -1,0 +1,67 @@
+---
+description: Deployment and operations guidelines
+globs: deploy.sh,install.sh,*.service
+---
+
+## 🏗️ Chief Software Architect Role
+- **Complete Analysis**: Understand full deployment impact before changes
+- **Resource Optimization**: Design for minimal server resource usage
+- **Risk Management**: Identify and warn about deployment risks
+- **Precise Execution**: Implement exactly what's requested
+- **System Thinking**: Consider interactions with all system components
+
+# Deployment & Operations Standards
+
+## 🚀 Deployment Architecture
+
+This project supports **dual deployment methods**:
+- **Recommended**: Python-based via [deploy.sh](mdc:deploy.sh)
+- **Legacy**: Shell-based via [install.sh](mdc:install.sh)
+
+## 📋 Critical Deployment Rules
+
+### File Permissions Management
+- **ALWAYS** set execute permissions on Python scripts during deployment
+- Use `chmod +x` in deployment scripts before creating symlinks
+- Verify permissions after file operations
+- Handle permission issues gracefully in wrapper scripts
+
+### System Integration
+- Create systemd services for:
+  - `openvpn-server@server-cert` (certificate-based)
+  - `openvpn-server@server-login` (username/password-based)  
+  - `openvpn-monitor` (traffic monitoring daemon)
+- Enable services with proper dependencies
+- Configure log rotation and cleanup
+
+### Security Hardening
+- Run services as `nobody:nogroup` when possible
+- Set restrictive file permissions on certificates and keys
+- Configure firewall rules for both server types
+- Enable IP forwarding in system configuration
+
+## 🔧 Operations Guidelines
+
+### Monitoring Service Management
+- Monitor service runs continuously as systemd daemon
+- Automatic restart on failure with exponential backoff
+- Centralized logging to `/var/log/openvpn/traffic_monitor.log`
+- Log rotation at 10MB threshold
+
+### Backup Strategy
+- Database backup includes all user data and quotas
+- Certificate backup includes PKI directory
+- Configuration backup includes OpenVPN settings
+- Encrypted backup files with password protection
+
+### Troubleshooting
+- Check systemd service status: `systemctl status openvpn-monitor`
+- Monitor logs: `tail -f /var/log/openvpn/traffic_monitor.log`
+- Verify OpenVPN management interfaces are accessible
+- Test database connectivity and permissions
+
+## 🛠️ Maintenance Tasks
+- Regular log rotation and cleanup
+- Database vacuum operations for SQLite
+- Certificate renewal monitoring
+- Quota usage reporting and alerts

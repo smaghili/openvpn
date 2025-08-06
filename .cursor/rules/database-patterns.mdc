@@ -1,0 +1,76 @@
+---
+description: Database design patterns and data access guidelines
+globs: database.sql,data/*.py
+---
+
+## 📊 Principal Consultant Standards
+- **Strategic Analysis**: Evaluate database changes impact on entire system
+- **Performance Focus**: Optimize queries for low-resource environments
+- **Code Quality**: Clean implementation without unnecessary comments
+- **Architecture Compliance**: Ensure all changes align with layered architecture
+- **Risk Assessment**: Warn about data integrity or performance risks
+
+# Database Design Patterns
+
+## 🗄️ Schema Architecture
+
+The database follows **normalized design** with proper foreign key relationships and triggers for automation.
+
+### Core Tables
+- **users**: Base user information with status tracking
+- **user_protocols**: Authentication methods per user (certificate/login)
+- **user_quotas**: Traffic quotas and current usage (auto-created via trigger)
+- **traffic_logs**: Historical traffic data for analysis
+
+See complete schema: [database.sql](mdc:database.sql)
+
+## 📊 Data Access Patterns
+
+### Repository Pattern Implementation
+- Use [data/user_repository.py](mdc:data/user_repository.py) as the **single source** for data operations
+- **NEVER** write raw SQL in service or core layers
+- All database operations must go through repository methods
+
+### Transaction Management
+```python
+# ALWAYS use transactions for multi-step operations
+db.execute_query("BEGIN TRANSACTION")
+try:
+    # Multiple operations
+    db.execute_query("COMMIT")
+except Exception:
+    db.execute_query("ROLLBACK")
+    raise
+```
+
+### Query Safety Rules
+- **ALWAYS** use parameterized queries: `execute_query(sql, (param1, param2))`
+- **NEVER** use string concatenation for SQL
+- Validate all user inputs before database operations
+- Handle `None` values explicitly in queries
+
+## 🔄 Traffic Data Management
+
+### Quota System Design
+- **Quota of 0 = unlimited traffic**
+- Track cumulative usage in `user_quotas.bytes_used`
+- Record individual sessions in `traffic_logs`
+- Use triggers for automatic quota record creation
+
+### Performance Considerations
+- Use incremental traffic updates (not absolute values)
+- Index frequently queried columns
+- Implement connection pooling for high-traffic scenarios
+- Regular database maintenance (VACUUM for SQLite)
+
+### Data Integrity Rules
+- Foreign key constraints ensure referential integrity
+- Use CASCADE DELETE to clean up related records
+- Validate quota values (non-negative)
+- Maintain audit trail in traffic_logs
+
+## 🛡️ Security Guidelines
+- Database file permissions: `600` (owner read/write only)
+- Store password hashes, never plaintext passwords
+- Sanitize all user inputs
+- Regular backup of database files

@@ -130,14 +130,15 @@ def print_management_menu() -> None:
     print("  3. List Users")
     print("  4. Get User Config")
     print("  5. Get Shared Config")
+    print("  6. Change User Password")
     print("\n📊 Traffic Management:")
-    print("  6. Set User Quota")
-    print("  7. View User Status")
+    print("  7. Set User Quota")
+    print("  8. View User Status")
     print("\n📦 System:")
-    print("  8. System Backup")
-    print("  9. System Restore")
-    print("  10. Uninstall VPN")
-    print("  11. Exit")
+    print("  9. System Backup")
+    print("  10. System Restore")
+    print("  11. Uninstall VPN")
+    print("  12. Exit")
 
 def add_user_flow(user_service: UserService) -> None:
     # This function remains unchanged
@@ -294,6 +295,40 @@ def view_user_status_flow(user_service: UserService) -> None:
     except Exception as e:
         print(f"❌ An unexpected error occurred: {e}")
 
+def change_user_password_flow(user_service: UserService) -> None:
+    """Flow to change password for an existing user."""
+    username = input("Enter username to change password for: ").strip()
+    
+    try:
+        user = user_service.user_repo.find_user_by_username(username)
+        if not user:
+            print(f"❌ User '{username}' not found.")
+            return
+            
+        if not user.get('password_hash'):
+            print(f"❌ User '{username}' does not have password authentication enabled.")
+            print("Only users with password authentication can have their password changed.")
+            return
+        
+        new_password = getpass("Enter new password: ")
+        if not new_password:
+            print("❌ Password cannot be empty.")
+            return
+            
+        confirm_password = getpass("Confirm new password: ")
+        if new_password != confirm_password:
+            print("❌ Passwords do not match.")
+            return
+        
+        user_service.change_user_password(username, new_password)
+        
+    except UserNotFoundError as e:
+        print(f"❌ {e}")
+    except ValidationError as e:
+        print(f"❌ {e}")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {e}")
+
 
 def backup_flow(backup_service: BackupService) -> None:
     # This function remains unchanged
@@ -407,16 +442,18 @@ def main() -> None:
             elif choice == '5':
                 get_shared_config_flow(openvpn_manager)
             elif choice == '6':
-                set_user_quota_flow(user_service)
+                change_user_password_flow(user_service)
             elif choice == '7':
-                view_user_status_flow(user_service)
+                set_user_quota_flow(user_service)
             elif choice == '8':
-                backup_flow(backup_service)
+                view_user_status_flow(user_service)
             elif choice == '9':
-                restore_flow(backup_service)
+                backup_flow(backup_service)
             elif choice == '10':
-                uninstall_flow(openvpn_manager)
+                restore_flow(backup_service)
             elif choice == '11':
+                uninstall_flow(openvpn_manager)
+            elif choice == '12':
                 print("Goodbye!")
                 break
             else:

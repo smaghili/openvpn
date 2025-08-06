@@ -1,0 +1,50 @@
+---
+globs: *.py
+description: Python coding standards for OpenVPN Manager project
+---
+
+## 👨‍💻 Developer Role Requirements
+
+**Act as Principal Developer/Chief Architect:**
+- Complete system analysis before implementation
+- Optimize for low-resource server environments
+- No inline comments or Persian text in code
+- English docstrings only above methods/classes
+- Execute exactly what's requested, nothing more
+
+# Python Coding Standards
+
+## 🐍 Code Quality Requirements
+
+### Type Safety
+- **ALWAYS** use type hints for function parameters and return values
+- Import types from `typing` module: `Optional`, `List`, `Dict`, `Any`
+- Use custom types from [core/types.py](mdc:core/types.py): `Username`, `Password`, `ConfigData`
+
+### Error Handling
+- Use custom exceptions from [core/exceptions.py](mdc:core/exceptions.py)
+- **NEVER** use bare `except:` - always specify exception types
+- Log errors with context using the established logging pattern
+- For CLI operations, provide user-friendly error messages
+
+### Database Operations
+- **ALWAYS** use parameterized queries (SQL injection protection)
+- Use transactions for multi-step operations (see [scripts/on_disconnect.py](mdc:scripts/on_disconnect.py))
+- Handle database errors gracefully with rollback
+
+### Security Requirements
+- Use `bcrypt` for password hashing (see [service/user_service.py](mdc:service/user_service.py))
+- Validate file permissions when creating system files
+- Check root privileges for system operations
+- Sanitize all user inputs
+
+### Performance Guidelines
+- Use incremental traffic recording in monitor service
+- Implement connection pooling for high-traffic scenarios
+- Close resources properly (sockets, file handles)
+- Use efficient parsing for OpenVPN status output
+
+## 📝 Documentation Standards
+- Include docstrings for all public methods
+- Document complex business logic
+- Use clear variable names that explain purpose

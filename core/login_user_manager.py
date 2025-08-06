@@ -52,6 +52,21 @@ class LoginUserManager(IBackupable):
         except Exception:
             pass
 
+    def change_user_password(self, username: Username, new_password: Password) -> None:
+        """
+        Changes the password for an existing system user.
+        """
+        try:
+            subprocess.run(
+                ["chpasswd"],
+                input=f"{username}:{new_password}",
+                text=True,
+                check=True, capture_output=True
+            )
+        except subprocess.CalledProcessError as e:
+            stderr_text = e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else str(e.stderr)
+            raise ServiceError(f"Failed to change password for system user '{username}': {stderr_text}")
+
 
 
     def get_backup_assets(self) -> List[str]:
