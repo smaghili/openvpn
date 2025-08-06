@@ -55,13 +55,18 @@ function install_deployment() {
     # Ensure CLI script has execute permissions before launching
     chmod +x cli/main.py api/app.py scripts/*.py 2>/dev/null || true
     
-    sudo PROJECT_ROOT="$PROJECT_ROOT" INSTALL_ONLY=1 "venv/bin/python" -m cli.main
-    
-    echo ""
-    echo "✅ CLI and OpenVPN installation completed!"
-    echo ""
-    echo "[5/5] Setting up Web Panel (API + Frontend)..."
-    setup_web_panel
+    # Run CLI installer and check exit status
+    if sudo PROJECT_ROOT="$PROJECT_ROOT" INSTALL_ONLY=1 "venv/bin/python" -m cli.main; then
+        echo ""
+        echo "✅ CLI and OpenVPN installation completed!"
+        echo ""
+        echo "[5/5] Setting up Web Panel (API + Frontend)..."
+        setup_web_panel
+    else
+        echo ""
+        echo "❌ CLI installation failed or was cancelled"
+        exit 1
+    fi
 }
 
 function setup_web_panel() {

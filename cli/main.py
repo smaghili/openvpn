@@ -376,11 +376,22 @@ def restore_flow(backup_service: BackupService) -> None:
             os.remove(local_path)
 
 def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
-    # This function remains unchanged
-    confirm = input("This will completely remove OpenVPN. Are you sure? (Y/n): ").strip().lower()
+    """Complete uninstallation including web panel services."""
+    confirm = input("This will completely remove OpenVPN and Web Panel. Are you sure? (Y/n): ").strip().lower()
     if confirm in ('', 'y', 'yes'):
         try:
-            print("🗑️  Uninstalling OpenVPN...")
+            print("🗑️  Uninstalling OpenVPN and Web Panel...")
+            
+            # Remove web panel services first
+            print("   └── Stopping web panel services...")
+            os.system("systemctl stop openvpn-api openvpn-monitor 2>/dev/null || true")
+            os.system("systemctl disable openvpn-api openvpn-monitor 2>/dev/null || true")
+            os.system("rm -f /etc/systemd/system/openvpn-api.service /etc/systemd/system/openvpn-monitor.service 2>/dev/null || true")
+            os.system("systemctl daemon-reload")
+            
+            # Remove environment file
+            if os.path.exists("environment.env"):
+                os.remove("environment.env")
             
             db = Database()
             user_repo = UserRepository(db)
@@ -395,13 +406,20 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
                 for username in unique_users:
                     user_service.remove_user(username, silent=True)
             
-            print("   └── Stopping services and cleaning up...")
+            print("   └── Stopping OpenVPN services and cleaning up...")
             openvpn_manager.uninstall_openvpn(silent=True)
-            print("✅ OpenVPN completely removed")
+            
+            # Remove database
+            if os.path.exists("data/db/openvpn.db"):
+                os.remove("data/db/openvpn.db")
+                print("   └── Database removed")
+            
+            print("✅ OpenVPN and Web Panel completely removed")
             
             sys.exit(0)
         except Exception as e:
             print(f"❌ Uninstallation failed: {e}")
+            sys.exit(1)
 
 def main() -> None:
     if os.geteuid() != 0:
