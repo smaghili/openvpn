@@ -16,7 +16,8 @@ from data.user_repository import UserRepository
 
 # --- Configuration ---
 MANAGEMENT_HOST = get_config_value("OPENVPN_MANAGEMENT_HOST", "127.0.0.1")
-MANAGEMENT_PORT = get_int_config("OPENVPN_MANAGEMENT_PORT", 7505)
+CERT_MANAGEMENT_PORT = get_int_config("OPENVPN_CERT_MANAGEMENT_PORT", 7505)
+LOGIN_MANAGEMENT_PORT = get_int_config("OPENVPN_LOGIN_MANAGEMENT_PORT", 7506)
 CHECK_INTERVAL = get_int_config("MONITOR_INTERVAL", 45)
 
 # Ensure interval is within safe bounds
@@ -33,10 +34,12 @@ from config.paths import VPNPaths
 PROJECT_ROOT = VPNPaths.get_project_root()
 
 class OpenVPNMonitor:
-    def __init__(self, host, port):
+    def __init__(self, host, cert_port, login_port):
         self.host = host
-        self.port = port
-        self.sock = None
+        self.cert_port = cert_port
+        self.login_port = login_port
+        self.cert_sock = None
+        self.login_sock = None
         self.db = Database()
         self.user_repo = UserRepository(self.db)
         log_dir = os.path.dirname(LOG_FILE)
@@ -65,30 +68,48 @@ class OpenVPNMonitor:
             pass  # Ignore rotation errors
 
     def connect(self):
+        success = True
+        
+        # Connect to certificate server
         try:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.connect((self.host, self.port))
+            self.cert_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.cert_sock.connect((self.host, self.cert_port))
             # Read the initial welcome message from the server
-            self.sock.recv(1024) 
-            self._log("Successfully connected to OpenVPN management interface.")
-            return True
+            self.cert_sock.recv(1024) 
+            self._log(f"Successfully connected to certificate server management interface (port {self.cert_port}).")
         except Exception as e:
-            self._log(f"ERROR: Could not connect to management interface: {e}")
-            return False
+            self._log(f"ERROR: Could not connect to certificate server management interface: {e}")
+            success = False
+            
+        # Connect to login server  
+        try:
+            self.login_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.login_sock.connect((self.host, self.login_port))
+            # Read the initial welcome message from the server
+            self.login_sock.recv(1024)
+            self._log(f"Successfully connected to login server management interface (port {self.login_port}).")
+        except Exception as e:
+            self._log(f"ERROR: Could not connect to login server management interface: {e}")
+            success = False
+            
+        return success
 
     def disconnect(self):
-        if self.sock:
-            self.sock.close()
-            self.sock = None
+        if self.cert_sock:
+            self.cert_sock.close()
+            self.cert_sock = None
+        if self.login_sock:
+            self.login_sock.close()
+            self.login_sock = None
 
-    def _send_command(self, command, timeout=10):
-        if not self.sock:
-            self._log("ERROR: Not connected to management interface.")
+    def _send_command(self, sock, server_name, command, timeout=10):
+        if not sock:
+            self._log(f"ERROR: Not connected to {server_name} management interface.")
             return None
         try:
             # Set socket timeout
-            self.sock.settimeout(timeout)
-            self.sock.sendall(f"{command}\n".encode())
+            sock.settimeout(timeout)
+            sock.sendall(f"{command}\n".encode())
             
             response = ""
             start_time = time.time()
@@ -97,41 +118,54 @@ class OpenVPNMonitor:
             
             while "END" not in response and (time.time() - start_time) < timeout and iterations < max_iterations:
                 try:
-                    data = self.sock.recv(4096).decode()
+                    data = sock.recv(4096).decode()
                     if not data:  # Connection closed
                         break
                     response += data
                     iterations += 1
                 except socket.timeout:
-                    self._log(f"Timeout waiting for response to command '{command}'")
+                    self._log(f"Timeout waiting for response to command '{command}' from {server_name}")
                     break
                 except socket.error as e:
-                    self._log(f"Socket error while receiving response: {e}")
+                    self._log(f"Socket error while receiving response from {server_name}: {e}")
                     break
             
             # Reset socket to blocking mode
-            self.sock.settimeout(None)
+            sock.settimeout(None)
             return response if response else None
             
         except socket.error as e:
-            self._log(f"ERROR: Socket error while sending command '{command}': {e}")
+            self._log(f"ERROR: Socket error while sending command '{command}' to {server_name}: {e}")
             self.disconnect()
             return None
         except Exception as e:
-            self._log(f"ERROR: Unexpected error with command '{command}': {e}")
+            self._log(f"ERROR: Unexpected error with command '{command}' to {server_name}: {e}")
             self.disconnect()
             return None
 
-    def get_status(self):
-        return self._send_command("status")
+    def get_combined_status(self):
+        """Get status from both certificate and login servers."""
+        cert_status = self._send_command(self.cert_sock, "certificate", "status")
+        login_status = self._send_command(self.login_sock, "login", "status") 
+        return cert_status, login_status
 
     def kill_user(self, username):
         self._log(f"Attempting to disconnect user '{username}' due to quota exceeded.")
-        response = self._send_command(f"kill {username}")
-        if response and "SUCCESS" in response:
-            self._log(f"Successfully disconnected user '{username}'.")
-        else:
-            self._log(f"Failed to disconnect user '{username}'. Response: {response}")
+        
+        # Try to kill user on both servers
+        cert_response = self._send_command(self.cert_sock, "certificate", f"kill {username}")
+        login_response = self._send_command(self.login_sock, "login", f"kill {username}")
+        
+        success = False
+        if cert_response and "SUCCESS" in cert_response:
+            self._log(f"Successfully disconnected user '{username}' from certificate server.")
+            success = True
+        if login_response and "SUCCESS" in login_response:
+            self._log(f"Successfully disconnected user '{username}' from login server.")
+            success = True
+            
+        if not success:
+            self._log(f"Failed to disconnect user '{username}' from any server.")
 
     def _parse_client_status(self, status_output):
         """Robust parsing of OpenVPN status output"""
@@ -196,13 +230,33 @@ class OpenVPNMonitor:
         return connected_users
 
     def check_quotas(self):
-        status_output = self.get_status()
-        if not status_output:
-            self._log("Could not get status from OpenVPN. Skipping check.")
+        cert_status, login_status = self.get_combined_status()
+        
+        if not cert_status and not login_status:
+            self._log("Could not get status from any OpenVPN server. Skipping check.")
             return
 
-        # Parse the status output with robust parsing
-        connected_users = self._parse_client_status(status_output)
+        # Parse status from both servers
+        connected_users = {}
+        
+        if cert_status:
+            cert_users = self._parse_client_status(cert_status)
+            if cert_users:
+                self._log(f"Found {len(cert_users)} users on certificate server")
+                connected_users.update(cert_users)
+                
+        if login_status:
+            login_users = self._parse_client_status(login_status)
+            if login_users:
+                self._log(f"Found {len(login_users)} users on login server")
+                # Merge login users, combining traffic if user exists on both servers
+                for username, traffic in login_users.items():
+                    if username in connected_users:
+                        # User connected to both servers - combine traffic
+                        connected_users[username]['bytes_received'] += traffic['bytes_received']
+                        connected_users[username]['bytes_sent'] += traffic['bytes_sent']
+                    else:
+                        connected_users[username] = traffic
         
         if not connected_users:
             self._log("No connected users found or failed to parse status")
@@ -255,7 +309,7 @@ class OpenVPNMonitor:
         
         while True:
             try:
-                if not self.sock:
+                if not self.cert_sock and not self.login_sock:
                     # If not connected, try to connect
                     if not self.connect():
                         consecutive_failures += 1
@@ -293,5 +347,5 @@ class OpenVPNMonitor:
         self._log("Monitor service stopped.")
 
 if __name__ == "__main__":
-    monitor = OpenVPNMonitor(MANAGEMENT_HOST, MANAGEMENT_PORT)
+    monitor = OpenVPNMonitor(MANAGEMENT_HOST, CERT_MANAGEMENT_PORT, LOGIN_MANAGEMENT_PORT)
     monitor.run_forever()
