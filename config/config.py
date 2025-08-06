@@ -5,9 +5,11 @@ Centralizes all configuration values and provides validation.
 
 import os
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
-from core.types import IPAddress, Port, InstallSettings
+
+if TYPE_CHECKING:
+    from core.types import IPAddress, Port, InstallSettings
 from core.exceptions import ConfigurationError, ValidationError
 from config.constants import OpenVPNConstants, ConfigurablePaths
 
@@ -24,8 +26,8 @@ class VPNConfig:
     SETTINGS_FILE: str = field(init=False)
     
     # Network defaults
-    DEFAULT_CERT_PORT: Port = 1194
-    DEFAULT_LOGIN_PORT: Port = 1195
+    DEFAULT_CERT_PORT: 'Port' = 1194
+    DEFAULT_LOGIN_PORT: 'Port' = 1195
     DEFAULT_PROTOCOL: str = "udp"
     DEFAULT_CIPHER: str = "AES-256-GCM"
     DEFAULT_CERT_SIZE: str = "2048"
@@ -65,7 +67,7 @@ class VPNConfig:
         return username
     
     @staticmethod
-    def validate_ip_address(ip: str) -> IPAddress:
+    def validate_ip_address(ip: str) -> 'IPAddress':
         """Validate IP address format."""
         config = VPNConfig()
         if not config.IP_PATTERN.match(ip):
@@ -73,7 +75,7 @@ class VPNConfig:
         return ip
     
     @staticmethod
-    def validate_port(port: int) -> Port:
+    def validate_port(port: int) -> 'Port':
         """Validate port number."""
         if not (1024 <= port <= 65535):
             raise ValidationError("port", str(port), "Port must be between 1024 and 65535")
@@ -94,7 +96,7 @@ class VPNConfig:
         return dns
     
     @staticmethod
-    def validate_install_settings(settings: Dict[str, Any]) -> InstallSettings:
+    def validate_install_settings(settings: Dict[str, Any]) -> 'InstallSettings':
         """Validate and convert installation settings."""
         try:
             return InstallSettings(
