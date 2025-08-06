@@ -473,4 +473,4 @@ main_menu() {
 }
 
 # Main execution
-cd /tmp && main_menu
+main_menu
