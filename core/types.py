@@ -32,17 +32,7 @@ class DNSProvider(Enum):
     GOOGLE = "4"
     ADGUARD = "5"
 
-@dataclass
-class InstallSettings:
-    """Installation settings with type safety."""
-    public_ip: IPAddress
-    cert_port: Port
-    cert_proto: str
-    login_port: Port
-    login_proto: str
-    dns: str
-    cipher: str
-    cert_size: str
+
 
 @dataclass
 class UserData:
