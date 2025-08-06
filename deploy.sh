@@ -26,7 +26,9 @@ check_root() {
 
 install_system_packages() {
     print_status "Installing system packages..."
-    apt-get update && apt-get install -y git python3 python3-pip python3-venv curl sqlite3 ufw systemd
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y -qq git python3 python3-pip python3-venv curl sqlite3 ufw systemd
     print_success "System packages installed"
 }
 
@@ -36,13 +38,17 @@ setup_project() {
     
     if [ -d "$PROJECT_DIR" ]; then
         print_warning "Project directory exists. Updating..."
-        cd "$PROJECT_DIR" && git reset --hard HEAD && git pull origin main
+        cd "$PROJECT_DIR"
+        git reset --hard HEAD >/dev/null 2>&1
+        git pull origin main >/dev/null 2>&1
     else
         print_status "Cloning project repository..."
-        git clone "$REPO_URL" "$PROJECT_DIR" && cd "$PROJECT_DIR"
+        git clone "$REPO_URL" "$PROJECT_DIR" >/dev/null 2>&1
+        cd "$PROJECT_DIR"
     fi
     
-    chown -R root:root /opt/$PROJECT_DIR && chmod -R 755 /opt/$PROJECT_DIR
+    chown -R root:root /opt/$PROJECT_DIR
+    chmod -R 755 /opt/$PROJECT_DIR
     export PROJECT_ROOT="/opt/$PROJECT_DIR"
     print_success "Project files ready at $PROJECT_ROOT"
 }
@@ -51,16 +57,17 @@ setup_python_environment() {
     print_status "Setting up Python virtual environment..."
     cd /opt/$PROJECT_DIR
     
-    [ ! -d "venv" ] && python3 -m venv venv
-    source venv/bin/activate && pip install --upgrade pip
+    [ ! -d "venv" ] && python3 -m venv venv >/dev/null 2>&1
+    source venv/bin/activate
+    pip install --upgrade pip -q >/dev/null 2>&1
     
     if [ -f "requirements.txt" ]; then
-        pip install -r requirements.txt
+        pip install -r requirements.txt -q >/dev/null 2>&1
     else
         print_error "requirements.txt not found!"; exit 1
     fi
     
-    chmod +x cli/main.py api/app.py scripts/*.py
+    chmod +x cli/main.py api/app.py scripts/*.py 2>/dev/null || true
     print_success "Python environment configured"
 }
 
@@ -158,7 +165,11 @@ setup_database() {
 
 configure_firewall() {
     print_status "Configuring firewall..."
-    ufw --force enable && ufw allow ssh && ufw allow ${API_PORT}/tcp && ufw allow 1194/udp && ufw allow 1195/udp
+    echo 'y' | ufw --force enable >/dev/null 2>&1
+    ufw allow ssh >/dev/null 2>&1
+    ufw allow ${API_PORT}/tcp >/dev/null 2>&1
+    ufw allow 1194/udp >/dev/null 2>&1
+    ufw allow 1195/udp >/dev/null 2>&1
     print_success "Firewall configured"
 }
 
@@ -187,8 +198,8 @@ verify_and_display() {
     
     # Test endpoints
     sleep 3
-    curl -s http://localhost:${API_PORT}/api/health > /dev/null && print_success "API is responding" || print_warning "API may not be ready yet"
-    curl -s http://localhost:${API_PORT}/ > /dev/null && print_success "Web panel is accessible" || print_warning "Web panel may not be ready yet"
+    timeout 10 curl -s http://localhost:${API_PORT}/api/health > /dev/null 2>&1 && print_success "API is responding" || print_warning "API may not be ready yet"
+    timeout 10 curl -s http://localhost:${API_PORT}/ > /dev/null 2>&1 && print_success "Web panel is accessible" || print_warning "Web panel may not be ready yet"
     
     # Display access info
     echo ""
@@ -197,7 +208,8 @@ verify_and_display() {
     echo "=================================================="
     echo ""
     echo -e "${BLUE}📱 Access Information:${NC}"
-    echo "   URL: http://$(curl -s ifconfig.me || echo 'YOUR_SERVER_IP'):${API_PORT}"
+    SERVER_IP=$(timeout 5 curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}' || echo 'YOUR_SERVER_IP')
+    echo "   URL: http://${SERVER_IP}:${API_PORT}"
     echo "   Local: http://localhost:${API_PORT}"
     echo ""
     echo -e "${BLUE}🔑 API Key for Login:${NC}"
@@ -218,15 +230,35 @@ verify_and_display() {
 
 complete_installation() {
     print_status "Starting complete OpenVPN Manager installation..."
+    
+    print_status "Step 1/10: Checking root privileges..."
     check_root
+    
+    print_status "Step 2/10: Installing system packages..."
     install_system_packages
+    
+    print_status "Step 3/10: Setting up project files..."
     setup_project
+    
+    print_status "Step 4/10: Configuring Python environment..."
     setup_python_environment
+    
+    print_status "Step 5/10: Setting up database..."
     setup_database
+    
+    print_status "Step 6/10: Setting up frontend..."
     setup_frontend
+    
+    print_status "Step 7/10: Creating services..."
     create_services
+    
+    print_status "Step 8/10: Configuring firewall..."
     configure_firewall
+    
+    print_status "Step 9/10: Starting services..."
     generate_and_start
+    
+    print_status "Step 10/10: Verifying installation..."
     verify_and_display
 }
 
