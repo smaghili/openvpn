@@ -397,35 +397,43 @@ def main() -> None:
         if not os.path.exists(OpenVPNManager.SETTINGS_FILE):
              sys.exit(0)
 
-    while True:
-        print_management_menu()
-        choice = input("Enter your choice: ").strip()
-        
-        if choice == '1':
-            add_user_flow(user_service)
-        elif choice == '2':
-            remove_user_flow(user_service)
-        elif choice == '3':
-            list_users_flow(user_service)
-        elif choice == '4':
-            get_user_config_flow(user_service)
-        elif choice == '5':
-            get_shared_config_flow(openvpn_manager)
-        elif choice == '6':
-            set_user_quota_flow(user_service)
-        elif choice == '7':
-            view_user_status_flow(user_service)
-        elif choice == '8':
-            backup_flow(backup_service)
-        elif choice == '9':
-            restore_flow(backup_service)
-        elif choice == '10':
-            uninstall_flow(openvpn_manager)
-        elif choice == '11':
-            print("Goodbye!")
-            break
-        else:
-            print("Invalid choice. Please try again.")
+    try:
+        while True:
+            print_management_menu()
+            try:
+                choice = input("Enter your choice: ").strip()
+            except KeyboardInterrupt:
+                print("\n\nGoodbye!")
+                sys.exit(0)
+            
+            if choice == '1':
+                add_user_flow(user_service)
+            elif choice == '2':
+                remove_user_flow(user_service)
+            elif choice == '3':
+                list_users_flow(user_service)
+            elif choice == '4':
+                get_user_config_flow(user_service)
+            elif choice == '5':
+                get_shared_config_flow(openvpn_manager)
+            elif choice == '6':
+                set_user_quota_flow(user_service)
+            elif choice == '7':
+                view_user_status_flow(user_service)
+            elif choice == '8':
+                backup_flow(backup_service)
+            elif choice == '9':
+                restore_flow(backup_service)
+            elif choice == '10':
+                uninstall_flow(openvpn_manager)
+            elif choice == '11':
+                print("Goodbye!")
+                break
+            else:
+                print("Invalid choice. Please try again.")
+    except KeyboardInterrupt:
+        print("\n\nGoodbye!")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
