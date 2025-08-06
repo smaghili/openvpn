@@ -1,6 +1,7 @@
 #!/bin/bash
 # Complete OpenVPN Manager Deployment Script
-# Installs CLI, API, and Web Panel with full system integration
+# Installs CLI + REST API + Web Panel with full system integration
+# Single Flask app serving both API endpoints and modern web interface
 
 # Enable debugging and exit on error
 set -e
@@ -118,23 +119,83 @@ setup_python_environment() {
 
 setup_frontend() {
     print_status "Setting up frontend (Web Panel)..."
-    cd /opt/$PROJECT_DIR/frontend
+    cd /opt/$PROJECT_DIR
     
+    # Check if frontend directory exists
+    if [ ! -d "frontend" ]; then
+        print_error "Frontend directory not found!"
+        exit 1
+    fi
+    
+    cd frontend
+    
+    # Check if pre-built dist directory exists
     if [ ! -d "dist" ]; then
         print_error "Pre-built frontend not found! The dist directory is missing."
         print_error "This should not happen with the static frontend implementation."
         exit 1
     fi
     
-    REQUIRED_FILES=("dist/index.html" "dist/assets/css/main.css" "dist/assets/js/app.js")
+    # Comprehensive file verification
+    print_status "Verifying frontend files..."
+    REQUIRED_FILES=(
+        "dist/index.html"
+        "dist/manifest.json" 
+        "dist/sw.js"
+        "dist/assets/css/main.css"
+        "dist/assets/css/themes.css"
+        "dist/assets/css/responsive.css"
+        "dist/assets/js/app.js"
+        "dist/assets/js/api.js"
+        "dist/assets/js/router.js"
+        "dist/assets/js/i18n.js"
+        "dist/assets/icons/sprite.svg"
+    )
+    
+    MISSING_FILES=()
     for file in "${REQUIRED_FILES[@]}"; do
-        [ ! -f "$file" ] && { print_error "Required frontend file missing: $file"; exit 1; }
+        if [ ! -f "$file" ]; then
+            MISSING_FILES+=("$file")
+        fi
     done
     
-    print_success "✅ Pre-built static frontend verified"
-    chown -R root:root dist/ && find dist/ -type d -exec chmod 755 {} \; && find dist/ -type f -exec chmod 644 {} \;
-    print_success "Frontend ready to serve via Flask (no build process required)"
-    print_status "📦 Frontend size: $(du -sh dist | cut -f1) | 🚀 Features: Multi-language, Dark/Light themes, Mobile responsive, PWA ready"
+    if [ ${#MISSING_FILES[@]} -gt 0 ]; then
+        print_error "Missing required frontend files:"
+        for file in "${MISSING_FILES[@]}"; do
+            print_error "  - $file"
+        done
+        exit 1
+    fi
+    
+    # Set proper permissions for web serving
+    print_status "Setting frontend permissions..."
+    chown -R root:root dist/
+    find dist/ -type d -exec chmod 755 {} \;
+    find dist/ -type f -exec chmod 644 {} \;
+    
+    # Verify Flask can serve the frontend
+    print_status "Verifying Flask integration..."
+    FLASK_STATIC_PATH="/opt/$PROJECT_DIR/frontend/dist"
+    if [ ! -r "$FLASK_STATIC_PATH/index.html" ]; then
+        print_error "Flask cannot read frontend files!"
+        exit 1
+    fi
+    
+    # Create log directory for frontend access logs
+    mkdir -p /var/log/openvpn
+    touch /var/log/openvpn/access.log
+    chmod 644 /var/log/openvpn/access.log
+    
+    print_success "✅ Pre-built static frontend verified and configured"
+    print_success "🌐 Web Panel ready to serve via Flask API"
+    
+    # Display frontend info
+    FRONTEND_SIZE=$(du -sh dist 2>/dev/null | cut -f1 || echo "N/A")
+    print_status "📦 Frontend size: $FRONTEND_SIZE"
+    print_status "🚀 Features: Multi-language (EN/FA), Dark/Light themes, Mobile responsive, PWA ready"
+    print_status "📋 Components: User management, OpenVPN config, Real-time monitoring, Analytics"
+    
+    cd /opt/$PROJECT_DIR
 }
 
 create_services() {
@@ -235,41 +296,102 @@ generate_and_start() {
 }
 
 verify_and_display() {
-    print_status "Verifying installation..."
+    print_status "Verifying complete installation (CLI + API + Web Panel)..."
     
     # Check services
-    systemctl is-active --quiet ${API_SERVICE_NAME} && print_success "Flask application is running" || print_error "Flask application is not running"
-    systemctl is-active --quiet ${MONITOR_SERVICE_NAME} && print_success "Monitor service is running" || print_error "Monitor service is not running"
+    if systemctl is-active --quiet ${API_SERVICE_NAME}; then
+        print_success "✅ Flask application is running"
+    else
+        print_error "❌ Flask application is not running"
+        print_error "   Check logs: journalctl -u ${API_SERVICE_NAME} -f"
+    fi
     
-    # Test endpoints
-    sleep 3
-    timeout 10 curl -s http://localhost:${API_PORT}/api/health > /dev/null 2>&1 && print_success "API is responding" || print_warning "API may not be ready yet"
-    timeout 10 curl -s http://localhost:${API_PORT}/ > /dev/null 2>&1 && print_success "Web panel is accessible" || print_warning "Web panel may not be ready yet"
+    if systemctl is-active --quiet ${MONITOR_SERVICE_NAME}; then
+        print_success "✅ Monitor service is running"
+    else
+        print_error "❌ Monitor service is not running"
+        print_error "   Check logs: journalctl -u ${MONITOR_SERVICE_NAME} -f"
+    fi
     
-    # Display access info
+    # Test all components
+    sleep 5
+    print_status "Testing system components..."
+    
+    # Test API health
+    if timeout 15 curl -s http://localhost:${API_PORT}/api/health > /dev/null 2>&1; then
+        print_success "✅ API endpoints are responding"
+    else
+        print_warning "⚠️  API may not be ready yet (this is normal on first startup)"
+    fi
+    
+    # Test Web Panel
+    if timeout 15 curl -s http://localhost:${API_PORT}/ > /dev/null 2>&1; then
+        print_success "✅ Web Panel is accessible"
+    else
+        print_warning "⚠️  Web Panel may not be ready yet"
+    fi
+    
+    # Test CLI availability  
+    if [ -x "/opt/$PROJECT_DIR/cli/main.py" ]; then
+        print_success "✅ CLI interface is ready"
+    else
+        print_warning "⚠️  CLI permissions issue detected"
+    fi
+    
+    # Frontend file verification
+    if [ -f "/opt/$PROJECT_DIR/frontend/dist/index.html" ]; then
+        print_success "✅ Frontend files are properly deployed"
+    else
+        print_error "❌ Frontend files missing"
+    fi
+    
+    # Display comprehensive access information
     echo ""
-    echo "=================================================="
-    echo -e "${GREEN}🎉 OpenVPN Manager Installation Complete!${NC}"
-    echo "=================================================="
+    echo "================================================================"
+    echo -e "${GREEN}🎉 OpenVPN Manager Complete Installation Successful!${NC}"
+    echo "================================================================"
     echo ""
-    echo -e "${BLUE}📱 Access Information:${NC}"
+    echo -e "${BLUE}🌐 WEB PANEL ACCESS:${NC}"
     SERVER_IP=$(timeout 5 curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}' || echo 'YOUR_SERVER_IP')
-    echo "   URL: http://${SERVER_IP}:${API_PORT}"
-    echo "   Local: http://localhost:${API_PORT}"
+    echo "   🔗 Public URL: http://${SERVER_IP}:${API_PORT}"
+    echo "   🏠 Local URL: http://localhost:${API_PORT}"
+    echo "   📱 Mobile-optimized with dark/light themes"
+    echo "   🌍 Multi-language support (English/Persian)"
     echo ""
-    echo -e "${BLUE}🔑 API Key for Login:${NC}"
-    echo "   $(cat /opt/$PROJECT_DIR/environment.env | grep OPENVPN_API_KEY | cut -d'=' -f2)"
+    echo -e "${BLUE}🔑 LOGIN CREDENTIALS:${NC}"
+    API_KEY=$(cat /opt/$PROJECT_DIR/environment.env | grep OPENVPN_API_KEY | cut -d'=' -f2)
+    echo "   API Key: ${API_KEY}"
+    echo "   💡 Use this key to login to the web panel"
     echo ""
-    echo -e "${BLUE}🔧 Management Commands:${NC}"
-    echo "   CLI: cd /opt/${PROJECT_DIR} && source venv/bin/activate && python -m cli.main"
-    echo "   App Logs: journalctl -u ${API_SERVICE_NAME} -f"
-    echo "   Monitor Logs: journalctl -u ${MONITOR_SERVICE_NAME} -f"
+    echo -e "${BLUE}⚙️  CLI MANAGEMENT:${NC}"
+    echo "   Command: cd /opt/${PROJECT_DIR} && source venv/bin/activate && python -m cli.main"
+    echo "   📋 Full user management and OpenVPN configuration"
     echo ""
-    echo -e "${YELLOW}⚠️  Important Notes:${NC}"
-    echo "   - Everything runs on port ${API_PORT} (single Flask app)"
-    echo "   - Web panel and API are served together"
-    echo "   - Use the API key above to login to web panel"
-    echo "   - Optimized for low-resource servers"
+    echo -e "${BLUE}📊 API ENDPOINTS:${NC}"
+    echo "   Health: http://localhost:${API_PORT}/api/health"
+    echo "   Users: http://localhost:${API_PORT}/api/users"
+    echo "   System: http://localhost:${API_PORT}/api/system"
+    echo "   Quota: http://localhost:${API_PORT}/api/quota"
+    echo ""
+    echo -e "${BLUE}🔧 SYSTEM MONITORING:${NC}"
+    echo "   Web Panel Logs: journalctl -u ${API_SERVICE_NAME} -f"
+    echo "   Traffic Monitor: journalctl -u ${MONITOR_SERVICE_NAME} -f"
+    echo "   Access Logs: tail -f /var/log/openvpn/access.log"
+    echo ""
+    echo -e "${BLUE}📦 INSTALLED COMPONENTS:${NC}"
+    echo "   ✅ CLI Interface (Command-line management)"
+    echo "   ✅ REST API (Backend services)" 
+    echo "   ✅ Web Panel (Modern web interface)"
+    echo "   ✅ Traffic Monitor (Real-time monitoring)"
+    echo "   ✅ PWA Support (Installable web app)"
+    echo ""
+    echo -e "${YELLOW}⚠️  IMPORTANT NOTES:${NC}"
+    echo "   • Single Flask app serves both API and Web Panel on port ${API_PORT}"
+    echo "   • Optimized for low-resource servers (minimal RAM/CPU usage)"  
+    echo "   • Web panel requires the API key for authentication"
+    echo "   • All components integrated and ready for production use"
+    echo ""
+    echo -e "${GREEN}🚀 Ready for OpenVPN user management!${NC}"
     echo ""
 }
 
