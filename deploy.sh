@@ -2,7 +2,9 @@
 # Complete OpenVPN Manager Deployment Script
 # Installs CLI, API, and Web Panel with full system integration
 
+# Enable debugging and exit on error
 set -e
+set -x
 
 # --- Configuration ---
 REPO_URL="https://github.com/smaghili/openvpn.git"
@@ -27,8 +29,19 @@ check_root() {
 install_system_packages() {
     print_status "Installing system packages..."
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq
-    apt-get install -y -qq git python3 python3-pip python3-venv curl sqlite3 ufw systemd
+    
+    print_status "Updating package lists..."
+    if ! apt-get update -qq; then
+        print_error "Failed to update package lists"
+        exit 1
+    fi
+    
+    print_status "Installing required packages..."
+    if ! apt-get install -y -qq git python3 python3-pip python3-venv curl sqlite3 ufw systemd; then
+        print_error "Failed to install system packages"
+        exit 1
+    fi
+    
     print_success "System packages installed"
 }
 
@@ -39,11 +52,21 @@ setup_project() {
     if [ -d "$PROJECT_DIR" ]; then
         print_warning "Project directory exists. Updating..."
         cd "$PROJECT_DIR"
-        git reset --hard HEAD >/dev/null 2>&1
-        git pull origin main >/dev/null 2>&1
+        if ! git reset --hard HEAD >/dev/null 2>&1; then
+            print_error "Failed to reset git repository"
+            exit 1
+        fi
+        if ! git pull origin main >/dev/null 2>&1; then
+            print_error "Failed to pull latest changes"
+            exit 1
+        fi
     else
         print_status "Cloning project repository..."
-        git clone "$REPO_URL" "$PROJECT_DIR" >/dev/null 2>&1
+        if ! git clone "$REPO_URL" "$PROJECT_DIR" >/dev/null 2>&1; then
+            print_error "Failed to clone repository from $REPO_URL"
+            print_error "Please check your internet connection and try again"
+            exit 1
+        fi
         cd "$PROJECT_DIR"
     fi
     
@@ -57,16 +80,38 @@ setup_python_environment() {
     print_status "Setting up Python virtual environment..."
     cd /opt/$PROJECT_DIR
     
-    [ ! -d "venv" ] && python3 -m venv venv >/dev/null 2>&1
-    source venv/bin/activate
-    pip install --upgrade pip -q >/dev/null 2>&1
-    
-    if [ -f "requirements.txt" ]; then
-        pip install -r requirements.txt -q >/dev/null 2>&1
-    else
-        print_error "requirements.txt not found!"; exit 1
+    if [ ! -d "venv" ]; then
+        print_status "Creating Python virtual environment..."
+        if ! python3 -m venv venv >/dev/null 2>&1; then
+            print_error "Failed to create Python virtual environment"
+            exit 1
+        fi
     fi
     
+    print_status "Activating virtual environment..."
+    if ! source venv/bin/activate; then
+        print_error "Failed to activate virtual environment"
+        exit 1
+    fi
+    
+    print_status "Upgrading pip..."
+    if ! pip install --upgrade pip -q >/dev/null 2>&1; then
+        print_error "Failed to upgrade pip"
+        exit 1
+    fi
+    
+    if [ -f "requirements.txt" ]; then
+        print_status "Installing Python dependencies..."
+        if ! pip install -r requirements.txt -q >/dev/null 2>&1; then
+            print_error "Failed to install Python dependencies"
+            exit 1
+        fi
+    else
+        print_error "requirements.txt not found!"
+        exit 1
+    fi
+    
+    print_status "Setting execute permissions..."
     chmod +x cli/main.py api/app.py scripts/*.py 2>/dev/null || true
     print_success "Python environment configured"
 }
