@@ -7,8 +7,13 @@ import os
 import re
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
-from core.exceptions import ConfigurationError, ValidationError
 from config.constants import OpenVPNConstants, ConfigurablePaths
+
+# Lazy import function to avoid circular dependency
+def _get_exceptions():
+    """Lazy import of exceptions to break circular dependency."""
+    from core.exceptions import ValidationError, ConfigurationError
+    return ValidationError, ConfigurationError
 
 # Moved from core.types to break circular import
 @dataclass
@@ -67,6 +72,7 @@ class VPNConfig:
     @staticmethod
     def validate_username(username: str) -> str:
         """Validate username format."""
+        ValidationError, _ = _get_exceptions()
         config = VPNConfig()
         if not config.USERNAME_PATTERN.match(username):
             raise ValidationError(
@@ -79,6 +85,7 @@ class VPNConfig:
     @staticmethod
     def validate_ip_address(ip: str) -> str:
         """Validate IP address format."""
+        ValidationError, _ = _get_exceptions()
         config = VPNConfig()
         if not config.IP_PATTERN.match(ip):
             raise ValidationError("ip_address", ip, "Invalid IP address format")
@@ -87,6 +94,7 @@ class VPNConfig:
     @staticmethod
     def validate_port(port: int) -> int:
         """Validate port number."""
+        ValidationError, _ = _get_exceptions()
         if not (1024 <= port <= 65535):
             raise ValidationError("port", str(port), "Port must be between 1024 and 65535")
         return port
@@ -94,6 +102,7 @@ class VPNConfig:
     @staticmethod
     def validate_protocol(protocol: str) -> str:
         """Validate network protocol."""
+        ValidationError, _ = _get_exceptions()
         if protocol.lower() not in ["udp", "tcp"]:
             raise ValidationError("protocol", protocol, "Protocol must be 'udp' or 'tcp'")
         return protocol.lower()
@@ -101,6 +110,7 @@ class VPNConfig:
     @staticmethod
     def validate_dns_choice(dns: str) -> str:
         """Validate DNS choice."""
+        ValidationError, _ = _get_exceptions()
         if dns not in ["1", "2", "3", "4", "5"]:
             raise ValidationError("dns", dns, "DNS choice must be between 1 and 5")
         return dns
@@ -108,6 +118,7 @@ class VPNConfig:
     @staticmethod
     def validate_install_settings(settings: Dict[str, Any]) -> InstallSettings:
         """Validate and convert installation settings."""
+        ValidationError, ConfigurationError = _get_exceptions()
         try:
             return InstallSettings(
                 public_ip=VPNConfig.validate_ip_address(settings["public_ip"]),
