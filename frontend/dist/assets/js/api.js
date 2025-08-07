@@ -210,11 +210,16 @@ class API {
 
     // Authentication API
     async login(username, password) {
-        const response = await this.post('/auth/login', { username, password });
-        if (response.token) {
-            this.setToken(response.token);
+        try {
+            const response = await this.post('/auth/login', { username, password });
+            if (response.token) {
+                this.setToken(response.token);
+            }
+            return response;
+        } catch (error) {
+            console.error('Login API error:', error);
+            throw error;
         }
-        return response;
     }
 
     async logout() {

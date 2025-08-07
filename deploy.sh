@@ -8,7 +8,8 @@ set -e # Exit immediately if a command exits with a non-zero status.
 REPO_URL="https://github.com/smaghili/openvpn.git"
 PROJECT_DIR="openvpn"
 ENV_FILE="/etc/openvpn-manager/.env"
-DB_PATH="/etc/openvpn-manager/database.db"
+# Use the same database path that the application uses (will be set dynamically)
+DB_PATH=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -167,6 +168,9 @@ EOF
 function setup_database() {
     print_header "Database Setup"
     
+    # Ensure database directory exists
+    mkdir -p "$(dirname "$DB_PATH")"
+    
     # Check if system is already installed
     if [ -f "$DB_PATH" ]; then
         print_warning "Database already exists. Checking admin user..."
@@ -263,10 +267,14 @@ permissions = [
 ]
 
 for permission in permissions:
-    cursor.execute(
-        'INSERT INTO admin_permissions (admin_id, permission) VALUES (?, ?)',
-        (admin_id, permission)
-    )
+    try:
+        cursor.execute(
+            'INSERT INTO admin_permissions (admin_id, permission) VALUES (?, ?)',
+            (admin_id, permission)
+        )
+    except Exception:
+        # Permission table might not exist, skip
+        pass
 
 conn.commit()
 conn.close()
@@ -297,18 +305,11 @@ Group=root
 WorkingDirectory=$(pwd)
 Environment=PYTHONPATH=$(pwd)
 EnvironmentFile=$ENV_FILE
-ExecStart=$(pwd)/venv/bin/python -m api.app
+ExecStart=$(pwd)/venv/bin/python3 $(pwd)/api/app.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-
-# Security settings
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/etc/openvpn-manager /var/log/openvpn /etc/openvpn
-PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
@@ -344,6 +345,9 @@ function setup_project() {
         git clone "$REPO_URL" "$PROJECT_DIR"
         cd "$PROJECT_DIR"
     fi
+    
+    # Set database path after entering project directory
+    DB_PATH="$(pwd)/openvpn_data/vpn_manager.db"
     
     echo "Setting up Python environment..."
     if [ ! -d "venv" ]; then
@@ -386,12 +390,24 @@ function start_services() {
     # Start API service
     systemctl start openvpn-api
     
+    # Wait for service to start
+    sleep 3
+    
     # Check service status
     if systemctl is-active --quiet openvpn-api; then
         print_success "API service started successfully"
+        
+        # Test API health
+        sleep 2
+        if curl -f http://localhost:$API_PORT/api/health >/dev/null 2>&1; then
+            print_success "API health check passed"
+        else
+            print_warning "API health check failed, but service is running"
+        fi
     else
         print_error "Failed to start API service"
         systemctl status openvpn-api
+        journalctl -u openvpn-api --no-pager -n 20
         exit 1
     fi
 }
@@ -405,7 +421,9 @@ function show_completion_info() {
     echo -e "Admin Username: ${YELLOW}$ADMIN_USERNAME${NC}"
     echo -e "Admin Password: ${YELLOW}$ADMIN_PASSWORD${NC}"
     echo -e "API URL: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
+    echo -e "Web Panel: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
     echo -e "Health Check: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/api/health${NC}"
+    echo -e "Database Path: ${YELLOW}$DB_PATH${NC}"
     
     echo -e "\n${BLUE}=== API ENDPOINTS ===${NC}"
     echo -e "Login: POST /api/auth/login"
@@ -445,31 +463,30 @@ function show_completion_info() {
 function main() {
     check_root
     
-    # Check if system is already partially installed
-    if [ -f "$DB_PATH" ] || [ -f "$ENV_FILE" ] || systemctl is-active --quiet openvpn-api; then
-        print_warning "System appears to be already installed or partially configured."
-        echo "This script will update/reinstall the system."
-        echo ""
+    if [ -f "/etc/systemd/system/openvpn-api.service" ] && systemctl is-enabled --quiet openvpn-api 2>/dev/null; then
+        echo "System is already installed. Do you want to update the panel? (y/N): "
+        read -r response
+        
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            print_header "Updating System"
+            systemctl stop openvpn-api 2>/dev/null || true
+            
+            if [ -d "$PROJECT_DIR" ]; then
+                cd "$PROJECT_DIR"
+                git reset --hard HEAD
+                git pull origin main
+            fi
+            
+            systemctl daemon-reload
+            systemctl restart openvpn-api
+            print_success "System updated successfully"
+            exit 0
+        else
+            echo "Update cancelled."
+            exit 0
+        fi
     fi
     
-    print_header "OpenVPN Manager - JWT Authentication Installation"
-    echo "This script will install OpenVPN Manager with enterprise-grade JWT authentication."
-    echo "The installation includes:"
-    echo "• JWT-based authentication system"
-    echo "• Role-based access control"
-    echo "• Real-time permission management"
-    echo "• Public profile system"
-    echo "• Enhanced security features"
-    echo ""
-    echo -n "Continue with installation? (y/N): "
-    read -r response
-    
-    if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        echo "Installation cancelled."
-        exit 0
-    fi
-    
-    # Installation steps
     install_dependencies
     setup_project
     get_admin_credentials
