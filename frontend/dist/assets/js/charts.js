@@ -52,8 +52,13 @@ class Charts {
     setupChart() {
         if (!window.Chart) return;
 
-        // Register Chart.js components
-        Chart.register(...Chart.registerables);
+        // Register Chart.js components (Chart.js v4 compatible)
+        if (Chart.registerables && Array.isArray(Chart.registerables)) {
+            Chart.register(...Chart.registerables);
+        } else if (Chart.registerables) {
+            // For older versions or different structure
+            Chart.register(Chart.registerables);
+        }
 
         // Set global defaults
         Chart.defaults.font.family = 'var(--font-family-base)';

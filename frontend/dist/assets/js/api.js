@@ -5,7 +5,7 @@
 
 class API {
     constructor() {
-        this.baseURL = '/api/v1';
+        this.baseURL = '/api';
         this.token = this.getStoredToken();
         this.refreshTimer = null;
         
@@ -98,9 +98,19 @@ class API {
     async request(endpoint, options = {}) {
         const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
         
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers
+        };
+
+        if (this.token) {
+            headers['Authorization'] = `Bearer ${this.token}`;
+        }
+        
         try {
             const response = await fetch(url, {
                 method: 'GET',
+                headers,
                 ...options
             });
 
@@ -243,7 +253,7 @@ class API {
 
     // System API
     async getSystemStats() {
-        return this.get('/system/stats');
+        return this.get('/system/status');
     }
 
     async getSystemHealth() {

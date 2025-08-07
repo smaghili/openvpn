@@ -187,6 +187,52 @@ def uninstall_vpn():
             'message': str(e)
         }), 500
 
+@system_bp.route('/services', methods=['GET'])
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('reports:view')
+def get_system_services():
+    """Get system services status."""
+    try:
+        services_status = {
+            'openvpn': {
+                'name': 'OpenVPN',
+                'status': 'running' if os.path.exists('/var/run/openvpn/server.pid') else 'stopped',
+                'enabled': True
+            },
+            'api': {
+                'name': 'OpenVPN Manager API',
+                'status': 'running',
+                'enabled': True
+            }
+        }
+        
+        return jsonify({
+            'message': 'System services retrieved successfully',
+            'services': services_status
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Failed to get system services',
+            'message': str(e)
+        }), 500
+
+@system_bp.route('/health', methods=['GET'])
+def system_health():
+    """Get system health status (no authentication required)."""
+    try:
+        return jsonify({
+            'status': 'healthy',
+            'message': 'OpenVPN Manager API is running',
+            'timestamp': os.popen('date').read().strip()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'message': str(e)
+        }), 500
+
 @system_bp.route('/status', methods=['GET'])
 @JWTMiddleware.require_auth
 @JWTMiddleware.require_permission('reports:view')
