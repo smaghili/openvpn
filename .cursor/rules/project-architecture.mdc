@@ -21,36 +21,91 @@ description: OpenVPN Manager project architecture and structure guidelines
 ✅ **Complete architecture understanding before writing new code**  
 ✅ **Always think and act as a system designer**
 
-# OpenVPN Manager - Project Architecture
+### 🚨 MANDATORY DEVELOPMENT PROTOCOL
+
+**NEVER code without complete understanding:**
+1. **Analyze explicit and implicit goals** of every request
+2. **Break down into clear objectives** and step-by-step plan
+3. **Refuse unclear or unsafe requests** - state clearly if unfeasible
+4. **Produce only production-ready code** - complete, clean, modular
+5. **Implement ONLY what's requested** - ask before adding extras
+6. **Assess and warn about risks** - performance, security, compatibility
+7. **Integrate with existing architecture** - respect layer boundaries
+8. **Think like system designer** - consider edge cases and extensibility
+9. **Never assume or speculate** - request clarification when needed
+
+# OpenVPN Manager - Multi-Interface Architecture
 
 ## 🏗️ Core Architecture Principles
 
-This is a **production-grade OpenVPN management system** with **traffic monitoring capabilities**. The project follows **layered architecture** with strict separation of concerns.
+This is a **production-grade OpenVPN management system** with **dual interface support** (CLI + Web Panel) and **real-time traffic monitoring capabilities**. The project follows **layered architecture** with strict separation of concerns.
 
 ### Layer Structure (Bottom to Top)
 1. **Data Layer** (`data/`) - Database access, repositories
 2. **Core Layer** (`core/`) - Business logic, OpenVPN management  
 3. **Service Layer** (`service/`) - Application services, orchestration
-4. **CLI Layer** (`cli/`) - User interface, command handling
+4. **Interface Layer** - Multiple access methods:
+   - **CLI Layer** (`cli/`) - Command-line interface
+   - **API Layer** (`api/`) - RESTful web API with Flask
+   - **Frontend Layer** (`frontend/`) - Static web interface (PWA)
 
 ### Key Components
 
-- **Main Entry Point**: [cli/main.py](mdc:cli/main.py) - CLI interface and user flows
+#### Core Management System
+- **CLI Entry Point**: [cli/main.py](mdc:cli/main.py) - Command-line interface and user flows
+- **API Server**: [api/app.py](mdc:api/app.py) - Flask-based web API with authentication
 - **Core Manager**: [core/openvpn_manager.py](mdc:core/openvpn_manager.py) - OpenVPN server management
 - **User Service**: [service/user_service.py](mdc:service/user_service.py) - User operations orchestration
 - **Data Repository**: [data/user_repository.py](mdc:data/user_repository.py) - Database operations
-- **Traffic Monitor**: [scripts/monitor_service.py](mdc:scripts/monitor_service.py) - Real-time traffic monitoring
-- **Database Schema**: [database.sql](mdc:database.sql) - SQLite schema definition
+
+#### Web Panel System
+- **API Routes**: [api/routes/](mdc:api/routes/) - RESTful endpoints for user, quota, and system management
+- **Authentication**: [api/middleware/auth_middleware.py](mdc:api/middleware/auth_middleware.py) - API key-based security
+- **Frontend Interface**: [frontend/dist/](mdc:frontend/dist/) - Pre-built static PWA with multi-language support
+- **Static Assets**: Modern responsive design with dark/light themes
+
+#### Monitoring & Operations
+- **Traffic Monitor**: [scripts/monitor_service.py](mdc:scripts/monitor_service.py) - Real-time traffic monitoring daemon
+- **Connection Hooks**: [scripts/on_connect.py](mdc:scripts/on_connect.py) & [scripts/on_disconnect.py](mdc:scripts/on_disconnect.py) - OpenVPN event handlers
+- **Database Schema**: [database.sql](mdc:database.sql) - SQLite schema with triggers and constraints
 - **Configuration**: [config/config.py](mdc:config/config.py) - Centralized configuration management
 
 ## 🚫 Critical Architecture Rules
 
-**NEVER violate layer boundaries:**
-- Data layer must NOT import from core/service layers
-- Each layer can only depend on layers below it
-- Use dependency injection in service layer
+### Layer Boundary Enforcement
+- **Data layer** must NOT import from core/service/api layers
+- **Core layer** can only use data layer, not service/api layers
+- **Service layer** orchestrates core and data, used by interfaces
+- **Interface layers** (CLI/API) use service layer, never bypass to core/data
 
-**Traffic monitoring is mission-critical:**
-- Monitor service runs as systemd daemon
-- Handles both certificate and login-based servers
-- Real-time quota enforcement with user disconnection
+### Dual Interface Management
+- **CLI and API must use identical service layer methods**
+- **No business logic in API routes** - delegate to service layer
+- **Consistent error handling** across both interfaces
+- **Shared validation** through service layer
+
+### Web Panel Security
+- **API key authentication** required for all protected endpoints
+- **CORS enabled** for cross-origin requests
+- **Security headers** on all static file responses
+- **No sensitive data** in frontend - API key authentication only
+
+### Traffic Monitoring Integration
+- **Monitor service** runs as systemd daemon independent of interfaces
+- **Real-time quota enforcement** affects both CLI and web panel users
+- **Database operations** must handle concurrent access from multiple interfaces
+- **Event logging** visible through both CLI and web panel
+
+## 📱 Web Panel Architecture
+
+### Frontend (Static PWA)
+- **Technology**: Vanilla JavaScript (no frameworks)
+- **Features**: Multi-language (EN/FA), Dark/Light themes, Responsive design
+- **Deployment**: Pre-built static files served by Flask
+- **Authentication**: API key-based with secure storage
+
+### API Structure
+- **Flask-based** RESTful API optimized for low-resource servers
+- **Route organization**: Separate blueprints for users, quotas, system management
+- **Middleware**: Authentication, error handling, CORS
+- **Static serving**: Optimized caching and compression for frontend assets

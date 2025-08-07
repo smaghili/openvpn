@@ -10,13 +10,27 @@ globs: deploy.sh,install.sh,*.service
 - **Precise Execution**: Implement exactly what's requested
 - **System Thinking**: Consider interactions with all system components
 
+### 🚨 CRITICAL: Development Protocol Compliance
+**MANDATORY before any deployment coding:**
+- **Never deploy without complete understanding** of requirements and risks
+- **Assess system impact** on existing services and architecture
+- **Production-ready deployments only** - no experimental or partial solutions
+- **Explicit approval required** for any additions beyond requested scope
+- **Clear warning required** if deployment may cause performance or compatibility issues
+
 # Deployment & Operations Standards
 
 ## 🚀 Deployment Architecture
 
-This project supports **dual deployment methods**:
-- **Recommended**: Python-based via [deploy.sh](mdc:deploy.sh)
-- **Legacy**: Shell-based via [install.sh](mdc:install.sh)
+This project supports **dual deployment methods** with **integrated web panel**:
+- **Recommended**: Python-based via [deploy.sh](mdc:deploy.sh) - Includes CLI + Web Panel + API
+- **Legacy**: Shell-based via [install.sh](mdc:install.sh) - CLI only
+
+### Web Panel Deployment Components
+- **Flask API Server**: RESTful backend with authentication
+- **Static Frontend**: Pre-built PWA served by Flask
+- **Systemd Integration**: API service with automatic restart
+- **Environment Configuration**: API key and security settings
 
 ## 📋 Critical Deployment Rules
 
@@ -31,14 +45,18 @@ This project supports **dual deployment methods**:
   - `openvpn-server@server-cert` (certificate-based)
   - `openvpn-server@server-login` (username/password-based)  
   - `openvpn-monitor` (traffic monitoring daemon)
-- Enable services with proper dependencies
-- Configure log rotation and cleanup
+  - `openvpn-api` (web panel Flask API server)
+- Enable services with proper dependencies and restart policies
+- Configure log rotation and cleanup for all services
+- Set up port forwarding for web panel access (default: 5000)
 
 ### Security Hardening
-- Run services as `nobody:nogroup` when possible
+- Run services as `nobody:nogroup` when possible (except API which needs root for OpenVPN operations)
 - Set restrictive file permissions on certificates and keys
-- Configure firewall rules for both server types
+- Configure firewall rules for OpenVPN servers and web panel port
 - Enable IP forwarding in system configuration
+- **API Security**: Generate secure API key and store in environment variables
+- **Frontend Security**: Serve static files with security headers
 
 ## 🔧 Operations Guidelines
 
@@ -55,10 +73,16 @@ This project supports **dual deployment methods**:
 - Encrypted backup files with password protection
 
 ### Troubleshooting
-- Check systemd service status: `systemctl status openvpn-monitor`
-- Monitor logs: `tail -f /var/log/openvpn/traffic_monitor.log`
+- Check systemd service status: 
+  - `systemctl status openvpn-monitor`
+  - `systemctl status openvpn-api`
+- Monitor logs: 
+  - `tail -f /var/log/openvpn/traffic_monitor.log`
+  - `journalctl -u openvpn-api -f`
 - Verify OpenVPN management interfaces are accessible
 - Test database connectivity and permissions
+- **Web Panel**: Test API health endpoint: `curl http://localhost:5000/api/health`
+- **Authentication**: Verify API key configuration in environment
 
 ## 🛠️ Maintenance Tasks
 - Regular log rotation and cleanup

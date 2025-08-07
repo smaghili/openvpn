@@ -12,6 +12,97 @@ description: Python coding standards for OpenVPN Manager project
 - English docstrings only above methods/classes
 - Execute exactly what's requested, nothing more
 
+# 🚀 Development Protocol - MANDATORY BEFORE ANY CODING
+
+## 🔍 1. COMPLETE ANALYSIS BEFORE ANY CODE
+**Never start coding without full understanding:**
+- Carefully analyze EXPLICIT and IMPLICIT goals of requests
+- Break down tasks into two clear lists:
+  a) Clear set of objectives/expected outcomes
+  b) Precise, step-by-step implementation plan
+
+## ⚠️ 2. DO NOT CODE IF TASK IS UNCLEAR OR UNSAFE
+**Generate NO code until:**
+- Request is fully understood
+- Solution is architecturally sound
+- Implementation is technically feasible
+
+**If request is ambiguous, incomplete, or technically risky, clearly state so.**
+**If request is not technically feasible, respond: "This request is not technically feasible as described."**
+
+## 🧠 3. CODE QUALITY & ARCHITECTURE REQUIREMENTS
+**Generated code MUST be:**
+✅ Complete and functional
+✅ Clean and readable
+✅ Well-structured and modular
+✅ Production-ready and maintainable
+
+**Follow SOLID principles, clean architecture, and separation of concerns.**
+
+**NEVER write:**
+❌ Partial or placeholder code
+❌ Repetitive or unclean logic
+❌ Quick hacks or spaghetti code
+
+**Comments must be:**
+✅ Clear and in English only
+✅ Placed at class/method level when needed
+❌ Never excessive or in other languages
+
+## 💡 4. EFFICIENCY & RESOURCE OPTIMIZATION
+**Always prioritize simple, efficient, and lightweight solutions.**
+**Avoid:**
+❌ Unnecessary complexity or over-abstraction
+❌ Heavy dependencies or bloated frameworks
+❌ Memory-intensive operations
+
+**Code must perform well on resource-constrained servers:**
+- Target: 1 GB RAM or less
+- Optimize for minimal CPU and memory usage
+- Avoid excessive async operations or background processes
+
+## 🔒 5. STRICT SCOPE ADHERENCE
+**Implement ONLY what was explicitly requested.**
+**If you identify potentially useful additions not in scope, ask: "This exceeds your current request - should I include this?"**
+**Never exceed defined requirements without explicit approval.**
+
+## ⚠️ 6. PROACTIVE RISK ASSESSMENT
+**Before implementing, identify potential issues:**
+- Performance bottlenecks
+- Security vulnerabilities
+- Compatibility problems
+- Architectural conflicts
+
+**If risks exist, pause and state: "This approach may cause [specific risks]. Should I proceed or explore alternatives?"**
+
+## 🧩 7. ARCHITECTURAL INTEGRATION
+**Always analyze existing codebase structure before modifications.**
+**Ensure new code integrates seamlessly with current architecture.**
+**Prioritize:**
+✅ System scalability and performance
+✅ Code reusability and modularity
+✅ Long-term maintainability
+✅ Clear separation of concerns
+
+## 🧭 8. SENIOR ARCHITECT MINDSET
+**Think beyond immediate implementation:**
+- Consider edge cases and error scenarios
+- Plan for future extensibility
+- Ensure robust error handling
+- Design for real-world production use
+
+**You are a technical decision maker, not just a code generator.**
+**Question unclear requirements and suggest improvements when appropriate.**
+
+## 📌 9. QUALITY ASSURANCE STANDARDS
+**Never assume project structure - request clarification if needed.**
+**Avoid speculative implementations ("this probably works").**
+**Every solution must be:**
+✅ Deliberately designed
+✅ Technically justified
+✅ Production-ready
+✅ Resource-efficient
+
 # Python Coding Standards
 
 ## 🐍 Code Quality Requirements
@@ -26,6 +117,7 @@ description: Python coding standards for OpenVPN Manager project
 - **NEVER** use bare `except:` - always specify exception types
 - Log errors with context using the established logging pattern
 - For CLI operations, provide user-friendly error messages
+- For API operations, return consistent JSON error responses with HTTP status codes
 
 ### Database Operations
 - **ALWAYS** use parameterized queries (SQL injection protection)
@@ -48,3 +140,57 @@ description: Python coding standards for OpenVPN Manager project
 - Include docstrings for all public methods
 - Document complex business logic
 - Use clear variable names that explain purpose
+
+## 🌐 API Development Patterns
+
+### Flask Route Structure
+- **Blueprint organization**: Separate blueprints for logical grouping (users, quota, system)
+- **Authentication decorator**: Always use `@AuthMiddleware.require_auth` for protected endpoints
+- **Service layer delegation**: Routes should only validate input and delegate to service layer
+- **Consistent error responses**: Use standard JSON error format with appropriate HTTP codes
+
+### Factory Pattern for Dependencies
+```python
+def get_user_service() -> UserService:
+    """Factory function - ALWAYS use this pattern for dependency injection."""
+    db = Database()
+    user_repo = UserRepository(db)
+    login_manager = LoginUserManager()
+    openvpn_manager = OpenVPNManager()
+    return UserService(user_repo, openvpn_manager, login_manager)
+```
+
+### API Response Standards
+```python
+# Success response
+return jsonify({'message': 'Operation successful', 'data': result}), 200
+
+# Error response
+return jsonify({'error': 'Error type', 'message': 'User-friendly description'}), status_code
+```
+
+### Input Validation
+- **Request data validation**: Always validate JSON request data before processing
+- **Type checking**: Use isinstance() for runtime type validation
+- **Service layer validation**: Delegate complex validation to service layer
+- **Error propagation**: Let service layer exceptions bubble up to route error handlers
+
+## 🔒 API Security Patterns
+
+### Authentication
+- **API key verification**: Use constant-time comparison with `hmac.compare_digest()`
+- **Environment variables**: Store sensitive configuration in environment variables
+- **Header validation**: Require `X-API-Key` header for all protected endpoints
+
+### Input Sanitization
+- **User input cleaning**: Strip whitespace and validate format before processing
+- **SQL injection prevention**: Always use parameterized queries through repository layer
+- **Path traversal protection**: Validate file paths and prevent directory traversal
+
+## ⚡ Performance Optimization
+
+### Flask Application
+- **Static file serving**: Optimize caching headers for different asset types
+- **Request processing**: Minimize memory allocation in request handlers
+- **Database connections**: Efficient connection handling through service layer
+- **Response compression**: Enable gzip compression for text responses

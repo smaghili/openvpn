@@ -1,0 +1,183 @@
+---
+description: Web panel development standards and API patterns for OpenVPN Manager
+---
+
+## 👨‍💻 Principal Developer Standards
+- **Full-Stack Architect**: Design both frontend and backend components
+- **Performance First**: Optimize for low-resource server environments
+- **Security Focus**: API key authentication and secure static serving
+- **Code Quality**: Clean separation between API routes and business logic
+
+### 🚨 MANDATORY: Follow Development Protocol
+**Before ANY web panel coding:**
+1. **Complete analysis** of request goals and technical requirements
+2. **Clear implementation plan** with step-by-step approach
+3. **Risk assessment** for performance, security, and compatibility
+4. **Production-ready code only** - no placeholder or partial implementations
+5. **Strict scope adherence** - implement only what's explicitly requested
+
+# Web Panel Development Standards
+
+## 🌐 Architecture Overview
+
+The web panel is a **dual-component system** consisting of a Flask-based API backend and a static PWA frontend, designed for production deployment on resource-constrained servers.
+
+### Technology Stack
+- **Backend**: Flask with Blueprint organization
+- **Frontend**: Vanilla JavaScript PWA (no frameworks)
+- **Authentication**: API key-based with environment variable configuration
+- **Database**: Shared SQLite with CLI interface through service layer
+
+## 🔒 API Development Patterns
+
+### Route Organization
+```python
+# Separate blueprints for logical grouping
+user_bp = Blueprint('users', __name__)      # User CRUD operations
+quota_bp = Blueprint('quota', __name__)     # Traffic and quota management  
+system_bp = Blueprint('system', __name__)   # Server configuration and monitoring
+```
+
+### Authentication Pattern
+```python
+@user_bp.route('/', methods=['POST'])
+@AuthMiddleware.require_auth  # ALWAYS use for protected endpoints
+def create_user():
+    # Route implementation
+```
+
+### Service Layer Integration
+```python
+def get_user_service() -> UserService:
+    """Factory function - ALWAYS use this pattern for dependency injection."""
+    db = Database()
+    user_repo = UserRepository(db)
+    login_manager = LoginUserManager()
+    openvpn_manager = OpenVPNManager()
+    return UserService(user_repo, openvpn_manager, login_manager)
+```
+
+### Error Response Format
+```python
+# Consistent error responses across all routes
+return jsonify({
+    'error': 'Error type',
+    'message': 'User-friendly description'
+}), status_code
+```
+
+## 📱 Frontend Development Standards
+
+### Progressive Web App Requirements
+- **Static deployment**: Pre-built files served by Flask
+- **Multi-language support**: English and Persian with RTL support
+- **Theme system**: Dark/Light mode with system preference detection
+- **Responsive design**: Mobile-first approach with desktop optimization
+
+### Authentication Flow
+```javascript
+// API key authentication with secure storage
+const apiKey = localStorage.getItem('api_key');
+const response = await fetch('/api/endpoint', {
+    headers: {
+        'X-API-Key': apiKey,
+        'Content-Type': 'application/json'
+    }
+});
+```
+
+### State Management Pattern
+```javascript
+// Simple state management without frameworks
+const AppState = {
+    user: null,
+    theme: 'system',
+    language: 'en',
+    // Update methods
+    setUser(user) { this.user = user; },
+    setTheme(theme) { this.theme = theme; }
+};
+```
+
+## 🛡️ Security Guidelines
+
+### API Security
+- **API key authentication**: Environment variable `OPENVPN_API_KEY`
+- **CORS configuration**: Enabled for cross-origin requests
+- **Security headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection
+- **Input validation**: All user inputs validated before processing
+
+### Static File Security
+- **Cache control**: Aggressive caching for assets, no-cache for HTML
+- **Content Security Policy**: Restrictive CSP headers
+- **File permissions**: Proper file system permissions for deployment
+
+### Sensitive Data Handling
+- **No secrets in frontend**: API key only, no user data storage
+- **Environment variables**: All sensitive configuration via environment
+- **Database access**: Only through service layer, never direct from API routes
+
+## ⚡ Performance Optimization
+
+### Backend Optimization
+- **Service layer caching**: Reuse UserService instances where appropriate
+- **Database connections**: Efficient connection handling
+- **Response compression**: Gzip compression for text responses
+- **Static file serving**: Optimized caching headers and ETags
+
+### Frontend Optimization
+- **Minimal JavaScript**: No heavy frameworks, vanilla JS only
+- **Asset optimization**: Pre-compressed CSS/JS files
+- **Lazy loading**: Load content as needed
+- **Local storage**: Minimize API calls with intelligent caching
+
+### Resource Constraints
+- **Memory usage**: Optimize for 1GB RAM servers
+- **CPU efficiency**: Minimal background processing
+- **Disk usage**: Efficient static file organization
+- **Network bandwidth**: Compressed responses and smart caching
+
+## 🔄 Data Flow Patterns
+
+### Request Lifecycle
+1. **Frontend**: User action triggers API call
+2. **Middleware**: Authentication validation
+3. **Route**: Input validation and delegation
+4. **Service**: Business logic orchestration
+5. **Repository**: Database operations
+6. **Response**: Formatted JSON response
+
+### Error Handling Chain
+```python
+# Service layer error handling
+try:
+    result = user_service.create_user(username, password)
+    return jsonify({'message': f'User "{username}" created successfully'}), 201
+except UserAlreadyExistsError as e:
+    return jsonify({'error': 'User exists', 'message': str(e)}), 409
+except ValidationError as e:
+    return jsonify({'error': 'Invalid input', 'message': str(e)}), 400
+except Exception as e:
+    return jsonify({'error': 'Server error', 'message': 'Internal error occurred'}), 500
+```
+
+## 🚀 Deployment Considerations
+
+### Static File Serving
+- **Flask integration**: Serve frontend through Flask app
+- **Caching strategy**: Long-term caching for assets, no-cache for HTML
+- **Compression**: Gzip compression for text files
+- **CDN compatibility**: Headers suitable for CDN deployment
+
+### Environment Configuration
+```bash
+# Required environment variables
+OPENVPN_API_KEY=your-secure-api-key
+API_SECRET_KEY=flask-secret-key
+```
+
+### Service Integration
+- **Systemd service**: API runs as systemd service
+- **Port configuration**: Default port 5000, configurable
+- **Process management**: Single-process Flask app optimized for low resources
+- **Monitoring**: Health check endpoint for service monitoring
