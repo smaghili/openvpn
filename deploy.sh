@@ -68,7 +68,7 @@ function generate_secure_password() {
 }
 
 function generate_jwt_secret() {
-    openssl rand -base64 64
+    openssl rand -base64 64 | tr -d '\n' | tr -d '=+/'
 }
 
 function get_admin_credentials() {
@@ -153,7 +153,7 @@ ADMIN_USERNAME=$ADMIN_USERNAME
 API_PORT=$API_PORT
 JWT_SECRET=$JWT_SECRET
 DATABASE_PATH=$DB_PATH
-API_SECRET_KEY=$(openssl rand -base64 32)
+API_SECRET_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '=+/')
 FLASK_ENV=production
 EOF
     
