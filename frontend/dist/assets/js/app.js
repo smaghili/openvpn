@@ -59,7 +59,7 @@ class App {
     setupEventListeners() {
         // Authentication events
         window.addEventListener('authenticationFailed', () => {
-            this.handleLogout();
+            this.showLoginPage();
         });
 
         // Language change events
@@ -270,13 +270,8 @@ class App {
      * Handle logout
      */
     async handleLogout() {
-        try {
-            await window.api.logout();
-        } catch (error) {
-            console.warn('Logout request failed:', error);
-        }
-        
         this.isAuthenticated = false;
+        window.api.setToken(null);
         this.cleanup();
         this.showLoginPage();
     }

@@ -7,12 +7,9 @@ class API {
     constructor() {
         this.baseURL = '/api';
         this.token = this.getStoredToken();
-        this.refreshTimer = null;
+        this.isAuthenticating = false;
         
-        // Clear old cached API data
         this.clearOldCache();
-        
-        // Request interceptor for authentication
         this.setupInterceptors();
     }
     
@@ -87,29 +84,26 @@ class API {
                 headers
             };
 
-            try {
-                const response = await originalFetch(url, config);
-                
-                // Handle authentication errors
-                if (response.status === 401) {
-                    this.handleAuthError();
-                }
-                
-                return response;
-            } catch (error) {
-                console.error('API request failed:', error);
-                throw error;
-            }
+                         const response = await originalFetch(url, config);
+             
+             if (response.status === 401 && !this.isAuthenticating && !url.includes('/auth/')) {
+                 this.handleAuthError();
+             }
+             
+             return response;
         };
     }
 
     /**
      * Handle authentication errors
      */
-    handleAuthError() {
-        this.setToken(null);
-        window.dispatchEvent(new CustomEvent('authenticationFailed'));
-    }
+         handleAuthError() {
+         if (this.isAuthenticating) return;
+         this.isAuthenticating = true;
+         
+         this.setToken(null);
+         window.dispatchEvent(new CustomEvent('authenticationFailed'));
+     }
 
     /**
      * Make HTTP request
@@ -239,26 +233,20 @@ class API {
 
     // Authentication API
     async login(username, password) {
+        this.isAuthenticating = true;
         try {
             const response = await this.post('/auth/login', { username, password });
             if (response.token) {
                 this.setToken(response.token);
             }
             return response;
-        } catch (error) {
-            console.error('Login API error:', error);
-            throw error;
+        } finally {
+            this.isAuthenticating = false;
         }
     }
 
     async logout() {
-        try {
-            await this.post('/auth/logout');
-        } catch (error) {
-            console.warn('Logout request failed:', error);
-        } finally {
-            this.setToken(null);
-        }
+        this.setToken(null);
     }
 
     async validateToken() {

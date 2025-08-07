@@ -246,6 +246,8 @@ if existing_admin:
         'UPDATE admins SET password_hash = ?, token_version = token_version + 1 WHERE id = ?', 
         (PASSWORD_HASH, admin_id)
     )
+    # Clear existing permissions first
+    cursor.execute('DELETE FROM admin_permissions WHERE admin_id = ?', (admin_id,))
 else:
     print(f"Creating new admin user...")
     cursor.execute(
@@ -253,9 +255,6 @@ else:
         (ADMIN_USERNAME, PASSWORD_HASH, 'admin')
     )
     admin_id = cursor.lastrowid
-
-# Clear existing permissions first
-cursor.execute('DELETE FROM admin_permissions WHERE admin_id = ?', (admin_id,))
 
 # Grant all permissions to admin
 permissions = [
