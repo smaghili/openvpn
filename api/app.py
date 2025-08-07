@@ -163,7 +163,8 @@ if __name__ == '__main__':
         sys.exit(1)
         
     app = create_app()
-    print("🚀 Starting OpenVPN Manager on http://0.0.0.0:5000")
-    print("📱 Web Panel: http://YOUR_IP:5000")
-    print("🔗 API: http://YOUR_IP:5000/api")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    port = int(os.environ.get('API_PORT', 5000))
+    print(f"🚀 Starting OpenVPN Manager on http://0.0.0.0:{port}")
+    print(f"📱 Web Panel: http://YOUR_IP:{port}")
+    print(f"🔗 API: http://YOUR_IP:{port}/api")
+    app.run(host='0.0.0.0', port=port, debug=False)
