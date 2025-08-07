@@ -167,6 +167,37 @@ EOF
 function setup_database() {
     print_header "Database Setup"
     
+    # Check if system is already installed
+    if [ -f "$DB_PATH" ]; then
+        print_warning "Database already exists. Checking admin user..."
+        
+        # Check if admin user exists
+        ADMIN_EXISTS=$(./venv/bin/python3 -c "
+import sqlite3
+import sys
+try:
+    conn = sqlite3.connect('$DB_PATH')
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM admins WHERE username = ?', ('$ADMIN_USERNAME',))
+    count = cursor.fetchone()[0]
+    conn.close()
+    print(count)
+except Exception as e:
+    print(0)
+")
+        
+        if [ "$ADMIN_EXISTS" -gt 0 ]; then
+            echo -e "${YELLOW}Admin user '$ADMIN_USERNAME' already exists.${NC}"
+            echo -n "Update admin password? (y/N): "
+            read -r update_admin
+            
+            if [[ ! "$update_admin" =~ ^[Yy]$ ]]; then
+                print_success "Database setup skipped - using existing configuration"
+                return
+            fi
+        fi
+    fi
+    
     # Hash admin password
     PASSWORD_HASH=$(./venv/bin/python3 -c "
 import bcrypt
@@ -225,7 +256,7 @@ for permission in permissions:
 
 conn.commit()
 conn.close()
-print(f"Database created successfully. Admin user '{admin_id}' created.")
+print(f"Database setup completed. Admin user ID: {admin_id}")
 EOF
     
     # Set database permissions
@@ -399,6 +430,13 @@ function show_completion_info() {
 
 function main() {
     check_root
+    
+    # Check if system is already partially installed
+    if [ -f "$DB_PATH" ] || [ -f "$ENV_FILE" ] || systemctl is-active --quiet openvpn-api; then
+        print_warning "System appears to be already installed or partially configured."
+        echo "This script will update/reinstall the system."
+        echo ""
+    fi
     
     print_header "OpenVPN Manager - JWT Authentication Installation"
     echo "This script will install OpenVPN Manager with enterprise-grade JWT authentication."
