@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS token_blacklist (
 );
 
 -- Add profile and ownership columns to existing users table
-ALTER TABLE users ADD COLUMN profile_token TEXT UNIQUE;
+ALTER TABLE users ADD COLUMN profile_token TEXT;
 ALTER TABLE users ADD COLUMN profile_last_accessed DATETIME;
 ALTER TABLE users ADD COLUMN profile_access_count INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN created_by INTEGER;
@@ -97,7 +97,7 @@ ALTER TABLE users ADD COLUMN created_by INTEGER;
 CREATE INDEX IF NOT EXISTS idx_admins_username ON admins(username);
 CREATE INDEX IF NOT EXISTS idx_admin_permissions_admin_id ON admin_permissions(admin_id);
 CREATE INDEX IF NOT EXISTS idx_token_blacklist_token_id ON token_blacklist(token_id);
-CREATE INDEX IF NOT EXISTS idx_users_profile_token ON users(profile_token);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_profile_token_unique ON users(profile_token) WHERE profile_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_created_by ON users(created_by);
 
 -- Auto-cleanup trigger for expired blacklisted tokens
