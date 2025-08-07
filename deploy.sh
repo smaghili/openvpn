@@ -457,12 +457,63 @@ function show_completion_info() {
     echo -e "\n${GREEN}Installation completed successfully!${NC}"
 }
 
+function cleanup_incomplete_installation() {
+    """Clean up files from incomplete installations."""
+    print_header "Cleaning up incomplete installation"
+    
+    # Stop services if running
+    systemctl stop openvpn-api 2>/dev/null || true
+    systemctl stop openvpn-monitor 2>/dev/null || true
+    
+    # Remove service files
+    rm -f /etc/systemd/system/openvpn-api.service
+    rm -f /etc/systemd/system/openvpn-monitor.service
+    
+    # Remove database and environment files
+    rm -f "$DB_PATH"
+    rm -f "$ENV_FILE"
+    
+    # Remove symlinks
+    rm -f /usr/local/bin/owpanel
+    
+    # Reload systemd
+    systemctl daemon-reload
+    
+    print_success "Cleanup completed"
+}
+
+function check_installation_status() {
+    """Check if installation is complete or incomplete."""
+    local has_db=false
+    local has_service=false
+    local has_env=false
+    
+    [ -f "$DB_PATH" ] && has_db=true
+    [ -f "/etc/systemd/system/openvpn-api.service" ] && has_service=true
+    [ -f "$ENV_FILE" ] && has_env=true
+    
+    if [ "$has_db" = true ] && [ "$has_service" = true ] && [ "$has_env" = true ]; then
+        return 0  # Complete installation
+    elif [ "$has_db" = true ] || [ "$has_service" = true ] || [ "$has_env" = true ]; then
+        return 1  # Incomplete installation
+    else
+        return 2  # No installation
+    fi
+}
+
 # --- Main Installation Process ---
 
 function main() {
     check_root
     
-    if [ -f "/etc/systemd/system/openvpn-api.service" ] && systemctl is-enabled --quiet openvpn-api 2>/dev/null; then
+
+    
+    # Check installation status
+    check_installation_status
+    local install_status=$?
+    
+    if [ $install_status -eq 0 ]; then
+        # Complete installation - offer update
         echo "System is already installed. Do you want to update the panel? (y/N): "
         read -r response
         
@@ -477,6 +528,18 @@ function main() {
         else
             echo "Update cancelled."
             exit 0
+        fi
+    elif [ $install_status -eq 1 ]; then
+        # Incomplete installation - offer cleanup
+        echo -e "${YELLOW}⚠️  Incomplete installation detected. Some files exist but installation is not complete.${NC}"
+        echo -n "Do you want to clean up and start fresh? (y/N): "
+        read -r cleanup_response
+        
+        if [[ "$cleanup_response" =~ ^[Yy]$ ]]; then
+            cleanup_incomplete_installation
+        else
+            echo "Please manually clean up the incomplete installation before proceeding."
+            exit 1
         fi
     fi
     

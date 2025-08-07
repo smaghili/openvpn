@@ -42,7 +42,7 @@ def bytes_to_human(byte_count: int) -> str:
     return f"{byte_count:.2f} {power_labels[n]}"
 
 def get_install_settings() -> Dict[str, str]:
-    # This function remains unchanged
+    """Get installation settings with improved validation."""
     settings = {}
     print("--- Initial VPN Setup ---")
     
@@ -56,11 +56,27 @@ def get_install_settings() -> Dict[str, str]:
 
     print("\n--- Certificate-based Authentication ---")
     settings["cert_port"] = input("Port [1194]: ").strip() or "1194"
-    settings["cert_proto"] = input("Protocol (udp/tcp) [udp]: ").strip() or "udp"
+    
+    # Improved protocol validation for certificate server
+    while True:
+        cert_proto = input("Protocol (udp/tcp) [udp]: ").strip().lower() or "udp"
+        if cert_proto in ["udp", "tcp"]:
+            settings["cert_proto"] = cert_proto
+            break
+        else:
+            print("❌ Invalid protocol. Please enter 'udp' or 'tcp'.")
 
     print("\n--- Username/Password-based Authentication ---")
     settings["login_port"] = input("Port [1195]: ").strip() or "1195"
-    settings["login_proto"] = input("Protocol (udp/tcp) [udp]: ").strip() or "udp"
+    
+    # Improved protocol validation for login server
+    while True:
+        login_proto = input("Protocol (udp/tcp) [udp]: ").strip().lower() or "udp"
+        if login_proto in ["udp", "tcp"]:
+            settings["login_proto"] = login_proto
+            break
+        else:
+            print("❌ Invalid protocol. Please enter 'udp' or 'tcp'.")
 
     print("\n--- DNS Configuration ---")
     print("1) System DNS\n2) Unbound (self-hosted)\n3) Cloudflare\n4) Google\n5) AdGuard DNS")
@@ -76,19 +92,25 @@ def get_install_settings() -> Dict[str, str]:
     return settings
 
 def install_flow(openvpn_manager: OpenVPNManager) -> None:
-    # This function remains unchanged
+    """Installation flow with improved error handling and recovery."""
     if os.path.exists(OpenVPNManager.SETTINGS_FILE):
         print("Installation already detected. Aborting.")
         return
 
-    raw_settings = get_install_settings()
-    
-    try:
-        validated_settings = config.validate_install_settings(raw_settings)
-        settings = raw_settings
-    except ConfigurationError as e:
-        print(f"❌ Configuration error: {e}")
-        return
+    while True:
+        raw_settings = get_install_settings()
+        
+        try:
+            validated_settings = config.validate_install_settings(raw_settings)
+            settings = raw_settings
+            break
+        except ConfigurationError as e:
+            print(f"❌ Configuration error: {e}")
+            retry = input("Would you like to re-enter the settings? (y/n): ").strip().lower()
+            if retry != 'y':
+                print("Installation aborted.")
+                return
+            continue
     
     print("\nStarting installation with the following settings:")
     for key, value in settings.items():
@@ -106,6 +128,7 @@ def install_flow(openvpn_manager: OpenVPNManager) -> None:
         print("From now on, you can run the panel from anywhere by typing: owpanel")
     except Exception as e:
         print(f"\n❌ Installation failed: {e}")
+        print("You may need to clean up partial installation files manually.")
         sys.exit(1)
 
 
