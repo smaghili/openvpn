@@ -4,3 +4,4 @@ bcrypt
 pyopenssl
 flask
 flask-cors
+pyjwt

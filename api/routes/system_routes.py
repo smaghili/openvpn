@@ -1,7 +1,7 @@
 import os
 import tempfile
 from flask import Blueprint, request, jsonify, send_file
-from api.middleware.auth_middleware import AuthMiddleware
+from api.middleware.jwt_middleware import JWTMiddleware
 from service.user_service import UserService
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
@@ -29,7 +29,8 @@ def get_services():
     }
 
 @system_bp.route('/backup', methods=['POST'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('system:config')
 def create_backup():
     """
     Create an encrypted backup of the entire VPN system.
@@ -76,7 +77,8 @@ def create_backup():
         }), 500
 
 @system_bp.route('/restore', methods=['POST'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('system:config')
 def restore_system():
     """
     Restore the VPN system from an encrypted backup file.
@@ -138,7 +140,8 @@ def restore_system():
         }), 500
 
 @system_bp.route('/uninstall', methods=['DELETE'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('system:config')
 def uninstall_vpn():
     """
     Completely uninstall the OpenVPN system and remove all users.
@@ -185,7 +188,8 @@ def uninstall_vpn():
         }), 500
 
 @system_bp.route('/status', methods=['GET'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('reports:view')
 def system_status():
     """Get overall system status and statistics."""
     try:

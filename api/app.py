@@ -16,7 +16,11 @@ sys.path.insert(0, project_root)
 from api.routes.user_routes import user_bp
 from api.routes.quota_routes import quota_bp  
 from api.routes.system_routes import system_bp
-from api.middleware.auth_middleware import AuthMiddleware
+from api.routes.auth_routes import auth_bp
+from api.routes.admin_routes import admin_bp
+from api.routes.permission_routes import permission_bp
+from api.routes.profile_routes import profile_bp
+from api.middleware.jwt_middleware import JWTMiddleware
 from api.middleware.error_handler import ErrorHandler
 
 def create_app() -> Flask:
@@ -32,48 +36,44 @@ def create_app() -> Flask:
     
     CORS(app)
     
-    AuthMiddleware.init_app(app)
+    JWTMiddleware.init_app(app)
     ErrorHandler.init_app(app)
     
     # API routes
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(admin_bp, url_prefix='/api/admins')
+    app.register_blueprint(permission_bp, url_prefix='/api/permissions')
     app.register_blueprint(user_bp, url_prefix='/api/users')
     app.register_blueprint(quota_bp, url_prefix='/api/quota')
     app.register_blueprint(system_bp, url_prefix='/api/system')
+    
+    # Profile routes
+    app.register_blueprint(profile_bp, url_prefix='/api/profile')
     
     @app.route('/api/health')
     def health_check():
         return {'status': 'healthy', 'message': 'OpenVPN Manager API is running'}
     
-    @app.route('/api/auth/login', methods=['POST'])
-    def login():
-        """Authenticate with API key and return success status."""
-        data = request.get_json()
-        if not data or 'api_key' not in data:
-            return jsonify({
-                'error': 'API key required',
-                'message': 'Please provide api_key in request body'
-            }), 400
-        
-        provided_key = data['api_key']
-        expected_key = os.environ.get('OPENVPN_API_KEY')
-        
-        if not expected_key:
-            return jsonify({
-                'error': 'API not configured',
-                'message': 'API key not configured on server'
-            }), 500
-        
-        if not hmac.compare_digest(provided_key.encode(), expected_key.encode()):
-            return jsonify({
-                'error': 'Invalid API key',
-                'message': 'The provided API key is invalid'
-            }), 401
-        
-        return jsonify({
-            'success': True,
-            'message': 'Authentication successful',
-            'token': provided_key  # Use API key as token
-        })
+    # Public profile routes (no authentication required)
+    @app.route('/profile/<profile_token>')
+    def public_profile_view(profile_token):
+        """Public profile view - delegate to profile routes."""
+        from api.routes.profile_routes import public_profile_view as profile_view
+        return profile_view(profile_token)
+    
+    @app.route('/profile/<profile_token>/data')
+    def public_profile_data(profile_token):
+        """Public profile data API - delegate to profile routes."""
+        from api.routes.profile_routes import public_profile_data as profile_data
+        return profile_data(profile_token)
+    
+    @app.route('/profile/<profile_token>/config.ovpn')
+    def download_ovpn_config(profile_token):
+        """Download OpenVPN config - delegate to profile routes."""
+        from api.routes.profile_routes import download_ovpn_config as download_config
+        return download_config(profile_token)
+    
+
     
     # Frontend routes - serve static files
     @app.route('/')

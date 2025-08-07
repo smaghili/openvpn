@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from api.middleware.auth_middleware import AuthMiddleware
+from api.middleware.jwt_middleware import JWTMiddleware
 from service.user_service import UserService
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
@@ -31,7 +31,8 @@ def bytes_to_human(byte_count: int) -> str:
     return f"{byte_count:.2f} {power_labels[n]}"
 
 @quota_bp.route('/<username>', methods=['PUT'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('quota:manage')
 def set_user_quota(username: str):
     """
     Set data quota for a specific user.
@@ -76,7 +77,8 @@ def set_user_quota(username: str):
     }), 200
 
 @quota_bp.route('/<username>', methods=['GET'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('quota:manage')
 def get_user_status(username: str):
     """Get detailed traffic status and quota information for a specific user."""
     user_service = get_user_service()

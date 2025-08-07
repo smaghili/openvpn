@@ -195,3 +195,9 @@ class UserRepository:
         LIMIT ?
         """
         return self.db.execute_query(query, (limit,))
+    
+    def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get user by ID."""
+        query = "SELECT * FROM users WHERE id = ?"
+        result = self.db.execute_query(query, (user_id,))
+        return result[0] if result else None

@@ -53,3 +53,56 @@ AFTER INSERT ON users
 BEGIN
     INSERT INTO user_quotas (user_id) VALUES (new.id);
 END;
+
+-- JWT AUTHENTICATION SYSTEM TABLES
+
+-- Create admins table (separate from VPN users)
+CREATE TABLE IF NOT EXISTS admins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'reseller',
+    token_version INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Dynamic permissions system
+CREATE TABLE IF NOT EXISTS admin_permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER NOT NULL,
+    permission TEXT NOT NULL,
+    granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(admin_id) REFERENCES admins(id) ON DELETE CASCADE,
+    UNIQUE(admin_id, permission)
+);
+
+-- Token blacklist for immediate revocation
+CREATE TABLE IF NOT EXISTS token_blacklist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_id TEXT UNIQUE NOT NULL,
+    admin_id INTEGER NOT NULL,
+    blacklisted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    FOREIGN KEY(admin_id) REFERENCES admins(id) ON DELETE CASCADE
+);
+
+-- Add profile and ownership columns to existing users table
+ALTER TABLE users ADD COLUMN profile_token TEXT UNIQUE;
+ALTER TABLE users ADD COLUMN profile_last_accessed DATETIME;
+ALTER TABLE users ADD COLUMN profile_access_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN created_by INTEGER;
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_admins_username ON admins(username);
+CREATE INDEX IF NOT EXISTS idx_admin_permissions_admin_id ON admin_permissions(admin_id);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_token_id ON token_blacklist(token_id);
+CREATE INDEX IF NOT EXISTS idx_users_profile_token ON users(profile_token);
+CREATE INDEX IF NOT EXISTS idx_users_created_by ON users(created_by);
+
+-- Auto-cleanup trigger for expired blacklisted tokens
+CREATE TRIGGER IF NOT EXISTS cleanup_expired_tokens
+AFTER INSERT ON token_blacklist
+BEGIN
+    DELETE FROM token_blacklist WHERE expires_at < datetime('now');
+END;

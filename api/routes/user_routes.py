@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from typing import Optional
-from api.middleware.auth_middleware import AuthMiddleware
+from api.middleware.jwt_middleware import JWTMiddleware
 from service.user_service import UserService
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
@@ -19,7 +19,8 @@ def get_user_service() -> UserService:
     return UserService(user_repo, openvpn_manager, login_manager)
 
 @user_bp.route('/', methods=['POST'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('users:create')
 def create_user():
     """
     Create a new VPN user with optional password authentication.
@@ -43,8 +44,20 @@ def create_user():
     
     validated_username = config.validate_username(username)
     
+    # Get current admin info for user creation tracking
+    from flask import g
+    current_admin = getattr(g, 'current_admin', None)
+    admin_id = current_admin['admin_id'] if current_admin else None
+    
     user_service = get_user_service()
     config_data = user_service.create_user(validated_username, password)
+    
+    # Update user with creator info if admin_id available
+    if admin_id and config_data:
+        user_id = user_service.user_repo.get_user_id_by_username(validated_username)
+        if user_id:
+            query = "UPDATE users SET created_by = ? WHERE id = ?"
+            user_service.user_repo.db.execute_query(query, (admin_id, user_id))
     
     response = {
         'message': f'User "{username}" created successfully',
@@ -59,7 +72,8 @@ def create_user():
     return jsonify(response), 201
 
 @user_bp.route('/<username>', methods=['DELETE'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('users:delete')
 def remove_user(username: str):
     """Remove a VPN user and all associated credentials."""
     user_service = get_user_service()
@@ -71,11 +85,19 @@ def remove_user(username: str):
     }), 200
 
 @user_bp.route('/', methods=['GET'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('users:read')
 def list_users():
-    """List all VPN users with their status and usage information."""
+    """List VPN users with their status and usage information (filtered by admin access)."""
+    from flask import g
+    current_admin = g.current_admin
+    
     user_service = get_user_service()
     users = user_service.get_all_users_with_status()
+    
+    # Filter users based on admin role
+    if current_admin['role'] != 'admin':
+        users = [user for user in users if user.get('created_by') == current_admin['admin_id']]
     
     if not users:
         return jsonify({
@@ -120,7 +142,8 @@ def list_users():
     }), 200
 
 @user_bp.route('/<username>/config', methods=['GET'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('users:read')
 def get_user_config(username: str):
     """Get the OpenVPN configuration file for a specific user."""
     user_service = get_user_service()
@@ -139,7 +162,8 @@ def get_user_config(username: str):
     }), 200
 
 @user_bp.route('/shared-config', methods=['GET'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('users:read')
 def get_shared_config():
     """Get the shared OpenVPN configuration for username/password authentication."""
     user_service = get_user_service()
@@ -151,7 +175,8 @@ def get_shared_config():
     }), 200
 
 @user_bp.route('/<username>/password', methods=['PUT'])
-@AuthMiddleware.require_auth
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('users:update')
 def change_user_password(username: str):
     """
     Change password for an existing user.
