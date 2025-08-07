@@ -241,10 +241,6 @@ EOF
     
     print_success "Database setup completed"
 }
-    chown root:root "$DB_PATH"
-    
-    print_success "Database setup completed"
-}
 
 function create_api_service() {
     print_header "API Service Setup"
