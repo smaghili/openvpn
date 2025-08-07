@@ -171,37 +171,6 @@ function setup_database() {
     # Ensure database directory exists
     mkdir -p "$(dirname "$DB_PATH")"
     
-    # Check if system is already installed
-    if [ -f "$DB_PATH" ]; then
-        print_warning "Database already exists. Checking admin user..."
-        
-        # Check if admin user exists
-        ADMIN_EXISTS=$(./venv/bin/python3 -c "
-import sqlite3
-import sys
-try:
-    conn = sqlite3.connect('$DB_PATH')
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM admins WHERE username = ?', ('$ADMIN_USERNAME',))
-    count = cursor.fetchone()[0]
-    conn.close()
-    print(count)
-except Exception as e:
-    print(0)
-")
-        
-        if [ "$ADMIN_EXISTS" -gt 0 ]; then
-            echo -e "${YELLOW}Admin user '$ADMIN_USERNAME' already exists.${NC}"
-            echo -n "Update admin password? (y/N): "
-            read -r update_admin
-            
-            if [[ ! "$update_admin" =~ ^[Yy]$ ]]; then
-                print_success "Database setup skipped - using existing configuration"
-                return
-            fi
-        fi
-    fi
-    
     # Hash admin password
     PASSWORD_HASH=$(./venv/bin/python3 -c "
 import bcrypt
@@ -223,14 +192,20 @@ DB_PATH = os.environ.get('DB_PATH_VAR', '')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME_VAR', '')
 PASSWORD_HASH = os.environ.get('PASSWORD_HASH_VAR', '')
 
-print(f"Setting up database at: {DB_PATH}")
-print(f"Creating admin user: {ADMIN_USERNAME}")
+# Check if database exists
+if os.path.exists(DB_PATH):
+    print(f"Database exists at: {DB_PATH}")
+    print("Checking admin user...")
+else:
+    print(f"Creating new database at: {DB_PATH}")
+
+print(f"Setting up admin user: {ADMIN_USERNAME}")
 
 # Create database connection
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
-# Run schema creation
+# Run schema creation (this will create tables if they don't exist)
 with open('database.sql', 'r') as f:
     schema = f.read()
     cursor.executescript(schema)
