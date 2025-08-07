@@ -458,7 +458,7 @@ function show_completion_info() {
 }
 
 function cleanup_incomplete_installation() {
-    """Clean up files from incomplete installations."""
+    # Clean up files from incomplete installations
     print_header "Cleaning up incomplete installation"
     
     # Stop services if running
@@ -483,7 +483,7 @@ function cleanup_incomplete_installation() {
 }
 
 function check_installation_status() {
-    """Check if installation is complete or incomplete."""
+    # Check if installation is complete or incomplete
     local has_db=false
     local has_service=false
     local has_env=false
