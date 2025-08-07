@@ -469,15 +469,9 @@ function main() {
         
         if [[ "$response" =~ ^[Yy]$ ]]; then
             print_header "Updating System"
-            systemctl stop openvpn-api 2>/dev/null || true
-            
-            if [ -d "$PROJECT_DIR" ]; then
-                cd "$PROJECT_DIR"
-                git reset --hard HEAD
-                git pull origin main
-            fi
-            
-            systemctl daemon-reload
+            systemctl stop openvpn-api
+            cd "$PROJECT_DIR" && git reset --hard HEAD && git pull origin main
+            chmod +x cli/main.py && ln -sf "$(pwd)/cli/main.py" /usr/local/bin/owpanel
             systemctl restart openvpn-api
             print_success "System updated successfully"
             exit 0
