@@ -461,7 +461,18 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
                 os.remove(env_file)
                 print(f"     ├── Removed {env_file}")
         
-        # 7. Remove system directories
+        # 7. Remove databases
+        print("   └── Removing databases...")
+        db_files = [
+            "openvpn_data/vpn_manager.db",
+            "/etc/openvpn-manager/database.db"
+        ]
+        for db_file in db_files:
+            if os.path.exists(db_file):
+                os.remove(db_file)
+                print(f"     ├── Removed database: {db_file}")
+        
+        # 8. Remove system directories
         print("   └── Removing system directories...")
         system_dirs = [
             "/etc/openvpn-manager",
@@ -472,7 +483,7 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
                 os.system(f"rm -rf '{sys_dir}'")
                 print(f"     ├── Removed directory: {sys_dir}")
         
-        # 8. Remove project directory
+        # 9. Remove project directory
         project_root = os.getcwd()
         print(f"\n   └── Removing project directory: {project_root}")
         os.chdir("/root")  # Change to safe directory
