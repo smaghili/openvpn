@@ -15,11 +15,25 @@ class App {
     }
 
     /**
-     * Initialize the application
+     * Initialize the application with proper dependency management
      */
     async init() {
         try {
-            // Setup event listeners
+            // Wait for DOM to be ready
+            if (document.readyState === 'loading') {
+                await new Promise(resolve => {
+                    document.addEventListener('DOMContentLoaded', resolve, { once: true });
+                });
+            }
+            
+            // Wait for i18n to be ready (simple check)
+            let attempts = 0;
+            while (!window.i18n && attempts < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            // Setup event listeners after DOM and i18n are ready
             this.setupEventListeners();
             
             // Load theme preference
@@ -30,6 +44,8 @@ class App {
             
             // Hide loading screen
             this.hideLoadingScreen();
+            
+            console.log('✅ App initialized successfully');
             
         } catch (error) {
             console.error('Failed to initialize application:', error);
@@ -83,15 +99,8 @@ class App {
             }
         });
 
-        // Listen for system theme changes
-        if (window.matchMedia) {
-            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            mediaQuery.addEventListener('change', (e) => {
-                if (this.currentTheme === 'auto') {
-                    this.applyTheme('auto');
-                }
-            });
-        }
+        // Remove auto theme system detection (simplified theme system)
+        // Only support manual light/dark toggle
     }
 
     /**
@@ -106,18 +115,24 @@ class App {
             });
         }
 
-        // Language selector in login page
+        // Language selector with improved event delegation
         document.addEventListener('click', (event) => {
+            // Language toggle buttons
             if (event.target.matches('#language-toggle, #nav-language-toggle')) {
+                event.preventDefault();
                 this.toggleLanguageDropdown(event.target);
+                return;
             }
             
+            // Language options
             if (event.target.matches('.language-option, .nav-language-option')) {
+                event.preventDefault();
                 const lang = event.target.getAttribute('data-lang');
-                if (lang && window.i18n) {
+                if (lang && window.i18n && window.i18n.setLanguage) {
                     window.i18n.setLanguage(lang);
                 }
                 this.hideLanguageDropdowns();
+                return;
             }
         });
 
@@ -344,23 +359,21 @@ class App {
     }
 
     /**
-     * Load theme preference
+     * Load theme preference (simplified: only light/dark)
      */
     loadThemePreference() {
         const savedTheme = localStorage.getItem('openvpn-theme');
-        this.currentTheme = savedTheme || 'light';
+        // Ensure only light or dark themes
+        this.currentTheme = (savedTheme === 'dark') ? 'dark' : 'light';
         this.applyTheme(this.currentTheme);
     }
 
     /**
-     * Toggle theme
+     * Toggle theme (simplified: light <-> dark only)
      */
     toggleTheme() {
-        const themes = ['light', 'dark', 'auto'];
-        const currentIndex = themes.indexOf(this.currentTheme);
-        const nextIndex = (currentIndex + 1) % themes.length;
-        
-        this.setTheme(themes[nextIndex]);
+        const newTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+        this.setTheme(newTheme);
     }
 
     /**
@@ -378,26 +391,22 @@ class App {
     }
 
     /**
-     * Apply theme to document
+     * Apply theme to document (simplified: only light/dark)
      */
     applyTheme(theme) {
         const body = document.body;
         const themeIcons = document.querySelectorAll('#theme-icon, #nav-theme-icon');
         
-        // Remove existing theme classes
-        body.classList.remove('theme-light', 'theme-dark', 'theme-auto');
+        // Remove existing theme classes (no more auto)
+        body.classList.remove('theme-light', 'theme-dark');
         
-        // Apply new theme
-        body.classList.add(`theme-${theme}`);
-        body.setAttribute('data-theme', theme);
+        // Apply new theme (only light or dark)
+        const finalTheme = (theme === 'dark') ? 'dark' : 'light';
+        body.classList.add(`theme-${finalTheme}`);
+        body.setAttribute('data-theme', finalTheme);
         
-        // Update theme icons
-        let iconName = 'sun';
-        if (theme === 'dark') {
-            iconName = 'moon';
-        } else if (theme === 'auto') {
-            iconName = 'monitor';
-        }
+        // Update theme icons (simplified)
+        const iconName = (finalTheme === 'dark') ? 'moon' : 'sun';
         
         themeIcons.forEach(icon => {
             icon.setAttribute('href', `assets/icons/sprite.svg#${iconName}`);

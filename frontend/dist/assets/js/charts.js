@@ -20,26 +20,43 @@ class Charts {
     }
 
     /**
-     * Load Chart.js library dynamically
+     * Load Chart.js library dynamically with proper timing
      */
     async loadChartJS() {
-        if (window.Chart) {
+        // Check if already loaded
+        if (window.Chart && window.Chart.registerables) {
             this.setupChart();
             return;
         }
 
         try {
-            // Load Chart.js from CDN
+            // Load Chart.js from CDN with timeout
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js';
-            script.onload = () => {
-                this.setupChart();
-            };
-            script.onerror = () => {
-                console.error('Failed to load Chart.js');
-                this.fallbackToSimpleCharts();
-            };
+            
+            const loadPromise = new Promise((resolve, reject) => {
+                script.onload = () => {
+                    // Wait for Chart.registerables to be available
+                    const checkRegisterables = () => {
+                        if (window.Chart && window.Chart.registerables) {
+                            resolve();
+                        } else {
+                            setTimeout(checkRegisterables, 50);
+                        }
+                    };
+                    checkRegisterables();
+                };
+                script.onerror = reject;
+                
+                // 10 second timeout
+                setTimeout(() => reject(new Error('Chart.js load timeout')), 10000);
+            });
+            
             document.head.appendChild(script);
+            await loadPromise;
+            
+            this.setupChart();
+            
         } catch (error) {
             console.error('Error loading Chart.js:', error);
             this.fallbackToSimpleCharts();
@@ -47,17 +64,29 @@ class Charts {
     }
 
     /**
-     * Setup Chart.js configuration
+     * Setup Chart.js configuration with proper error handling
      */
     setupChart() {
-        if (!window.Chart) return;
+        if (!window.Chart || !window.Chart.registerables) {
+            console.warn('Chart.js not properly loaded');
+            return;
+        }
 
-        // Register Chart.js components (Chart.js v4 compatible)
-        if (Chart.registerables && Array.isArray(Chart.registerables)) {
-            Chart.register(...Chart.registerables);
-        } else if (Chart.registerables) {
-            // For older versions or different structure
-            Chart.register(Chart.registerables);
+        try {
+            // Register Chart.js components (Chart.js v4 compatible)
+            if (Array.isArray(Chart.registerables)) {
+                Chart.register(...Chart.registerables);
+            } else if (Chart.registerables) {
+                // For different structure
+                Chart.register(Chart.registerables);
+            } else {
+                console.warn('Chart.registerables not found');
+                return;
+            }
+        } catch (error) {
+            console.error('Failed to register Chart.js components:', error);
+            this.fallbackToSimpleCharts();
+            return;
         }
 
         // Set global defaults

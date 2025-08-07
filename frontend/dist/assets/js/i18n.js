@@ -509,8 +509,19 @@ class I18n {
 
             // Apply initial language
             this.applyLanguage();
+            
+            // Dispatch ready event to prevent race conditions
+            window.dispatchEvent(new CustomEvent('i18nReady', {
+                detail: { language: this.currentLanguage }
+            }));
+            
         } catch (error) {
             console.error('Failed to load translations:', error);
+            
+            // Dispatch ready event even on error
+            window.dispatchEvent(new CustomEvent('i18nReady', {
+                detail: { language: this.currentLanguage, error: true }
+            }));
         }
     }
 
@@ -544,10 +555,10 @@ class I18n {
             value = fallbackValue;
         }
         
-        // If still no translation found, return the key
+        // If still no translation found, return empty string to prevent "undefined"
         if (value === null) {
             console.warn(`Translation not found for key: ${key}`);
-            return key;
+            return '';
         }
         
         // Replace parameters in translation
@@ -622,11 +633,14 @@ class I18n {
      * Update all elements with i18n attributes
      */
     updateElements() {
-        // Update text content
+        // Update text content - prevent "undefined" display
         document.querySelectorAll('[data-i18n]').forEach(element => {
             const key = element.getAttribute('data-i18n');
             if (key) {
-                element.textContent = this.t(key);
+                const translation = this.t(key);
+                if (translation && translation !== key) {
+                    element.textContent = translation;
+                }
             }
         });
         

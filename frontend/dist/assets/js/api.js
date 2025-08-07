@@ -9,8 +9,27 @@ class API {
         this.token = this.getStoredToken();
         this.refreshTimer = null;
         
+        // Clear old cached API data
+        this.clearOldCache();
+        
         // Request interceptor for authentication
         this.setupInterceptors();
+    }
+    
+    /**
+     * Clear old cached data
+     */
+    clearOldCache() {
+        try {
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+                if (key.includes('api-v1') || key.includes('system/stats')) {
+                    localStorage.removeItem(key);
+                }
+            });
+        } catch (error) {
+            console.warn('Failed to clear old cache:', error);
+        }
     }
 
     /**
