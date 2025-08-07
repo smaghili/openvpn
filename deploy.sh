@@ -383,6 +383,10 @@ function show_completion_info() {
     echo -e "View Logs: ${YELLOW}journalctl -u openvpn-api -f${NC}"
     echo -e "Service Status: ${YELLOW}systemctl status openvpn-api${NC}"
     
+    echo -e "\n${BLUE}=== CLI ACCESS ===${NC}"
+    echo -e "CLI Panel: ${YELLOW}owpanel${NC}"
+    echo -e "You can now access the CLI management panel using the 'owpanel' command from anywhere."
+    
     echo -e "\n${GREEN}Installation completed successfully!${NC}"
 }
 

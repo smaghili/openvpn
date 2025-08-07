@@ -376,50 +376,122 @@ def restore_flow(backup_service: BackupService) -> None:
             os.remove(local_path)
 
 def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
-    """Complete uninstallation including web panel services."""
-    confirm = input("This will completely remove OpenVPN and Web Panel. Are you sure? (Y/n): ").strip().lower()
-    if confirm in ('', 'y', 'yes'):
+    """Complete uninstallation - removes everything including owpanel command."""
+    print("⚠️  This will completely remove OpenVPN, Web Panel, and ALL configurations.")
+    print("    This action cannot be undone!")
+    
+    confirm = input("\nProceed with complete removal? (Y/n): ").strip().lower()
+    if confirm not in ('', 'y', 'yes'):
+        print("Uninstallation cancelled.")
+        return
+        
+    try:
+        print("🗑️  Complete system removal in progress...")
+        
+        # 1. Stop and remove all systemd services
+        print("   └── Stopping and removing systemd services...")
+        services = ['openvpn-api', 'openvpn-monitor', 'openvpn-server@server-cert', 'openvpn-server@server-login']
+        for service in services:
+            os.system(f"systemctl stop {service} 2>/dev/null || true")
+            os.system(f"systemctl disable {service} 2>/dev/null || true")
+        
+        # Remove service files
+        service_files = [
+            '/etc/systemd/system/openvpn-api.service',
+            '/etc/systemd/system/openvpn-monitor.service'
+        ]
+        for service_file in service_files:
+            if os.path.exists(service_file):
+                os.remove(service_file)
+                print(f"     ├── Removed {service_file}")
+        
+        os.system("systemctl daemon-reload")
+        
+        # 2. Remove owpanel command
+        print("   └── Removing owpanel command...")
+        owpanel_paths = ['/usr/local/bin/owpanel', '/usr/bin/owpanel']
+        for path in owpanel_paths:
+            if os.path.exists(path):
+                os.remove(path)
+                print(f"     ├── Removed {path}")
+        
+        # 3. Remove all VPN users and configurations
+        print("   └── Removing VPN users and configurations...")
         try:
-            print("🗑️  Uninstalling OpenVPN and Web Panel...")
-            
-            # Remove web panel services first
-            print("   └── Stopping web panel services...")
-            os.system("systemctl stop openvpn-api openvpn-monitor 2>/dev/null || true")
-            os.system("systemctl disable openvpn-api openvpn-monitor 2>/dev/null || true")
-            os.system("rm -f /etc/systemd/system/openvpn-api.service /etc/systemd/system/openvpn-monitor.service 2>/dev/null || true")
-            os.system("systemctl daemon-reload")
-            
-            # Remove environment file
-            if os.path.exists("environment.env"):
-                os.remove("environment.env")
-            
             db = Database()
             user_repo = UserRepository(db)
             login_manager = LoginUserManager()
             user_service = UserService(user_repo, openvpn_manager, login_manager)
             
-            # Use get_all_users_with_status to get all users
             users = user_service.get_all_users_with_status()
             if users:
                 unique_users = set(user['username'] for user in users)
-                print(f"   └── Removing {len(unique_users)} VPN users...")
+                print(f"     ├── Removing {len(unique_users)} VPN users...")
                 for username in unique_users:
                     user_service.remove_user(username, silent=True)
-            
-            print("   └── Stopping OpenVPN services and cleaning up...")
-            openvpn_manager.uninstall_openvpn(silent=True)
-            
-            # Remove database
-            if os.path.exists("data/db/openvpn.db"):
-                os.remove("data/db/openvpn.db")
-                print("   └── Database removed")
-            
-            print("✅ OpenVPN and Web Panel completely removed")
-            
-            sys.exit(0)
         except Exception as e:
-            print(f"❌ Uninstallation failed: {e}")
-            sys.exit(1)
+            print(f"     ├── Warning: Could not remove users cleanly: {e}")
+        
+        # 4. Stop OpenVPN and remove all configurations
+        print("   └── Stopping OpenVPN services and removing configurations...")
+        openvpn_manager.uninstall_openvpn(silent=True)
+        
+        # 5. Remove all databases
+        print("   └── Removing databases...")
+        db_paths = [
+            "data/db/openvpn.db",  # Old path
+            "database.db",         # New JWT path
+            "/etc/openvpn-manager/database.db"  # System path
+        ]
+        for db_path in db_paths:
+            if os.path.exists(db_path):
+                os.remove(db_path)
+                print(f"     ├── Removed database: {db_path}")
+        
+        # 6. Remove environment files
+        print("   └── Removing environment configurations...")
+        env_files = [
+            "environment.env",
+            ".env", 
+            "/etc/openvpn-manager/.env",
+            "/etc/openvpn-manager/environment.env"
+        ]
+        for env_file in env_files:
+            if os.path.exists(env_file):
+                os.remove(env_file)
+                print(f"     ├── Removed {env_file}")
+        
+        # 7. Remove system directories
+        print("   └── Removing system directories...")
+        system_dirs = [
+            "/etc/openvpn-manager",
+            "/var/log/openvpn"
+        ]
+        for sys_dir in system_dirs:
+            if os.path.exists(sys_dir):
+                os.system(f"rm -rf '{sys_dir}'")
+                print(f"     ├── Removed directory: {sys_dir}")
+        
+        # 8. Remove project directory (optional - ask user)
+        project_root = os.getcwd()
+        print(f"\n   └── Current project directory: {project_root}")
+        remove_project = input("     Remove entire project directory? (y/N): ").strip().lower()
+        if remove_project in ('y', 'yes'):
+            print("     ├── Removing project directory...")
+            os.chdir("/root")  # Change to safe directory
+            os.system(f"rm -rf '{project_root}'")
+            print(f"     ├── Removed {project_root}")
+            print("\n✅ Complete removal finished - project directory deleted")
+            sys.exit(0)
+        
+        print("\n✅ OpenVPN and Web Panel completely removed")
+        print("   Project files remain but all services and configurations are deleted.")
+        sys.exit(0)
+        
+    except Exception as e:
+        print(f"\n❌ Uninstallation failed: {e}")
+        print("Some components may not have been removed completely.")
+        sys.exit(1)
 
 def main() -> None:
     if os.geteuid() != 0:
@@ -439,10 +511,10 @@ def main() -> None:
         install_flow(openvpn_manager)
         if not os.path.exists(OpenVPNManager.SETTINGS_FILE):
              sys.exit(0)
-        # If INSTALL_ONLY environment variable is set, exit after installation
-        if os.environ.get('INSTALL_ONLY'):
-            print("Installation completed. Exiting as requested.")
-            sys.exit(0)
+
+    # If INSTALL_ONLY environment variable is set, exit after installation (don't show menu)
+    if os.environ.get('INSTALL_ONLY'):
+        sys.exit(0)
 
     try:
         while True:
