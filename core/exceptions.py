@@ -66,3 +66,15 @@ class ValidationError(VPNManagerError):
         self.value = value
         self.reason = reason
         super().__init__(f"Validation failed for {field}='{value}': {reason}")
+
+class AuthenticationError(VPNManagerError):
+    """Raised when authentication fails."""
+    pass
+
+class AuthorizationError(VPNManagerError):
+    """Raised when authorization fails."""
+    pass
+
+class TokenError(VPNManagerError):
+    """Raised when JWT token operations fail."""
+    pass

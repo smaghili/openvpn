@@ -209,8 +209,8 @@ class API {
     }
 
     // Authentication API
-    async login(apiKey) {
-        const response = await this.post('/auth/login', { api_key: apiKey });
+    async login(username, password) {
+        const response = await this.post('/auth/login', { username, password });
         if (response.token) {
             this.setToken(response.token);
         }

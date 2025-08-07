@@ -221,10 +221,11 @@ class App {
      */
     async handleLogin(event) {
         const formData = new FormData(event.target);
-        const apiKey = formData.get('apiKey');
+        const username = formData.get('username');
+        const password = formData.get('password');
         
-        if (!apiKey) {
-            this.showLoginError('API key is required');
+        if (!username || !password) {
+            this.showLoginError('Username and password are required');
             return;
         }
 
@@ -232,14 +233,14 @@ class App {
         this.setLoginLoading(true);
 
         try {
-            await window.api.login(apiKey);
+            await window.api.login(username, password);
             this.isAuthenticated = true;
             await this.showMainApp();
         } catch (error) {
             console.error('Login failed:', error);
             
             if (error.status === 401) {
-                this.showLoginError(window.i18n?.t('login.invalidCredentials') || 'Invalid API key');
+                this.showLoginError(window.i18n?.t('login.invalidCredentials') || 'Invalid username or password');
             } else if (error.isNetworkError()) {
                 this.showLoginError(window.i18n?.t('login.connectionError') || 'Connection error');
             } else {
