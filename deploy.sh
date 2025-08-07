@@ -195,13 +195,18 @@ with open('database.sql', 'r') as f:
     schema = f.read()
     cursor.executescript(schema)
 
-# Create admin user
+# Create or update admin user
 cursor.execute(
-    'INSERT INTO admins (username, password_hash, role) VALUES (?, ?, ?)', 
+    'INSERT OR REPLACE INTO admins (username, password_hash, role) VALUES (?, ?, ?)', 
     ('$ADMIN_USERNAME', '$PASSWORD_HASH', 'admin')
 )
 
-admin_id = cursor.lastrowid
+# Get admin ID
+cursor.execute('SELECT id FROM admins WHERE username = ?', ('$ADMIN_USERNAME',))
+admin_id = cursor.fetchone()[0]
+
+# Clear existing permissions first
+cursor.execute('DELETE FROM admin_permissions WHERE admin_id = ?', (admin_id,))
 
 # Grant all permissions to admin
 permissions = [
