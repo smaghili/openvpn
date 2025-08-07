@@ -192,44 +192,24 @@ DB_PATH = os.environ.get('DB_PATH_VAR', '')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME_VAR', '')
 PASSWORD_HASH = os.environ.get('PASSWORD_HASH_VAR', '')
 
-# Check if database exists
-if os.path.exists(DB_PATH):
-    print(f"Database exists at: {DB_PATH}")
-    print("Checking admin user...")
-else:
-    print(f"Creating new database at: {DB_PATH}")
-
-print(f"Setting up admin user: {ADMIN_USERNAME}")
+print(f"Creating database at: {DB_PATH}")
 
 # Create database connection
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
-# Run schema creation (this will create tables if they don't exist)
+# Run schema creation
 with open('database.sql', 'r') as f:
     schema = f.read()
     cursor.executescript(schema)
 
-# Check if admin exists
-cursor.execute('SELECT id FROM admins WHERE username = ?', (ADMIN_USERNAME,))
-existing_admin = cursor.fetchone()
-
-if existing_admin:
-    admin_id = existing_admin[0]
-    print(f"Admin user exists, updating password...")
-    cursor.execute(
-        'UPDATE admins SET password_hash = ?, token_version = token_version + 1 WHERE id = ?', 
-        (PASSWORD_HASH, admin_id)
-    )
-    # Clear existing permissions first
-    cursor.execute('DELETE FROM admin_permissions WHERE admin_id = ?', (admin_id,))
-else:
-    print(f"Creating new admin user...")
-    cursor.execute(
-        'INSERT INTO admins (username, password_hash, role) VALUES (?, ?, ?)', 
-        (ADMIN_USERNAME, PASSWORD_HASH, 'admin')
-    )
-    admin_id = cursor.lastrowid
+# Create admin user
+print(f"Creating admin user: {ADMIN_USERNAME}")
+cursor.execute(
+    'INSERT INTO admins (username, password_hash, role) VALUES (?, ?, ?)', 
+    (ADMIN_USERNAME, PASSWORD_HASH, 'admin')
+)
+admin_id = cursor.lastrowid
 
 # Grant all permissions to admin
 permissions = [
@@ -257,6 +237,10 @@ EOF
     
     # Set database permissions
     chmod 644 "$DB_PATH"
+    chown root:root "$DB_PATH"
+    
+    print_success "Database setup completed"
+}
     chown root:root "$DB_PATH"
     
     print_success "Database setup completed"
@@ -540,17 +524,15 @@ function main() {
     
     if [ -f "/etc/systemd/system/openvpn-api.service" ]; then
         show_installation_menu
-        # If re-install was chosen, continue with fresh installation
     fi
     
-    # Fresh installation process
     install_dependencies
     setup_project
     get_admin_credentials
     get_api_port
     setup_environment
-    setup_openvpn
     setup_database
+    setup_openvpn
     create_api_service
     start_services
     show_completion_info

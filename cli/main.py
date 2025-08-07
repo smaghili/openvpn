@@ -529,13 +529,7 @@ def main() -> None:
         print("This script must be run as root.")
         sys.exit(1)
     
-    db = Database()
-    user_repo = UserRepository(db)
-    login_manager = LoginUserManager()
     openvpn_manager = OpenVPNManager()
-    user_service = UserService(user_repo, openvpn_manager, login_manager)
-    backupable_components = [openvpn_manager, login_manager, user_service]
-    backup_service = BackupService(backupable_components)
 
     if not os.path.exists(OpenVPNManager.SETTINGS_FILE):
         print("Welcome! It looks like this is a fresh installation.")
@@ -543,9 +537,17 @@ def main() -> None:
         if not os.path.exists(OpenVPNManager.SETTINGS_FILE):
              sys.exit(0)
 
-    # If INSTALL_ONLY environment variable is set, exit after installation (don't show menu)
+    # If INSTALL_ONLY environment variable is set, exit after installation
     if os.environ.get('INSTALL_ONLY'):
         sys.exit(0)
+
+    # Initialize services only for management operations
+    db = Database()
+    user_repo = UserRepository(db)
+    login_manager = LoginUserManager()
+    user_service = UserService(user_repo, openvpn_manager, login_manager)
+    backupable_components = [openvpn_manager, login_manager, user_service]
+    backup_service = BackupService(backupable_components)
 
     try:
         while True:
