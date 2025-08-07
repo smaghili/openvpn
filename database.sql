@@ -5,6 +5,10 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT,
     status TEXT DEFAULT 'active',
+    profile_token TEXT,
+    profile_last_accessed DATETIME,
+    profile_access_count INTEGER DEFAULT 0,
+    created_by INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -87,11 +91,8 @@ CREATE TABLE IF NOT EXISTS token_blacklist (
     FOREIGN KEY(admin_id) REFERENCES admins(id) ON DELETE CASCADE
 );
 
--- Add profile and ownership columns to existing users table
-ALTER TABLE users ADD COLUMN profile_token TEXT;
-ALTER TABLE users ADD COLUMN profile_last_accessed DATETIME;
-ALTER TABLE users ADD COLUMN profile_access_count INTEGER DEFAULT 0;
-ALTER TABLE users ADD COLUMN created_by INTEGER;
+-- Add profile and ownership columns to existing users table (if not exists)
+-- Note: SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we handle this in the application
 
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_admins_username ON admins(username);
