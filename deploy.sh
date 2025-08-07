@@ -208,17 +208,22 @@ print(hashed.decode('utf-8'))
 ")
     
     # Create database and admin user
-    ./venv/bin/python3 << EOF
+    JWT_SECRET_VAR="$JWT_SECRET" DB_PATH_VAR="$DB_PATH" ADMIN_USERNAME_VAR="$ADMIN_USERNAME" PASSWORD_HASH_VAR="$PASSWORD_HASH" ./venv/bin/python3 << 'EOF'
 import sqlite3
 import sys
 import os
 
-# Set environment variables
-os.environ['JWT_SECRET'] = '$JWT_SECRET'
-os.environ['DATABASE_PATH'] = '$DB_PATH'
+# Get variables from environment (passed from shell)
+JWT_SECRET = os.environ.get('JWT_SECRET_VAR', '')
+DB_PATH = os.environ.get('DB_PATH_VAR', '')
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME_VAR', '')
+PASSWORD_HASH = os.environ.get('PASSWORD_HASH_VAR', '')
+
+print(f"Setting up database at: {DB_PATH}")
+print(f"Creating admin user: {ADMIN_USERNAME}")
 
 # Create database connection
-conn = sqlite3.connect('$DB_PATH')
+conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
 # Run schema creation
@@ -226,15 +231,24 @@ with open('database.sql', 'r') as f:
     schema = f.read()
     cursor.executescript(schema)
 
-# Create or update admin user
-cursor.execute(
-    'INSERT OR REPLACE INTO admins (username, password_hash, role) VALUES (?, ?, ?)', 
-    ('$ADMIN_USERNAME', '$PASSWORD_HASH', 'admin')
-)
+# Check if admin exists
+cursor.execute('SELECT id FROM admins WHERE username = ?', (ADMIN_USERNAME,))
+existing_admin = cursor.fetchone()
 
-# Get admin ID
-cursor.execute('SELECT id FROM admins WHERE username = ?', ('$ADMIN_USERNAME',))
-admin_id = cursor.fetchone()[0]
+if existing_admin:
+    admin_id = existing_admin[0]
+    print(f"Admin user exists, updating password...")
+    cursor.execute(
+        'UPDATE admins SET password_hash = ?, token_version = token_version + 1 WHERE id = ?', 
+        (PASSWORD_HASH, admin_id)
+    )
+else:
+    print(f"Creating new admin user...")
+    cursor.execute(
+        'INSERT INTO admins (username, password_hash, role) VALUES (?, ?, ?)', 
+        (ADMIN_USERNAME, PASSWORD_HASH, 'admin')
+    )
+    admin_id = cursor.lastrowid
 
 # Clear existing permissions first
 cursor.execute('DELETE FROM admin_permissions WHERE admin_id = ?', (admin_id,))
