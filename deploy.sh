@@ -269,7 +269,6 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
     
-    # Reload systemd and enable service
     systemctl daemon-reload
     systemctl enable openvpn-api
     
@@ -300,9 +299,7 @@ function setup_project() {
         cd "$PROJECT_DIR"
     fi
     
-    # Set database path after entering project directory
     DB_PATH="$(pwd)/openvpn_data/vpn_manager.db"
-    
     echo "Setting up Python environment..."
     if [ ! -d "venv" ]; then
         python3 -m venv venv
@@ -317,10 +314,7 @@ function setup_project() {
         print_error "requirements.txt not found"
         exit 1
     fi
-    
-    # Set execute permissions
     chmod +x cli/main.py api/app.py scripts/*.py 2>/dev/null || true
-    
     print_success "Project setup completed"
 }
 
@@ -328,8 +322,6 @@ function setup_openvpn() {
     print_header "OpenVPN Installation"
     
     export PROJECT_ROOT="$(pwd)"
-    
-    # Run CLI installer for OpenVPN setup
     if sudo PROJECT_ROOT="$PROJECT_ROOT" INSTALL_ONLY=1 ./venv/bin/python -m cli.main; then
         print_success "OpenVPN installation completed"
     else
@@ -340,18 +332,11 @@ function setup_openvpn() {
 
 function start_services() {
     print_header "Starting Services"
-    
-    # Start API service
     systemctl start openvpn-api
-    
-    # Wait for service to start
     sleep 3
     
-    # Check service status
     if systemctl is-active --quiet openvpn-api; then
         print_success "API service started successfully"
-        
-        # Test API health
         sleep 2
         if curl -f http://localhost:$API_PORT/api/health >/dev/null 2>&1; then
             print_success "API health check passed"
@@ -375,35 +360,7 @@ function show_completion_info() {
     echo -e "Admin Username: ${YELLOW}$ADMIN_USERNAME${NC}"
     echo -e "Admin Password: ${YELLOW}$ADMIN_PASSWORD${NC}"
     echo -e "API URL: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
-    echo -e "Web Panel: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
     echo -e "Health Check: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/api/health${NC}"
-    echo -e "Database Path: ${YELLOW}$DB_PATH${NC}"
-    
-    echo -e "\n${BLUE}=== API ENDPOINTS ===${NC}"
-    echo -e "Login: POST /api/auth/login"
-    echo -e "Users: GET /api/users (requires authentication)"
-    echo -e "Admin Panel: GET /api/admins (admin only)"
-    echo -e "Documentation: Available via API endpoints"
-    
-    echo -e "\n${BLUE}=== SECURITY FEATURES ===${NC}"
-    echo -e "✅ JWT-based authentication with token versioning"
-    echo -e "✅ Real-time permission checking"
-    echo -e "✅ Token blacklisting for immediate revocation"
-    echo -e "✅ Rate limiting on all endpoints"
-    echo -e "✅ Role-based access control (Admin/Reseller)"
-    echo -e "✅ Public profile system with secure tokens"
-    
-    echo -e "\n${BLUE}=== IMPORTANT NOTES ===${NC}"
-    echo -e "${RED}🔒 SAVE THESE CREDENTIALS SECURELY!${NC}"
-    echo -e "The admin password cannot be recovered if lost."
-    echo -e "Environment file: $ENV_FILE"
-    echo -e "Database file: $DB_PATH"
-    
-    echo -e "\n${BLUE}=== SERVICE MANAGEMENT ===${NC}"
-    echo -e "Start API: ${YELLOW}systemctl start openvpn-api${NC}"
-    echo -e "Stop API: ${YELLOW}systemctl stop openvpn-api${NC}"
-    echo -e "View Logs: ${YELLOW}journalctl -u openvpn-api -f${NC}"
-    echo -e "Service Status: ${YELLOW}systemctl status openvpn-api${NC}"
     
     echo -e "\n${BLUE}=== CLI ACCESS ===${NC}"
     echo -e "CLI Panel: ${YELLOW}owpanel${NC}"
