@@ -414,15 +414,15 @@ function start_services() {
 function show_completion_info() {
     print_header "Installation Complete"
     
-    echo -e "${GREEN}🎉 OpenVPN Manager with JWT Authentication has been successfully installed!${NC}\n"
+    echo -e "${GREEN}🎉 OpenVPN Manager API Server has been successfully installed!${NC}\n"
     
     echo -e "${BLUE}=== AUTHENTICATION DETAILS ===${NC}"
     echo -e "Admin Username: ${YELLOW}$ADMIN_USERNAME${NC}"
     echo -e "Admin Password: ${YELLOW}$ADMIN_PASSWORD${NC}"
     echo -e "API URL: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
-    echo -e "Web Panel: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
     echo -e "Health Check: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/api/health${NC}"
     echo -e "Database Path: ${YELLOW}$DB_PATH${NC}"
+    echo -e "${RED}Web Panel: REMOVED (API-only mode)${NC}"
     
     echo -e "\n${BLUE}=== API ENDPOINTS ===${NC}"
     echo -e "Login: POST /api/auth/login"
@@ -485,8 +485,8 @@ function main() {
     get_admin_credentials
     get_api_port
     setup_environment
-    setup_openvpn
     setup_database
+    setup_openvpn
     create_api_service
     start_services
     show_completion_info
