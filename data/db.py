@@ -92,3 +92,26 @@ class Database:
             raise DatabaseError(f"Database script execution failed: {e}")
         finally:
             self.disconnect()
+
+    def get_connection(self):
+        """
+        Returns a context manager for database connections.
+        This allows for better connection management in UDS monitor.
+        """
+        class ConnectionContext:
+            def __init__(self, db_instance):
+                self.db = db_instance
+                self.conn = None
+            
+            def __enter__(self):
+                self.db.connect()
+                self.conn = self.db.conn
+                return self.conn
+            
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                if self.conn:
+                    self.conn.close()
+                    self.conn = None
+                self.db.conn = None
+        
+        return ConnectionContext(self)

@@ -248,31 +248,44 @@ function create_api_service() {
     # Create systemd service file
     cat > /etc/systemd/system/openvpn-api.service << EOF
 [Unit]
-Description=OpenVPN Manager API Server with JWT Authentication
+Description=OpenVPN Manager API Service
 After=network.target
-Wants=network.target
 
 [Service]
 Type=simple
 User=root
-Group=root
-WorkingDirectory=$(pwd)
-Environment=PYTHONPATH=$(pwd)
-EnvironmentFile=$ENV_FILE
-ExecStart=$(pwd)/venv/bin/python3 $(pwd)/api/app.py
+WorkingDirectory=$PROJECT_DIR
+Environment=PATH=$PROJECT_DIR/venv/bin
+ExecStart=$PROJECT_DIR/venv/bin/python -m api.app
 Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
+    # Reload systemd and enable service
     systemctl daemon-reload
     systemctl enable openvpn-api
     
     print_success "API service created and enabled"
+}
+
+function deploy_uds_monitor() {
+    print_header "UDS Traffic Monitor Deployment"
+    
+    if [ -f "scripts/deploy_uds_monitor.sh" ]; then
+        chmod +x scripts/deploy_uds_monitor.sh
+        if ./scripts/deploy_uds_monitor.sh; then
+            print_success "UDS monitor deployed successfully"
+        else
+            print_error "UDS monitor deployment failed"
+            exit 1
+        fi
+    else
+        print_error "UDS monitor deployment script not found"
+        exit 1
+    fi
 }
 
 function install_dependencies() {
@@ -487,6 +500,7 @@ function main() {
     setup_database
     setup_openvpn
     create_api_service
+    deploy_uds_monitor
     start_services
     show_completion_info
 }
