@@ -506,17 +506,17 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
                 os.system(f"rm -rf '{sys_dir}'")
                 print(f"     ├── Removed directory: {sys_dir}")
         
-        # 9. Remove project directory
-        project_root = os.getcwd()
-        print(f"\n   └── Removing project directory: {project_root}")
-        os.chdir("/root")  # Change to safe directory
-        os.system(f"rm -rf '{project_root}'")
-        print(f"     ├── Removed {project_root}")
-        print("\n✅ Complete removal finished - project directory deleted")
-        sys.exit(0)
-        
-        print("\n✅ OpenVPN and Web Panel completely removed")
-        print("   Project files remain but all services and configurations are deleted.")
+        print("   └── Removing project directory...")
+        try:
+            project_root = os.getcwd()
+            os.chdir("/root")
+            if os.path.exists(project_root):
+                os.system(f"rm -rf '{project_root}'")      
+        except OSError as e:
+            print(f"     ├── Warning: Could not remove project directory: {e}")
+
+        print("\n✅ Complete removal finished")
+        print("   All OpenVPN services, configurations, and project files have been removed.")
         sys.exit(0)
         
     except Exception as e:
