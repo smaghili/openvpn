@@ -378,9 +378,12 @@ function setup_openvpn() {
 }
 
 function start_services() {
-    print_header "Starting Services"
+    print_header "Starting Services" 
+    mkdir -p /var/log/openvpn
+    touch /var/log/openvpn/traffic_monitor.log
+    chmod 644 /var/log/openvpn/traffic_monitor.log
+    chown root:root /var/log/openvpn/traffic_monitor.log
     
-    # Start API service
     systemctl start openvpn-api
     sleep 3
     
@@ -399,7 +402,6 @@ function start_services() {
         exit 1
     fi
     
-    # Start UDS monitor service
     systemctl start openvpn-uds-monitor
     sleep 2
     
