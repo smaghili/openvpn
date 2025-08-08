@@ -158,9 +158,12 @@ EOF
 setup_directories() {
     log_info "Setting up required directories..."
     
-    # Create log directory
+    # Create log directory and log file
     mkdir -p /var/log/openvpn
     chmod 755 /var/log/openvpn
+    touch /var/log/openvpn/traffic_monitor.log
+    chmod 644 /var/log/openvpn/traffic_monitor.log
+    chown root:root /var/log/openvpn/traffic_monitor.log
     
     # Create OpenVPN server directory
     mkdir -p /run/openvpn-server

@@ -378,11 +378,7 @@ function setup_openvpn() {
 }
 
 function start_services() {
-    print_header "Starting Services" 
-    mkdir -p /var/log/openvpn
-    touch /var/log/openvpn/traffic_monitor.log
-    chmod 644 /var/log/openvpn/traffic_monitor.log
-    chown root:root /var/log/openvpn/traffic_monitor.log
+    print_header "Starting Services"
     
     systemctl start openvpn-api
     sleep 3
