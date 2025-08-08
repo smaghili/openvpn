@@ -221,27 +221,20 @@ test_uds_connection() {
     fi
 }
 
-start_services() {
-    log_info "Starting services..."
+restart_openvpn_for_uds() {
+    log_info "Applying UDS configuration..."
     
     # Restart OpenVPN to apply UDS configuration
-    if systemctl is-active --quiet openvpn-server@server; then
-        log_info "Restarting OpenVPN service to apply UDS configuration..."
-        systemctl restart openvpn-server@server
-        sleep 5
+    if systemctl is-active --quiet openvpn-server@server-cert; then
+        log_info "Restarting OpenVPN certificate service to apply UDS configuration..."
+        systemctl restart openvpn-server@server-cert
+        sleep 3
     fi
     
-    # Start UDS monitor service
-    log_info "Starting UDS monitor service..."
-    systemctl start "$SERVICE_NAME"
-    
-    # Check service status
-    if systemctl is-active --quiet "$SERVICE_NAME"; then
-        log_info "UDS monitor service started successfully"
-    else
-        log_error "Failed to start UDS monitor service"
-        systemctl status "$SERVICE_NAME" --no-pager
-        exit 1
+    if systemctl is-active --quiet openvpn-server@server-login; then
+        log_info "Restarting OpenVPN login service to apply UDS configuration..."
+        systemctl restart openvpn-server@server-login
+        sleep 3
     fi
 }
 
@@ -281,9 +274,9 @@ main() {
     setup_directories
     update_environment_config
     deploy_service
+    restart_openvpn_for_uds
     test_uds_connection
-    start_services
-    show_status
+    log_info "Deployment completed successfully!"
 }
 
 # Run main function

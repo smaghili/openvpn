@@ -380,6 +380,7 @@ function setup_openvpn() {
 function start_services() {
     print_header "Starting Services"
     
+    # Start API service
     systemctl start openvpn-api
     sleep 3
     
@@ -398,6 +399,7 @@ function start_services() {
         exit 1
     fi
     
+    # Start UDS monitor service
     systemctl start openvpn-uds-monitor
     sleep 2
     
