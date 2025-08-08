@@ -19,7 +19,12 @@ SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
 OPENVPN_CONFIG="/etc/openvpn/server.conf"
 
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    if [[ "$1" == *"Starting UDS-based"* ]] || \
+       [[ "$1" == *"Deployment completed"* ]] || \
+       [[ "$1" == *"started successfully"* ]] || \
+       [[ "$1" == *"test successful"* ]]; then
+        echo -e "${GREEN}✅${NC} $1"
+    fi
 }
 
 log_warn() {

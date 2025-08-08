@@ -32,7 +32,7 @@ CPUQuota=10%
 
 # Environment variables
 Environment=PYTHONUNBUFFERED=1
-Environment=OPENVPN_UDS_SOCKET=/run/openvpn/ovpn-mgmt.sock
+Environment=OPENVPN_UDS_SOCKET=/run/openvpn-server/ovpn-mgmt-cert.sock
 Environment=BYTECOUNT_INTERVAL=5
 Environment=RECONCILE_INTERVAL=300
 Environment=DB_FLUSH_INTERVAL=30
