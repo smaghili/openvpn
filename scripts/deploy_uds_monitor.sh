@@ -140,14 +140,9 @@ ExecStart=/usr/bin/python3 $PROJECT_ROOT/scripts/uds_monitor_service.py
 Restart=always
 RestartSec=10
 
-# Environment variables
+# Environment configuration
+EnvironmentFile=/root/openvpn/environment.env
 Environment=PYTHONUNBUFFERED=1
-Environment=OPENVPN_UDS_SOCKET=$UDS_SOCKET
-Environment=BYTECOUNT_INTERVAL=5
-Environment=RECONCILE_INTERVAL=300
-Environment=DB_FLUSH_INTERVAL=30
-Environment=QUOTA_BUFFER_BYTES=20971520
-Environment=MAX_LOG_SIZE=10485760
 
 [Install]
 WantedBy=multi-user.target
