@@ -168,8 +168,8 @@ EOF
 function setup_database() {
     print_header "Database Setup"
     
-    # Get absolute path to project directory
-    local absolute_project_dir="$(cd "$PROJECT_DIR" && pwd)"
+    # Get absolute path to project directory (we're already in the project directory)
+    local absolute_project_dir="$(pwd)"
     
     # Ensure database directory exists
     mkdir -p "$(dirname "$DB_PATH")"
@@ -248,8 +248,8 @@ EOF
 function create_api_service() {
     print_header "API Service Setup"
     
-    # Get absolute path to project directory
-    local absolute_project_dir="$(cd "$PROJECT_DIR" && pwd)"
+    # Get absolute path to project directory (we're already in the project directory)
+    local absolute_project_dir="$(pwd)"
     
     # Create systemd service file with absolute paths
     cat > /etc/systemd/system/openvpn-api.service << EOF
@@ -280,8 +280,8 @@ EOF
 function deploy_uds_monitor() {
     print_header "UDS Traffic Monitor Deployment"
     
-    # Get absolute path to project directory
-    local absolute_project_dir="$(cd "$PROJECT_DIR" && pwd)"
+    # Get absolute path to project directory (we're already in the project directory)
+    local absolute_project_dir="$(pwd)"
     
     if [ -f "$absolute_project_dir/scripts/deploy_uds_monitor.sh" ]; then
         chmod +x "$absolute_project_dir/scripts/deploy_uds_monitor.sh"
