@@ -66,8 +66,6 @@ def create_app() -> Flask:
         from api.routes.profile_routes import download_ovpn_config as download_config
         return download_config(profile_token)
     
-
-    
     # API-only server - no frontend routes
     @app.route('/')
     def api_info():
@@ -98,5 +96,6 @@ if __name__ == '__main__':
     print(f"🚀 Starting OpenVPN Manager API Server on http://0.0.0.0:{port}")
     print(f"🔗 API Endpoints: http://YOUR_IP:{port}/api")
     print(f"📊 Health Check: http://YOUR_IP:{port}/api/health")
-    print(f"ℹ️  Web Panel: REMOVED (API-only mode)")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    
+    from waitress import serve
+    serve(app, host='0.0.0.0', port=port, threads=4)
