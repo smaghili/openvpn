@@ -262,6 +262,8 @@ Type=simple
 User=root
 WorkingDirectory=$absolute_project_dir
 Environment=PATH=$absolute_project_dir/venv/bin
+EnvironmentFile=$ENV_FILE
+EnvironmentFile=$absolute_project_dir/environment.env
 ExecStart=$absolute_project_dir/venv/bin/python -m api.app
 Restart=always
 RestartSec=3
