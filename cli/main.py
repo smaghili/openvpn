@@ -548,10 +548,10 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
         # 6. Remove environment files
         print("   └── Removing environment configurations...")
         env_files = [
-            "environment.env",
+            ".env",
             ".env", 
             "/etc/openvpn-manager/.env",
-            "/etc/openvpn-manager/environment.env"
+            "/etc/openvpn-manager/.env"
         ]
         for env_file in env_files:
             try:

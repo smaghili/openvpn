@@ -6,8 +6,8 @@ set -e # Exit immediately if a command exits with a non-zero status.
 
 # --- Configuration ---
 REPO_URL="https://github.com/smaghili/openvpn.git"
-PROJECT_DIR="openvpn"
-ENV_FILE="/etc/openvpn-manager/.env"
+PROJECT_DIR="/etc/owpanel"
+ENV_FILE="/etc/owpanel/.env"
 # Use the same database path that the application uses (will be set dynamically)
 DB_PATH=""
 
@@ -140,22 +140,41 @@ function get_api_port() {
 function setup_environment() {
     print_header "Environment Configuration"
     
-    # Create secure directory
-    mkdir -p /etc/openvpn-manager
-    chmod 700 /etc/openvpn-manager
-    
     # Generate JWT secret
     JWT_SECRET=$(generate_jwt_secret)
     
-    # Create environment file
+    # Create consolidated environment file with all configurations
     cat > "$ENV_FILE" << EOF
-# OpenVPN Manager JWT Authentication Configuration
-ADMIN_USERNAME=$ADMIN_USERNAME
+# OpenVPN Panel Configuration
+# ===========================================
+
+# Core Path Configuration
+PROJECT_ROOT=$PROJECT_DIR
+
+# Database Paths
+DATABASE_FILE=$DB_PATH
+DATABASE_DIR=$PROJECT_DIR/openvpn_data
+
+# Log File
+OPENVPN_LOG_FILE=/var/log/openvpn/traffic_monitor.log
+
+# API Configuration
 API_PORT=$API_PORT
 JWT_SECRET=$JWT_SECRET
-DATABASE_PATH=$DB_PATH
 API_SECRET_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '=+/')
+OPENVPN_API_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '=+/')
 FLASK_ENV=production
+
+# Admin Configuration
+ADMIN_USERNAME=$ADMIN_USERNAME
+
+# UDS Monitor Configuration
+OPENVPN_UDS_SOCKET=/run/openvpn-server/ovpn-mgmt-cert.sock
+BYTECOUNT_INTERVAL=5
+RECONCILE_INTERVAL=300
+DB_FLUSH_INTERVAL=30
+QUOTA_BUFFER_BYTES=20971520
+MAX_LOG_SIZE=10485760
 EOF
     
     # Set secure permissions
@@ -263,7 +282,6 @@ User=root
 WorkingDirectory=$absolute_project_dir
 Environment=PATH=$absolute_project_dir/venv/bin
 EnvironmentFile=$ENV_FILE
-EnvironmentFile=$absolute_project_dir/environment.env
 ExecStart=$absolute_project_dir/venv/bin/python -m api.app
 Restart=always
 RestartSec=3

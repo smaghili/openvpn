@@ -74,11 +74,15 @@ systemctl enable openvpn-api.service
 print_status "Starting OpenVPN API service..."
 systemctl start openvpn-api.service
 
+# Get API port from environment
+API_PORT=$(grep "^API_PORT=" /etc/owpanel/.env 2>/dev/null | cut -d'=' -f2)
+API_PORT=${API_PORT:-5000}  # Default to 5000 if not found
+
 # Check service status
 if systemctl is-active --quiet openvpn-api.service; then
     print_status "✅ OpenVPN API service is running successfully!"
-    print_status "API is available at: http://localhost:5000"
-    print_status "Health check: http://localhost:5000/api/health"
+    print_status "API is available at: http://localhost:$API_PORT"
+    print_status "Health check: http://localhost:$API_PORT/api/health"
 else
     print_error "❌ Failed to start OpenVPN API service"
     print_error "Check logs with: journalctl -u openvpn-api.service -f"

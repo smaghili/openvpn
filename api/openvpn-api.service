@@ -7,13 +7,12 @@ Wants=network.target
 Type=simple
 User=root
 Group=root
-WorkingDirectory=/root/openvpn
-Environment=PATH=/root/openvpn/venv/bin
-Environment=PYTHONPATH=/root/openvpn
-EnvironmentFile=/etc/openvpn-manager/.env
-EnvironmentFile=/root/openvpn/environment.env
+WorkingDirectory=/etc/owpanel
+Environment=PATH=/etc/owpanel/venv/bin
+Environment=PYTHONPATH=/etc/owpanel
+EnvironmentFile=/etc/owpanel/.env
 
-ExecStart=/root/openvpn/venv/bin/python api/app.py
+ExecStart=/etc/owpanel/venv/bin/python api/app.py
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=3
@@ -25,7 +24,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/root/openvpn/openvpn_data /var/log/openvpn
+ReadWritePaths=/etc/owpanel/openvpn_data /var/log/openvpn
 
 # Logging
 StandardOutput=journal

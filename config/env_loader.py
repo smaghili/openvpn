@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Environment configuration loader for OpenVPN Traffic Monitor
-Loads configuration from environment.env file if it exists
+Loads configuration from .env file if it exists
 """
 import os
 
@@ -11,12 +11,12 @@ def load_env_file(env_file_path=None):
     
     Args:
         env_file_path (str): Path to the environment file. 
-                           If None, looks for 'environment.env' in project root.
+                           If None, looks for '.env' in project root.
     """
     if env_file_path is None:
         # Get project root directory
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-        env_file_path = os.path.join(project_root, 'environment.env')
+        env_file_path = os.path.join(project_root, '.env')
     
     if not os.path.exists(env_file_path):
         return  # No env file, use system environment variables

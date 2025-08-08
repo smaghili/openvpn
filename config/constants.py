@@ -26,15 +26,15 @@ class ConfigurablePaths:
     
     @staticmethod
     def get_project_root():
-        return os.environ.get('PROJECT_ROOT', '/root/openvpn')
+        return os.environ.get('PROJECT_ROOT', '/etc/owpanel')
     
     @staticmethod
     def get_database_file():
-        return os.environ.get('DATABASE_FILE', '/root/openvpn/openvpn_data/vpn_manager.db')
+        return os.environ.get('DATABASE_FILE', '/etc/owpanel/openvpn_data/vpn_manager.db')
     
     @staticmethod
     def get_database_dir():
-        return os.environ.get('DATABASE_DIR', '/root/openvpn/openvpn_data')
+        return os.environ.get('DATABASE_DIR', '/etc/owpanel/openvpn_data')
     
     @staticmethod
     def get_log_file():

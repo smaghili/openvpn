@@ -8,8 +8,8 @@ PartOf=openvpn-server@server.service
 Type=simple
 User=root
 Group=openvpn
-WorkingDirectory=/root/openvpn
-ExecStart=/usr/bin/python3 /root/openvpn/scripts/uds_monitor_service.py
+WorkingDirectory=/etc/owpanel
+ExecStart=/usr/bin/python3 /etc/owpanel/scripts/uds_monitor_service.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -20,7 +20,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log/openvpn /root/openvpn/openvpn_data
+ReadWritePaths=/var/log/openvpn /etc/owpanel/openvpn_data
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
@@ -33,9 +33,9 @@ CPUQuota=10%
 # Environment variables
 Environment=PYTHONUNBUFFERED=1
 Environment=OPENVPN_UDS_SOCKET=/run/openvpn-server/ovpn-mgmt-cert.sock
-Environment=DATABASE_FILE=/root/openvpn/openvpn_data/vpn_manager.db
+Environment=DATABASE_FILE=/etc/owpanel/openvpn_data/vpn_manager.db
 Environment=OPENVPN_LOG_FILE=/var/log/openvpn/traffic_monitor.log
-Environment=PROJECT_ROOT=/root/openvpn
+Environment=PROJECT_ROOT=/etc/owpanel
 Environment=BYTECOUNT_INTERVAL=5
 Environment=RECONCILE_INTERVAL=300
 Environment=DB_FLUSH_INTERVAL=30

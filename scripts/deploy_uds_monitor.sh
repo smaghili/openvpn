@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-PROJECT_ROOT="${PROJECT_ROOT:-/root/openvpn}"
+PROJECT_ROOT="${PROJECT_ROOT:-/etc/owpanel}"
 UDS_SOCKET="/run/openvpn-server/ovpn-mgmt-cert.sock"
 SERVICE_NAME="openvpn-uds-monitor"
 SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
@@ -141,7 +141,7 @@ Restart=always
 RestartSec=10
 
 # Environment configuration
-EnvironmentFile=/root/openvpn/environment.env
+EnvironmentFile=/etc/owpanel/.env
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
@@ -177,22 +177,22 @@ update_environment_config() {
     log_info "Updating environment configuration..."
     
     # Update environment file with UDS configuration
-    if [[ -f "$PROJECT_ROOT/environment.env" ]]; then
+    if [[ -f "$PROJECT_ROOT/.env" ]]; then
         # Remove existing UDS configuration if present
-        sed -i '/^OPENVPN_UDS_SOCKET=/d' "$PROJECT_ROOT/environment.env"
-        sed -i '/^BYTECOUNT_INTERVAL=/d' "$PROJECT_ROOT/environment.env"
-        sed -i '/^RECONCILE_INTERVAL=/d' "$PROJECT_ROOT/environment.env"
-        sed -i '/^DB_FLUSH_INTERVAL=/d' "$PROJECT_ROOT/environment.env"
-        sed -i '/^QUOTA_BUFFER_BYTES=/d' "$PROJECT_ROOT/environment.env"
+        sed -i '/^OPENVPN_UDS_SOCKET=/d' "$PROJECT_ROOT/.env"
+        sed -i '/^BYTECOUNT_INTERVAL=/d' "$PROJECT_ROOT/.env"
+        sed -i '/^RECONCILE_INTERVAL=/d' "$PROJECT_ROOT/.env"
+        sed -i '/^DB_FLUSH_INTERVAL=/d' "$PROJECT_ROOT/.env"
+        sed -i '/^QUOTA_BUFFER_BYTES=/d' "$PROJECT_ROOT/.env"
         
         # Add new UDS configuration
-        echo "" >> "$PROJECT_ROOT/environment.env"
-        echo "# UDS Monitor Configuration" >> "$PROJECT_ROOT/environment.env"
-        echo "OPENVPN_UDS_SOCKET=$UDS_SOCKET" >> "$PROJECT_ROOT/environment.env"
-        echo "BYTECOUNT_INTERVAL=5" >> "$PROJECT_ROOT/environment.env"
-        echo "RECONCILE_INTERVAL=300" >> "$PROJECT_ROOT/environment.env"
-        echo "DB_FLUSH_INTERVAL=30" >> "$PROJECT_ROOT/environment.env"
-        echo "QUOTA_BUFFER_BYTES=20971520" >> "$PROJECT_ROOT/environment.env"
+        echo "" >> "$PROJECT_ROOT/.env"
+        echo "# UDS Monitor Configuration" >> "$PROJECT_ROOT/.env"
+        echo "OPENVPN_UDS_SOCKET=$UDS_SOCKET" >> "$PROJECT_ROOT/.env"
+        echo "BYTECOUNT_INTERVAL=5" >> "$PROJECT_ROOT/.env"
+        echo "RECONCILE_INTERVAL=300" >> "$PROJECT_ROOT/.env"
+        echo "DB_FLUSH_INTERVAL=30" >> "$PROJECT_ROOT/.env"
+        echo "QUOTA_BUFFER_BYTES=20971520" >> "$PROJECT_ROOT/.env"
     fi
     
     log_info "Environment configuration updated"

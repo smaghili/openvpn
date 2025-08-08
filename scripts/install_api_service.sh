@@ -31,7 +31,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Configuration
-PROJECT_ROOT="/root/openvpn"
+PROJECT_ROOT="/etc/owpanel"
 SERVICE_FILE="api/openvpn-api.service"
 SERVICE_NAME="openvpn-api"
 VENV_PATH="$PROJECT_ROOT/venv"
@@ -58,9 +58,9 @@ if [[ ! -f "$PROJECT_ROOT/$SERVICE_FILE" ]]; then
     exit 1
 fi
 
-# Check if environment.env exists
-if [[ ! -f "$PROJECT_ROOT/environment.env" ]]; then
-    print_error "Environment file $PROJECT_ROOT/environment.env not found"
+# Check if .env exists
+if [[ ! -f "$PROJECT_ROOT/.env" ]]; then
+    print_error "Environment file $PROJECT_ROOT/.env not found"
     exit 1
 fi
 
@@ -84,7 +84,7 @@ print_info "Using existing configuration:"
 print_info "  API_PORT: $API_PORT"
 print_info "  Configuration files:"
 print_info "    - $DEPLOY_ENV_FILE (deploy.sh settings)"
-print_info "    - $PROJECT_ROOT/environment.env (project settings)"
+print_info "    - $PROJECT_ROOT/.env (project settings)"
 
 # Create log directory
 mkdir -p /var/log/openvpn
@@ -141,9 +141,9 @@ echo "  Health check: http://YOUR_IP:$API_PORT/api/health"
 echo ""
 print_info "Configuration files:"
 echo "  $DEPLOY_ENV_FILE (API settings from deploy.sh)"
-echo "  $PROJECT_ROOT/environment.env (project settings)"
+echo "  $PROJECT_ROOT/.env (project settings)"
 echo ""
 print_info "To change configuration:"
 echo "  1. Edit $DEPLOY_ENV_FILE for API settings"
-echo "  2. Edit $PROJECT_ROOT/environment.env for project settings"
+echo "  2. Edit $PROJECT_ROOT/.env for project settings"
 echo "  3. Restart service: systemctl restart $SERVICE_NAME" 

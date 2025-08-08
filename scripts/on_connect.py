@@ -9,8 +9,8 @@ import sqlite3
 from datetime import datetime
 
 def load_env_vars():
-    """Load environment variables from environment.env file."""
-    env_file = os.path.join(os.path.dirname(__file__), '..', 'environment.env')
+    """Load environment variables from .env file."""
+    env_file = os.path.join(os.path.dirname(__file__), '..', '.env')
     if os.path.exists(env_file):
         with open(env_file, 'r') as f:
             for line in f:
@@ -23,7 +23,7 @@ def get_log_file():
     return os.environ.get('OPENVPN_LOG_FILE', '/var/log/openvpn/traffic_monitor.log')
 
 def get_database_file():
-    return os.environ.get('DATABASE_FILE', '/root/openvpn/openvpn_data/vpn_manager.db')
+    return os.environ.get('DATABASE_FILE', '/etc/owpanel/openvpn_data/vpn_manager.db')
 
 def check_user_quota():
     """

@@ -171,7 +171,7 @@ sudo systemctl status openvpn-uds-monitor.service
 ### Database Queries
 ```bash
 # Check user quotas and usage
-sqlite3 /root/openvpn/openvpn_data/vpn_manager.db "
+sqlite3 /etc/owpanel/openvpn_data/vpn_manager.db "
 SELECT u.username, q.quota_bytes, q.bytes_used, 
        (q.bytes_used * 100.0 / q.quota_bytes) as usage_percent
 FROM users u 
@@ -179,7 +179,7 @@ JOIN user_quotas q ON u.id = q.user_id
 WHERE q.quota_bytes > 0;"
 
 # View recent traffic logs
-sqlite3 /root/openvpn/openvpn_data/vpn_manager.db "
+sqlite3 /etc/owpanel/openvpn_data/vpn_manager.db "
 SELECT u.username, t.bytes_sent, t.bytes_received, t.log_timestamp
 FROM traffic_logs t
 JOIN users u ON t.user_id = u.id
@@ -273,36 +273,36 @@ PRAGMA temp_store=MEMORY;
 ### **Monthly Quota Reset**
 ```bash
 # Create reset script
-cat > /root/openvpn/scripts/reset_quotas.sh << 'EOF'
+cat > /etc/owpanel/scripts/reset_quotas.sh << 'EOF'
 #!/bin/bash
-sqlite3 /root/openvpn/openvpn_data/vpn_manager.db "
+sqlite3 /etc/owpanel/openvpn_data/vpn_manager.db "
 UPDATE user_quotas SET bytes_used = 0, updated_at = CURRENT_TIMESTAMP;
 "
 echo "Quotas reset at $(date)" >> /var/log/openvpn/quota_reset.log
 EOF
 
-chmod +x /root/openvpn/scripts/reset_quotas.sh
+chmod +x /etc/owpanel/scripts/reset_quotas.sh
 
 # Add to crontab (first day of month at 00:01)
-echo "1 0 1 * * /root/openvpn/scripts/reset_quotas.sh" | sudo crontab -
+echo "1 0 1 * * /etc/owpanel/scripts/reset_quotas.sh" | sudo crontab -
 ```
 
 ### **Database Maintenance**
 ```bash
 # Weekly database optimization
-cat > /root/openvpn/scripts/db_maintenance.sh << 'EOF'
+cat > /etc/owpanel/scripts/db_maintenance.sh << 'EOF'
 #!/bin/bash
-sqlite3 /root/openvpn/openvpn_data/vpn_manager.db "
+sqlite3 /etc/owpanel/openvpn_data/vpn_manager.db "
 VACUUM;
 ANALYZE;
 PRAGMA wal_checkpoint(TRUNCATE);
 "
 EOF
 
-chmod +x /root/openvpn/scripts/db_maintenance.sh
+chmod +x /etc/owpanel/scripts/db_maintenance.sh
 
 # Add to crontab (weekly on Sunday at 02:00)
-echo "0 2 * * 0 /root/openvpn/scripts/db_maintenance.sh" | sudo crontab -
+echo "0 2 * * 0 /etc/owpanel/scripts/db_maintenance.sh" | sudo crontab -
 ```
 
 ### **Log Rotation**
@@ -338,13 +338,13 @@ echo "status" | socat - UNIX-CONNECT:/run/openvpn/ovpn-mgmt.sock
 sudo journalctl -u openvpn-uds-monitor.service -f | grep "Session.*bytes"
 
 # Check database updates
-watch -n 5 'sqlite3 /root/openvpn/openvpn_data/vpn_manager.db "SELECT username, bytes_used FROM users u JOIN user_quotas q ON u.id = q.user_id;"'
+watch -n 5 'sqlite3 /etc/owpanel/openvpn_data/vpn_manager.db "SELECT username, bytes_used FROM users u JOIN user_quotas q ON u.id = q.user_id;"'
 ```
 
 ### **Quota Enforcement Test**
 ```bash
 # Set a small quota for testing
-sqlite3 /root/openvpn/openvpn_data/vpn_manager.db "
+sqlite3 /etc/owpanel/openvpn_data/vpn_manager.db "
 UPDATE user_quotas 
 SET quota_bytes = 1048576 
 WHERE user_id = (SELECT id FROM users WHERE username = 'testuser');

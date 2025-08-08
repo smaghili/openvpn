@@ -12,17 +12,17 @@ class VPNPaths:
     @staticmethod
     def get_project_root():
         """Get project root directory."""
-        return get_config_value('PROJECT_ROOT', '/root/openvpn')
+        return get_config_value('PROJECT_ROOT', '/etc/owpanel')
     
     @staticmethod
     def get_database_file():
         """Get database file path."""
-        return get_config_value('DATABASE_FILE', '/root/openvpn/openvpn_data/vpn_manager.db')
+        return get_config_value('DATABASE_FILE', '/etc/owpanel/openvpn_data/vpn_manager.db')
     
     @staticmethod
     def get_database_dir():
         """Get database directory path."""
-        return get_config_value('DATABASE_DIR', '/root/openvpn/openvpn_data')
+        return get_config_value('DATABASE_DIR', '/etc/owpanel/openvpn_data')
     
     @staticmethod
     def get_log_file():
@@ -87,17 +87,17 @@ class VPNPaths:
     @staticmethod
     def get_scripts_dir():
         """Get scripts directory path."""
-        return get_config_value('SCRIPTS_DIR', '/root/openvpn/scripts')
+        return get_config_value('SCRIPTS_DIR', '/etc/owpanel/scripts')
     
     @staticmethod
     def get_on_connect_script():
         """Get on_connect script path."""
-        return get_config_value('ON_CONNECT_SCRIPT', '/root/openvpn/scripts/on_connect.py')
+        return get_config_value('ON_CONNECT_SCRIPT', '/etc/owpanel/scripts/on_connect.py')
     
     @staticmethod
     def get_on_disconnect_script():
         """Get on_disconnect script path."""
-        return get_config_value('ON_DISCONNECT_SCRIPT', '/root/openvpn/scripts/on_disconnect.py')
+        return get_config_value('ON_DISCONNECT_SCRIPT', '/etc/owpanel/scripts/on_disconnect.py')
     
     @staticmethod
     def get_status_file():

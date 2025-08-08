@@ -25,7 +25,7 @@ from data.db import Database
 from data.user_repository import UserRepository
 
 # Configuration
-UDS_SOCKET_PATH = get_config_value("OPENVPN_UDS_SOCKET", "/run/openvpn/ovpn-mgmt.sock")
+UDS_SOCKET_PATH = get_config_value("OPENVPN_UDS_SOCKET", "/run/openvpn-server/ovpn-mgmt-cert.sock")
 BYTECOUNT_INTERVAL = get_int_config("BYTECOUNT_INTERVAL", 5)  # seconds
 RECONCILE_INTERVAL = get_int_config("RECONCILE_INTERVAL", 300)  # 5 minutes
 DB_FLUSH_INTERVAL = get_int_config("DB_FLUSH_INTERVAL", 30)  # seconds
