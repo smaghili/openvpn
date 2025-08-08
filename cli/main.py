@@ -483,9 +483,14 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             # Removed openvpn-monitor.service - now using UDS monitor
         ]
         for service_file in service_files:
-            if os.path.exists(service_file):
-                os.remove(service_file)
-                print(f"     ├── Removed {service_file}")
+            try:
+                if os.path.exists(service_file):
+                    os.remove(service_file)
+                    print(f"     ├── Removed {service_file}")
+                else:
+                    print(f"     ├── Service file not found: {service_file}")
+            except Exception as e:
+                print(f"     ├── Warning: Could not remove service file {service_file}: {e}")
         
         os.system("systemctl daemon-reload")
         
@@ -493,9 +498,14 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
         print("   └── Removing owpanel command...")
         owpanel_paths = ['/usr/local/bin/owpanel', '/usr/bin/owpanel']
         for path in owpanel_paths:
-            if os.path.exists(path):
-                os.remove(path)
-                print(f"     ├── Removed {path}")
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+                    print(f"     ├── Removed {path}")
+                else:
+                    print(f"     ├── Command not found: {path}")
+            except Exception as e:
+                print(f"     ├── Warning: Could not remove command {path}: {e}")
         
         # 3. Remove all VPN users and configurations
         print("   └── Removing VPN users and configurations...")
@@ -526,9 +536,14 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             "/etc/openvpn-manager/database.db"  # System path
         ]
         for db_path in db_paths:
-            if os.path.exists(db_path):
-                os.remove(db_path)
-                print(f"     ├── Removed database: {db_path}")
+            try:
+                if os.path.exists(db_path):
+                    os.remove(db_path)
+                    print(f"     ├── Removed database: {db_path}")
+                else:
+                    print(f"     ├── Database not found: {db_path}")
+            except Exception as e:
+                print(f"     ├── Warning: Could not remove database {db_path}: {e}")
         
         # 6. Remove environment files
         print("   └── Removing environment configurations...")
@@ -539,9 +554,14 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             "/etc/openvpn-manager/environment.env"
         ]
         for env_file in env_files:
-            if os.path.exists(env_file):
-                os.remove(env_file)
-                print(f"     ├── Removed {env_file}")
+            try:
+                if os.path.exists(env_file):
+                    os.remove(env_file)
+                    print(f"     ├── Removed {env_file}")
+                else:
+                    print(f"     ├── Environment file not found: {env_file}")
+            except Exception as e:
+                print(f"     ├── Warning: Could not remove environment file {env_file}: {e}")
         
         # 7. Remove databases
         print("   └── Removing databases...")
@@ -550,9 +570,14 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             "/etc/openvpn-manager/database.db"
         ]
         for db_file in db_files:
-            if os.path.exists(db_file):
-                os.remove(db_file)
-                print(f"     ├── Removed database: {db_file}")
+            try:
+                if os.path.exists(db_file):
+                    os.remove(db_file)
+                    print(f"     ├── Removed database: {db_file}")
+                else:
+                    print(f"     ├── Database not found: {db_file}")
+            except Exception as e:
+                print(f"     ├── Warning: Could not remove database {db_file}: {e}")
         
         # 8. Remove system directories
         print("   └── Removing system directories...")
@@ -561,17 +586,40 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             "/var/log/openvpn"
         ]
         for sys_dir in system_dirs:
-            if os.path.exists(sys_dir):
-                os.system(f"rm -rf '{sys_dir}'")
-                print(f"     ├── Removed directory: {sys_dir}")
+            try:
+                if os.path.exists(sys_dir):
+                    os.system(f"rm -rf '{sys_dir}'")
+                    print(f"     ├── Removed directory: {sys_dir}")
+                else:
+                    print(f"     ├── Directory not found: {sys_dir}")
+            except Exception as e:
+                print(f"     ├── Warning: Could not remove directory {sys_dir}: {e}")
         
         print("   └── Removing project directory...")
         try:
-            project_root = os.getcwd()
-            os.chdir("/root")
-            if os.path.exists(project_root):
-                os.system(f"rm -rf '{project_root}'")      
-        except OSError as e:
+            # Get current directory safely
+            try:
+                project_root = os.getcwd()
+            except OSError:
+                # If current directory doesn't exist, try to get it from environment
+                project_root = os.environ.get('PWD', '/tmp')
+                print(f"     ├── Current directory not accessible, using: {project_root}")
+            
+            # Change to a safe directory first
+            try:
+                os.chdir("/root")
+            except OSError:
+                os.chdir("/tmp")
+                print("     ├── Could not change to /root, using /tmp instead")
+            
+            # Remove project directory if it exists and is not the current directory
+            if os.path.exists(project_root) and project_root != os.getcwd():
+                os.system(f"rm -rf '{project_root}'")
+                print(f"     ├── Removed project directory: {project_root}")
+            else:
+                print(f"     ├── Project directory not found or is current directory: {project_root}")
+                
+        except Exception as e:
             print(f"     ├── Warning: Could not remove project directory: {e}")
 
         print("\n✅ Complete removal finished")

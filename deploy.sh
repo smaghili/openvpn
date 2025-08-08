@@ -168,11 +168,14 @@ EOF
 function setup_database() {
     print_header "Database Setup"
     
+    # Get absolute path to project directory
+    local absolute_project_dir="$(cd "$PROJECT_DIR" && pwd)"
+    
     # Ensure database directory exists
     mkdir -p "$(dirname "$DB_PATH")"
     
     # Hash admin password
-    PASSWORD_HASH=$(./venv/bin/python3 -c "
+    PASSWORD_HASH=$("$absolute_project_dir/venv/bin/python3" -c "
 import bcrypt
 import sys
 password = '$ADMIN_PASSWORD'.encode('utf-8')
@@ -181,7 +184,7 @@ print(hashed.decode('utf-8'))
 ")
     
     # Create database and admin user
-    JWT_SECRET_VAR="$JWT_SECRET" DB_PATH_VAR="$DB_PATH" ADMIN_USERNAME_VAR="$ADMIN_USERNAME" PASSWORD_HASH_VAR="$PASSWORD_HASH" ./venv/bin/python3 << 'EOF'
+    JWT_SECRET_VAR="$JWT_SECRET" DB_PATH_VAR="$DB_PATH" ADMIN_USERNAME_VAR="$ADMIN_USERNAME" PASSWORD_HASH_VAR="$PASSWORD_HASH" "$absolute_project_dir/venv/bin/python3" << 'EOF'
 import sqlite3
 import sys
 import os
@@ -245,7 +248,10 @@ EOF
 function create_api_service() {
     print_header "API Service Setup"
     
-    # Create systemd service file
+    # Get absolute path to project directory
+    local absolute_project_dir="$(cd "$PROJECT_DIR" && pwd)"
+    
+    # Create systemd service file with absolute paths
     cat > /etc/systemd/system/openvpn-api.service << EOF
 [Unit]
 Description=OpenVPN Manager API Service
@@ -254,9 +260,9 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=$PROJECT_DIR
-Environment=PATH=$PROJECT_DIR/venv/bin
-ExecStart=$PROJECT_DIR/venv/bin/python -m api.app
+WorkingDirectory=$absolute_project_dir
+Environment=PATH=$absolute_project_dir/venv/bin
+ExecStart=$absolute_project_dir/venv/bin/python -m api.app
 Restart=always
 RestartSec=3
 
@@ -274,9 +280,12 @@ EOF
 function deploy_uds_monitor() {
     print_header "UDS Traffic Monitor Deployment"
     
-    if [ -f "scripts/deploy_uds_monitor.sh" ]; then
-        chmod +x scripts/deploy_uds_monitor.sh
-        if ./scripts/deploy_uds_monitor.sh; then
+    # Get absolute path to project directory
+    local absolute_project_dir="$(cd "$PROJECT_DIR" && pwd)"
+    
+    if [ -f "$absolute_project_dir/scripts/deploy_uds_monitor.sh" ]; then
+        chmod +x "$absolute_project_dir/scripts/deploy_uds_monitor.sh"
+        if PROJECT_ROOT="$absolute_project_dir" "$absolute_project_dir/scripts/deploy_uds_monitor.sh"; then
             print_success "UDS monitor deployed successfully"
         else
             print_error "UDS monitor deployment failed"
@@ -311,8 +320,9 @@ function setup_project() {
         git clone "$REPO_URL" "$PROJECT_DIR"
         cd "$PROJECT_DIR"
     fi
+    local absolute_project_dir="$(pwd)"
+    DB_PATH="$absolute_project_dir/openvpn_data/vpn_manager.db"
     
-    DB_PATH="$(pwd)/openvpn_data/vpn_manager.db"
     echo "Setting up Python environment..."
     if [ ! -d "venv" ]; then
         python3 -m venv venv
@@ -327,15 +337,19 @@ function setup_project() {
         print_error "requirements.txt not found"
         exit 1
     fi
-    chmod +x cli/main.py api/app.py scripts/*.py 2>/dev/null || true
+    
+    # Set execute permissions with absolute paths
+    chmod +x "$absolute_project_dir/cli/main.py" "$absolute_project_dir/api/app.py" 2>/dev/null || true
+    chmod +x "$absolute_project_dir/scripts/"*.py 2>/dev/null || true
+    
     print_success "Project setup completed"
 }
 
 function setup_openvpn() {
     print_header "OpenVPN Installation"
-    
-    export PROJECT_ROOT="$(pwd)"
-    if sudo PROJECT_ROOT="$PROJECT_ROOT" INSTALL_ONLY=1 ./venv/bin/python -m cli.main; then
+    local absolute_project_dir="$(pwd)"
+    export PROJECT_ROOT="$absolute_project_dir"
+    if sudo PROJECT_ROOT="$absolute_project_dir" INSTALL_ONLY=1 "$absolute_project_dir/venv/bin/python" -m cli.main; then
         print_success "OpenVPN installation completed"
     else
         print_error "OpenVPN installation failed"
@@ -345,6 +359,8 @@ function setup_openvpn() {
 
 function start_services() {
     print_header "Starting Services"
+    
+    # Start API service
     systemctl start openvpn-api
     sleep 3
     
@@ -361,6 +377,17 @@ function start_services() {
         systemctl status openvpn-api
         journalctl -u openvpn-api --no-pager -n 20
         exit 1
+    fi
+    
+    # Start UDS monitor service
+    systemctl start openvpn-uds-monitor
+    sleep 2
+    
+    if systemctl is-active --quiet openvpn-uds-monitor; then
+        print_success "UDS monitor service started successfully"
+    else
+        print_warning "UDS monitor service failed to start, but continuing..."
+        systemctl status openvpn-uds-monitor --no-pager
     fi
 }
 

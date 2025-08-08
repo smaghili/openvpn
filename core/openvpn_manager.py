@@ -574,11 +574,18 @@ verb 3"""
     def _get_monitoring_config(self, service_type: str = "cert") -> str:
         """Returns the config lines needed for traffic monitoring with UDS."""
         
+        # Use different sockets for different services
+        if service_type == "login":
+            uds_socket = "/run/openvpn-server/ovpn-mgmt-login.sock"
+        else:
+            uds_socket = "/run/openvpn-server/ovpn-mgmt-cert.sock"
+        
         return f"""
 # --- Traffic Monitoring Config ---
 script-security 2
 client-connect /etc/openvpn/scripts/on_connect.py
 client-disconnect /etc/openvpn/scripts/on_disconnect.py
+management {uds_socket} unix
 """
 
     def _get_primary_interface(self) -> str:

@@ -12,10 +12,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-PROJECT_ROOT="/root/openvpn"
+PROJECT_ROOT="${PROJECT_ROOT:-/root/openvpn}"
+UDS_SOCKET="/run/openvpn-server/ovpn-mgmt-cert.sock"
 SERVICE_NAME="openvpn-uds-monitor"
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-UDS_SOCKET="/run/openvpn/ovpn-mgmt.sock"
+SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
 OPENVPN_CONFIG="/etc/openvpn/server.conf"
 
 log_info() {
@@ -56,19 +56,31 @@ backup_openvpn_config() {
 configure_openvpn_uds() {
     log_info "Configuring OpenVPN for UDS management interface..."
     
-    # Check if UDS management is already configured
-    if grep -q "management.*unix" "$OPENVPN_CONFIG" 2>/dev/null; then
-        log_warn "UDS management interface already configured in OpenVPN"
-        return
+    # Create /run/openvpn-server directory if it doesn't exist
+    mkdir -p /run/openvpn-server
+    chmod 755 /run/openvpn-server
+    
+    # Configure server-cert.conf
+    if [[ -f "/etc/openvpn/server/server-cert.conf" ]]; then
+        # Remove any existing management lines
+        sed -i '/^management/d' "/etc/openvpn/server/server-cert.conf"
+        
+        # Add UDS management interface
+        echo "" >> "/etc/openvpn/server/server-cert.conf"
+        echo "# UDS Management Interface" >> "/etc/openvpn/server/server-cert.conf"
+        echo "management /run/openvpn-server/ovpn-mgmt-cert.sock unix" >> "/etc/openvpn/server/server-cert.conf"
     fi
     
-
-    
-    # Add UDS management configuration
-    echo "" >> "$OPENVPN_CONFIG"
-    echo "# UDS Management Interface for Traffic Monitoring" >> "$OPENVPN_CONFIG"
-    echo "management $UDS_SOCKET unix" >> "$OPENVPN_CONFIG"
-    echo "status-version 3" >> "$OPENVPN_CONFIG"
+    # Configure server-login.conf
+    if [[ -f "/etc/openvpn/server/server-login.conf" ]]; then
+        # Remove any existing management lines
+        sed -i '/^management/d' "/etc/openvpn/server/server-login.conf"
+        
+        # Add UDS management interface
+        echo "" >> "/etc/openvpn/server/server-login.conf"
+        echo "# UDS Management Interface" >> "/etc/openvpn/server/server-login.conf"
+        echo "management /run/openvpn-server/ovpn-mgmt-login.sock unix" >> "/etc/openvpn/server/server-login.conf"
+    fi
     
     log_info "Added UDS management interface configuration"
 }
@@ -109,13 +121,35 @@ setup_monitor_user() {
 deploy_service() {
     log_info "Deploying UDS monitor service..."
     
-    # Copy service file
-    cp "$PROJECT_ROOT/scripts/openvpn-uds-monitor.service" "$SERVICE_FILE"
-    
-    # Reload systemd
+    # Create systemd service file
+    cat > "$SERVICE_FILE" << EOF
+[Unit]
+Description=OpenVPN UDS Traffic Monitor Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$PROJECT_ROOT
+ExecStart=/usr/bin/python3 $PROJECT_ROOT/scripts/uds_monitor_service.py
+Restart=always
+RestartSec=10
+
+# Environment variables
+Environment=PYTHONUNBUFFERED=1
+Environment=OPENVPN_UDS_SOCKET=$UDS_SOCKET
+Environment=BYTECOUNT_INTERVAL=5
+Environment=RECONCILE_INTERVAL=300
+Environment=DB_FLUSH_INTERVAL=30
+Environment=QUOTA_BUFFER_BYTES=20971520
+Environment=MAX_LOG_SIZE=10485760
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Enable and start service
     systemctl daemon-reload
-    
-    # Enable service
     systemctl enable "$SERVICE_NAME"
     
     log_info "UDS monitor service deployed and enabled"
@@ -128,7 +162,11 @@ setup_directories() {
     mkdir -p /var/log/openvpn
     chmod 755 /var/log/openvpn
     
-    # Create database directory if it doesn't exist
+    # Create OpenVPN server directory
+    mkdir -p /run/openvpn-server
+    chmod 755 /run/openvpn-server
+    
+    # Create database directory
     mkdir -p "$PROJECT_ROOT/openvpn_data"
     chmod 700 "$PROJECT_ROOT/openvpn_data"
     
@@ -138,18 +176,23 @@ setup_directories() {
 update_environment_config() {
     log_info "Updating environment configuration..."
     
-    # Update environment.env with UDS-specific settings
+    # Update environment file with UDS configuration
     if [[ -f "$PROJECT_ROOT/environment.env" ]]; then
-        # Add UDS configuration if not present
-        if ! grep -q "OPENVPN_UDS_SOCKET" "$PROJECT_ROOT/environment.env"; then
-            echo "" >> "$PROJECT_ROOT/environment.env"
-            echo "# UDS Monitor Configuration" >> "$PROJECT_ROOT/environment.env"
-            echo "OPENVPN_UDS_SOCKET=$UDS_SOCKET" >> "$PROJECT_ROOT/environment.env"
-            echo "BYTECOUNT_INTERVAL=5" >> "$PROJECT_ROOT/environment.env"
-            echo "RECONCILE_INTERVAL=300" >> "$PROJECT_ROOT/environment.env"
-            echo "DB_FLUSH_INTERVAL=30" >> "$PROJECT_ROOT/environment.env"
-            echo "QUOTA_BUFFER_BYTES=20971520" >> "$PROJECT_ROOT/environment.env"
-        fi
+        # Remove existing UDS configuration if present
+        sed -i '/^OPENVPN_UDS_SOCKET=/d' "$PROJECT_ROOT/environment.env"
+        sed -i '/^BYTECOUNT_INTERVAL=/d' "$PROJECT_ROOT/environment.env"
+        sed -i '/^RECONCILE_INTERVAL=/d' "$PROJECT_ROOT/environment.env"
+        sed -i '/^DB_FLUSH_INTERVAL=/d' "$PROJECT_ROOT/environment.env"
+        sed -i '/^QUOTA_BUFFER_BYTES=/d' "$PROJECT_ROOT/environment.env"
+        
+        # Add new UDS configuration
+        echo "" >> "$PROJECT_ROOT/environment.env"
+        echo "# UDS Monitor Configuration" >> "$PROJECT_ROOT/environment.env"
+        echo "OPENVPN_UDS_SOCKET=$UDS_SOCKET" >> "$PROJECT_ROOT/environment.env"
+        echo "BYTECOUNT_INTERVAL=5" >> "$PROJECT_ROOT/environment.env"
+        echo "RECONCILE_INTERVAL=300" >> "$PROJECT_ROOT/environment.env"
+        echo "DB_FLUSH_INTERVAL=30" >> "$PROJECT_ROOT/environment.env"
+        echo "QUOTA_BUFFER_BYTES=20971520" >> "$PROJECT_ROOT/environment.env"
     fi
     
     log_info "Environment configuration updated"
