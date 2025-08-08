@@ -32,12 +32,12 @@
 
 2. **اعمال تغییرات:**
    ```bash
-   sudo systemctl restart openvpn-monitor
+   sudo systemctl restart openvpn-uds-monitor
    ```
 
 3. **بررسی وضعیت:**
    ```bash
-   sudo systemctl status openvpn-monitor
+   sudo systemctl status openvpn-uds-monitor
    ```
 
 ### 📝 مثال تغییر تنظیمات
@@ -50,7 +50,7 @@ MONITOR_INTERVAL=30
 
 سپس:
 ```bash
-sudo systemctl restart openvpn-monitor
+sudo systemctl restart openvpn-uds-monitor
 ```
 
 ### ⚠️ نکات مهم
@@ -64,7 +64,7 @@ sudo systemctl restart openvpn-monitor
 
 برای مشاهده لاگ‌های سرویس:
 ```bash
-sudo journalctl -u openvpn-monitor -f
+sudo journalctl -u openvpn-uds-monitor -f
 ```
 
 برای مشاهده لاگ‌های مانیتورینگ:

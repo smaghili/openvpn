@@ -393,12 +393,12 @@ function complete_uninstall() {
     print_header "Complete System Uninstallation"
     
     # Stop and disable services
-    systemctl stop openvpn-api openvpn-monitor 2>/dev/null || true
-    systemctl disable openvpn-api openvpn-monitor 2>/dev/null || true
+    systemctl stop openvpn-api 2>/dev/null || true
+systemctl disable openvpn-api 2>/dev/null || true
     
     # Remove systemd services
     rm -f /etc/systemd/system/openvpn-api.service
-    rm -f /etc/systemd/system/openvpn-monitor.service
+    # Removed openvpn-monitor.service - now using UDS monitor
     systemctl daemon-reload
     
     # Remove configuration files

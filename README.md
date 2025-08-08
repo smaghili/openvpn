@@ -1,6 +1,6 @@
-# OpenVPN Dual Auth Installer
+# OpenVPN Manager with UDS Traffic Monitoring
 
-A minimal, production-grade OpenVPN installer with dual authentication (certificate + username/password) for Ubuntu 18+.
+A comprehensive OpenVPN management system with **near-realtime traffic monitoring** using Unix Domain Sockets (UDS), dual authentication, and production-grade monitoring capabilities.
 
 ---
 
@@ -25,7 +25,11 @@ bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/install.
 - **Main idea inspired by:** [angristan/openvpn-install](https://github.com/angristan/openvpn-install)
 - **Supported OS:** Ubuntu 18.04 and newer
 - **Key Features:**
-  - Simple, clean, and professional
+  - **Near-realtime traffic monitoring** (5-10 second updates via UDS)
+  - **Accurate quota enforcement** with buffer-based cutoff
+  - **Zero network exposure** (UDS-based communication, no TCP ports)
   - Dual authentication: each user gets both certificate and login access
+  - **Production-ready monitoring** with systemd service and log rotation
   - Robust backup and restore functionality
   - Designed for maintainability and real-world production use
+  - **Complete TCP monitor removal** - old 7505/7506 ports eliminated

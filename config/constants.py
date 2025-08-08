@@ -17,10 +17,6 @@ class OpenVPNConstants:
     VAR_LOG_OPENVPN = "/var/log/openvpn"
     VAR_RUN_OPENVPN = "/var/run/openvpn"
     
-    # Management ports
-    MANAGEMENT_PORT_CERT = 7505
-    MANAGEMENT_PORT_LOGIN = 7506
-    
     # Monitor settings
     MONITOR_INTERVAL = 45
     MAX_LOG_SIZE = 10485760  # 10MB

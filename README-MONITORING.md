@@ -1,12 +1,16 @@
-# OpenVPN Traffic Monitoring System
+# OpenVPN Traffic Monitoring System (Legacy TCP)
 
 ## 📋 Overview
 
-This is a robust, lightweight traffic monitoring system for OpenVPN that combines three components:
+**⚠️ DEPRECATED: This TCP-based monitoring system has been replaced by the UDS-based system.**
+
+This was a robust, lightweight traffic monitoring system for OpenVPN that combined three components:
 
 1. **OpenVPN Hooks** (Zero overhead) - Scripts that run on client connect/disconnect
 2. **Management Interface Monitoring** (Minimal resources) - Real-time traffic monitoring via TCP
 3. **SQLite Database** (File-based) - Lightweight storage for quotas and traffic logs
+
+**For the new UDS-based system, see: [README-UDS-MONITORING.md](README-UDS-MONITORING.md)**
 
 ## 🏗️ Architecture
 

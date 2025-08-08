@@ -2,6 +2,7 @@
 import os
 import sys
 import re
+import time
 from getpass import getpass
 import urllib.request
 from typing import Dict, Any, Optional
@@ -156,7 +157,7 @@ def print_management_menu() -> None:
     print("  6. Change User Password")
     print("\n📊 Traffic Management:")
     print("  7. Set User Quota")
-    print("  8. View User Status")
+    print("  8. View User Status (Real-time)")
     print("\n📦 System:")
     print("  9. System Backup")
     print("  10. System Restore")
@@ -292,26 +293,84 @@ def set_user_quota_flow(user_service: UserService) -> None:
         print(f"❌ An unexpected error occurred: {e}")
 
 def view_user_status_flow(user_service: UserService) -> None:
-    """Flow to view the detailed traffic status of a user."""
+    """Flow to view the detailed traffic status of a user with real-time updates."""
     username = input("Enter username to view status for: ").strip()
+    
     try:
+        # Verify user exists first
         status = user_service.get_user_status(username)
         if not status:
             print("Could not retrieve status for this user.")
             return
 
-        quota = status.get('quota_bytes', 0)
-        used = status.get('bytes_used', 0)
+        print(f"\n--- Real-time Traffic Monitor for {username} ---")
+        print("Press Ctrl+C to stop monitoring")
+        print("-" * 60)
         
-        print(f"\n--- Status for {status['username']} ---")
-        print(f"  Quota Limit: {bytes_to_human(quota)} ({'Unlimited' if quota == 0 else f'{quota:,} bytes'})")
-        print(f"  Data Used:   {bytes_to_human(used)} ({used:,} bytes)")
+        last_used = 0
+        update_count = 0
+        
+        while True:
+            try:
+                # Get current status
+                status = user_service.get_user_status(username)
+                if not status:
+                    print("❌ Could not retrieve status for this user.")
+                    break
 
-        if quota > 0:
-            percentage = (used / quota) * 100
-            remaining_bytes = quota - used
-            print(f"  Usage:       {percentage:.2f}%")
-            print(f"  Remaining:   {bytes_to_human(remaining_bytes)}")
+                quota = status.get('quota_bytes', 0)
+                used = status.get('bytes_used', 0)
+                current_time = time.strftime("%H:%M:%S")
+                
+                # Calculate traffic change
+                traffic_change = used - last_used
+                traffic_change_str = ""
+                if traffic_change > 0:
+                    traffic_change_str = f" (+{bytes_to_human(traffic_change)})"
+                elif traffic_change < 0:
+                    traffic_change_str = f" ({bytes_to_human(traffic_change)})"
+                
+                # Clear screen and show updated status
+                os.system('clear' if os.name == 'posix' else 'cls')
+                print(f"\n--- Real-time Traffic Monitor for {username} ---")
+                print(f"Last Update: {current_time} | Updates: {update_count}")
+                print("Press Ctrl+C to stop monitoring")
+                print("-" * 60)
+                
+                print(f"  Quota Limit: {bytes_to_human(quota)} ({'Unlimited' if quota == 0 else f'{quota:,} bytes'})")
+                print(f"  Data Used:   {bytes_to_human(used)} ({used:,} bytes){traffic_change_str}")
+
+                if quota > 0:
+                    percentage = (used / quota) * 100
+                    remaining_bytes = quota - used
+                    print(f"  Usage:       {percentage:.2f}%")
+                    print(f"  Remaining:   {bytes_to_human(remaining_bytes)}")
+                    
+                    # Warning if usage is high
+                    if percentage >= 90:
+                        print(f"  ⚠️  WARNING: Usage is {percentage:.1f}% - approaching quota limit!")
+                    elif percentage >= 75:
+                        print(f"  ⚠️  Notice: Usage is {percentage:.1f}%")
+                
+                print(f"\n  Status: {'🟢 Active' if used > last_used else '🟡 Idle'}")
+                print("-" * 60)
+                
+                last_used = used
+                update_count += 1
+                
+                # Wait 5 seconds before next update
+                time.sleep(5)
+                
+            except KeyboardInterrupt:
+                print(f"\n\n✅ Monitoring stopped. Final status for {username}:")
+                print(f"  Total Data Used: {bytes_to_human(used)}")
+                if quota > 0:
+                    percentage = (used / quota) * 100
+                    print(f"  Final Usage: {percentage:.2f}%")
+                break
+            except Exception as e:
+                print(f"❌ Error updating status: {e}")
+                break
         
     except UserNotFoundError as e:
         print(f"❌ {e}")
@@ -413,7 +472,7 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
         
         # 1. Stop and remove all systemd services
         print("   └── Stopping and removing systemd services...")
-        services = ['openvpn-api', 'openvpn-monitor', 'openvpn-server@server-cert', 'openvpn-server@server-login']
+        services = ['openvpn-api', 'openvpn-server@server-cert', 'openvpn-server@server-login']
         for service in services:
             os.system(f"systemctl stop {service} 2>/dev/null || true")
             os.system(f"systemctl disable {service} 2>/dev/null || true")
@@ -421,7 +480,7 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
         # Remove service files
         service_files = [
             '/etc/systemd/system/openvpn-api.service',
-            '/etc/systemd/system/openvpn-monitor.service'
+            # Removed openvpn-monitor.service - now using UDS monitor
         ]
         for service_file in service_files:
             if os.path.exists(service_file):

@@ -270,68 +270,17 @@ class OpenVPNManager(IBackupable):
         # This method remains unchanged
         pass
 
-    def _create_monitor_service_file(self) -> None:
-        """Creates the systemd service file for the monitor with dynamic paths."""
-        # Use VPNPaths for consistent path management
-        from config.paths import VPNPaths
-        from config.env_loader import get_config_value
-        
-        project_root = VPNPaths.get_project_root()
-        management_port = get_config_value("OPENVPN_MANAGEMENT_PORT", "7505")
-        
-        service_content = f"""[Unit]
-Description=OpenVPN Traffic Monitor Service
-After=network.target openvpn-server@server-cert.service openvpn-server@server-login.service
-Wants=openvpn-server@server-cert.service openvpn-server@server-login.service
-
-[Service]
-Type=simple
-User=root
-Group=root
-WorkingDirectory={project_root}
-Environment=MONITOR_INTERVAL=45
-Environment=MAX_LOG_SIZE=10485760
-Environment=PYTHONPATH={project_root}
-Environment=PROJECT_ROOT={project_root}
-Environment=OPENVPN_MANAGEMENT_PORT={management_port}
-Environment=OPENVPN_LOG_FILE=/var/log/openvpn/traffic_monitor.log
-ExecStart=/usr/bin/python3 {project_root}/scripts/monitor_service.py
-Restart=always
-RestartSec=5
-KillMode=mixed
-KillSignal=SIGTERM
-TimeoutStopSec=30
-LimitNOFILE=1024
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=openvpn-monitor
-
-[Install]
-WantedBy=multi-user.target
-"""
-        
-        service_file_path = "/etc/systemd/system/openvpn-monitor.service"
-        with open(service_file_path, 'w') as f:
-            f.write(service_content)
-
     def _start_openvpn_services(self, silent: bool = False) -> None:
-        """Enables and starts OpenVPN and the monitoring service."""
+        """Enables and starts OpenVPN services."""
         if not silent:
             print("[7/7] Starting all services...")
-            print("   └── Creating monitor service file...")
-        
-        # Create the service file with dynamic paths
-        self._create_monitor_service_file()
-        
-        if not silent:
             print("   └── Reloading systemd daemon...")
         
         subprocess.run(["systemctl", "daemon-reload"], check=True, capture_output=True)
         
         services_to_manage = [
             "openvpn-server@server-cert",
-            "openvpn-server@server-login",
-            "openvpn-monitor"
+            "openvpn-server@server-login"
         ]
         
         for service in services_to_manage:
@@ -503,8 +452,6 @@ tls-version-min 1.2
 
         if not silent:
             print("   └── Final process cleanup...")
-        subprocess.run(["fuser", "-k", "7505/tcp"], check=False, capture_output=True)
-        subprocess.run(["fuser", "-k", "7506/tcp"], check=False, capture_output=True)
 
         if not silent:
             print("   └── Removing packages...")
@@ -524,7 +471,7 @@ tls-version-min 1.2
     def pre_restore(self) -> None:
         """Stops all related services before a restore operation."""
         services_to_stop = [
-            "openvpn-monitor",
+            "openvpn-uds-monitor",
             "openvpn-server@server-cert",
             "openvpn-server@server-login"
         ]
@@ -625,20 +572,13 @@ status /var/log/openvpn/status-login.log
 verb 3"""
 
     def _get_monitoring_config(self, service_type: str = "cert") -> str:
-        """Returns the config lines needed for traffic monitoring with dynamic paths."""
-        
-        # Use different ports for different services
-        if service_type == "login":
-            management_port = OpenVPNConstants.MANAGEMENT_PORT_LOGIN
-        else:
-            management_port = OpenVPNConstants.MANAGEMENT_PORT_CERT
+        """Returns the config lines needed for traffic monitoring with UDS."""
         
         return f"""
 # --- Traffic Monitoring Config ---
 script-security 2
 client-connect /etc/openvpn/scripts/on_connect.py
 client-disconnect /etc/openvpn/scripts/on_disconnect.py
-management 127.0.0.1 {management_port}
 """
 
     def _get_primary_interface(self) -> str:

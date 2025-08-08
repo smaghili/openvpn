@@ -1,0 +1,43 @@
+[Unit]
+Description=OpenVPN UDS Traffic Monitor Service
+After=network.target openvpn-server@server.service
+Wants=openvpn-server@server.service
+PartOf=openvpn-server@server.service
+
+[Service]
+Type=simple
+User=root
+Group=openvpn
+WorkingDirectory=/root/openvpn
+ExecStart=/usr/bin/python3 /root/openvpn/scripts/uds_monitor_service.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/openvpn /root/openvpn/openvpn_data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=100M
+CPUQuota=10%
+
+# Environment variables
+Environment=PYTHONUNBUFFERED=1
+Environment=OPENVPN_UDS_SOCKET=/run/openvpn/ovpn-mgmt.sock
+Environment=BYTECOUNT_INTERVAL=5
+Environment=RECONCILE_INTERVAL=300
+Environment=DB_FLUSH_INTERVAL=30
+Environment=QUOTA_BUFFER_BYTES=20971520
+Environment=MAX_LOG_SIZE=10485760
+
+[Install]
+WantedBy=multi-user.target 

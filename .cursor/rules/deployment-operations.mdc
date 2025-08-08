@@ -44,7 +44,7 @@ This project supports **dual deployment methods** with **integrated web panel**:
 - Create systemd services for:
   - `openvpn-server@server-cert` (certificate-based)
   - `openvpn-server@server-login` (username/password-based)  
-  - `openvpn-monitor` (traffic monitoring daemon)
+  - `openvpn-uds-monitor` (UDS-based traffic monitoring daemon)
   - `openvpn-api` (web panel Flask API server)
 - Enable services with proper dependencies and restart policies
 - Configure log rotation and cleanup for all services
@@ -74,7 +74,7 @@ This project supports **dual deployment methods** with **integrated web panel**:
 
 ### Troubleshooting
 - Check systemd service status: 
-  - `systemctl status openvpn-monitor`
+  - `systemctl status openvpn-uds-monitor`
   - `systemctl status openvpn-api`
 - Monitor logs: 
   - `tail -f /var/log/openvpn/traffic_monitor.log`
