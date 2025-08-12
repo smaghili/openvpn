@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import logging
 import os
+import secrets
 import sys
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -24,7 +26,10 @@ def create_app() -> Flask:
     app = Flask(__name__)
     secret_key = os.environ.get("API_SECRET_KEY")
     if not secret_key:
-        raise RuntimeError("API_SECRET_KEY environment variable is required")
+        secret_key = secrets.token_urlsafe(32)
+        logging.warning(
+            "API_SECRET_KEY environment variable is missing; generated temporary key"
+        )
     app.config["SECRET_KEY"] = secret_key
 
     CORS(app)
