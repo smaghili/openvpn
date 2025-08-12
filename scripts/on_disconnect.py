@@ -67,7 +67,6 @@ def update_traffic_usage():
       
         db_file = os.environ.get("OPENVPN_DB_FILE") or VPNPaths.get_database_file()
         
- main
         if not os.path.exists(db_file):
             # If database doesn't exist, just log to file
             with open(log_file, "a") as f:
