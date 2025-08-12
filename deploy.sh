@@ -10,6 +10,8 @@ PROJECT_DIR="/etc/owpanel"
 ENV_FILE="/etc/owpanel/.env"
 # Use the same database path that the application uses (will be set dynamically)
 DB_PATH=""
+# Script directory (source repository)
+SCRIPT_DIR="$(pwd)"
 
 # Colors for output
 RED='\033[0;31m'
@@ -342,6 +344,11 @@ function setup_project() {
     fi
     local absolute_project_dir="$(pwd)"
     DB_PATH="$absolute_project_dir/openvpn_data/vpn_manager.db"
+
+    # Copy web UI assets into the project directory if missing
+    if [ -d "$SCRIPT_DIR/ui" ] && [ ! -d "$absolute_project_dir/ui" ]; then
+        cp -r "$SCRIPT_DIR/ui" "$absolute_project_dir/"
+    fi
     
     echo "Setting up Python environment..."
     if [ ! -d "venv" ]; then
@@ -392,6 +399,11 @@ function start_services() {
         else
             print_warning "API health check failed, but service is running"
         fi
+        if curl -f http://localhost:$API_PORT/ | grep -qi '<!doctype html'; then
+            print_success "Web panel reachable"
+        else
+            print_warning "Web panel not reachable"
+        fi
     else
         print_error "Failed to start API service"
         systemctl status openvpn-api
@@ -421,6 +433,8 @@ function show_completion_info() {
     echo -e "Admin Password: ${YELLOW}$ADMIN_PASSWORD${NC}"
     echo -e "API URL: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
     echo -e "Health Check: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/api/health${NC}"
+    echo -e "Login Page: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/${NC}"
+    echo -e "${YELLOW}Remember to change the default admin password after first login.${NC}"
     
     echo -e "\n${BLUE}=== CLI ACCESS ===${NC}"
     echo -e "CLI Panel: ${YELLOW}owpanel${NC}"

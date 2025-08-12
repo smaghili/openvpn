@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
-from flask import Flask, jsonify
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 
 from .routes.user_routes import user_bp
@@ -17,20 +17,19 @@ from .middleware.auth_middleware import AuthMiddleware
 
 def create_app() -> Flask:
     """
-    Creates and configures the Flask application with API endpoints only.
-    Frontend web panel has been removed - only REST API is available.
+    Creates and configures the Flask application serving both API and web UI.
     """
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='../ui', static_url_path='/')
     secret_key = os.environ.get('API_SECRET_KEY')
     if not secret_key:
         raise RuntimeError('API_SECRET_KEY environment variable is required')
     app.config['SECRET_KEY'] = secret_key
     
     CORS(app)
-    
-      AuthMiddleware.init_app(app)
-      JWTMiddleware.init_app(app)
-      ErrorHandler.init_app(app)
+
+    AuthMiddleware.init_app(app)
+    JWTMiddleware.init_app(app)
+    ErrorHandler.init_app(app)
     
     # API routes
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -66,23 +65,14 @@ def create_app() -> Flask:
         from .routes.profile_routes import download_ovpn_config as download_config
         return download_config(profile_token)
     
-    # API-only server - no frontend routes
+    # Serve web UI
     @app.route('/')
-    def api_info():
-        """API information endpoint"""
-        return {
-            'message': 'OpenVPN Manager API Server',
-            'version': '2.0.0',
-            'status': 'running',
-            'endpoints': {
-                'health': '/api/health',
-                'auth': '/api/auth/*',
-                'users': '/api/users/*',
-                'system': '/api/system/*',
-                'profiles': '/api/profile/*'
-            },
-            'note': 'Web panel has been removed - API only'
-        }
+    def index():
+        return app.send_static_file('index.html')
+
+    @app.route('/<path:path>')
+    def static_proxy(path):
+        return send_from_directory(app.static_folder, path)
     
     return app
 

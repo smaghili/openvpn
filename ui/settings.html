@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>General Settings</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="script.js"></script>
+<script src="api.js"></script>
+</head>
+<body>
+<div class="toast-container"></div>
+<div class="modal"><div class="modal-content"><p class="modal-message"></p><button class="yes" data-i18n="modal_yes"></button><button class="no" data-i18n="modal_no"></button></div></div>
+<div class="container">
+<nav class="sidebar">
+<h1 data-i18n="sidebar_title"></h1>
+<button onclick="toggleTheme()" data-i18n="btn_theme"></button>
+<select id="langSelect" onchange="setLanguage(this.value)">
+<option value="fa" data-i18n="lang_fa"></option>
+<option value="en" data-i18n="lang_en"></option>
+</select>
+<ul>
+<li><a href="overview.html" data-i18n="nav_overview"></a></li>
+<li><a href="users.html" data-i18n="nav_users"></a></li>
+<li><a href="openvpn.html" data-i18n="nav_openvpn"></a></li>
+<li><a href="wireguard.html" data-i18n="nav_wireguard"></a></li>
+<li><a href="settings.html" data-i18n="nav_settings"></a></li>
+<li><a href="index.html" data-i18n="nav_logout"></a></li>
+</ul>
+</nav>
+<div class="content">
+<header><div data-i18n="settings_title"></div></header>
+<section style="margin-top:1rem;">
+<h3 data-i18n="admin_account"></h3>
+<label><span data-i18n="username"></span> <input type="text" value="admin"/></label>
+<button onclick="showToast(translations[currentLang].username)" data-i18n="change"></button>
+<label><span data-i18n="label_password"></span> <input type="password" value="********"/></label>
+<button onclick="showModal(translations[currentLang].reset_confirm,()=>showToast(translations[currentLang].reset))" data-i18n="change_reset"></button>
+</section>
+<section style="margin-top:1rem;">
+<h3 data-i18n="display_language"></h3>
+<label><span data-i18n="btn_language"></span> <select><option value="fa" data-i18n="lang_fa"></option><option value="en" data-i18n="lang_en"></option></select></label>
+<label><span data-i18n="btn_theme"></span> <select><option value="dark" data-i18n="dark"></option><option value="light" data-i18n="light"></option></select></label>
+<label><span data-i18n="timezone"></span> <select><option value="tz" data-i18n="tz"></option></select></label>
+</section>
+<section style="margin-top:1rem;">
+<h3 data-i18n="network_ports"></h3>
+<label><span data-i18n="panel_port"></span> <input type="text" value="443"/></label>
+<button onclick="showModal(translations[currentLang].apply_confirm,()=>showToast(translations[currentLang].applied))" data-i18n="apply"></button>
+</section>
+<section style="margin-top:1rem;">
+<h3 data-i18n="agents"></h3>
+<button id="addAgentBtn" data-i18n="add_agent"></button>
+<table class="table">
+<thead><tr><th data-i18n="name_code"></th><th data-i18n="permissions"></th><th data-i18n="actions"></th></tr></thead>
+<tbody>
+<tr><td>agt-001</td><td><label><input type="checkbox"/><span data-i18n="perm_create"></span></label><label><input type="checkbox"/><span data-i18n="perm_edit"></span></label><label><input type="checkbox"/><span data-i18n="perm_delete"></span></label><label><input type="checkbox"/><span data-i18n="perm_view_log"></span></label></td><td><button data-i18n="edit"></button><button data-i18n="delete"></button></td></tr>
+<tr><td>agt-002</td><td><label><input type="checkbox" checked/><span data-i18n="perm_create"></span></label><label><input type="checkbox" checked/><span data-i18n="perm_edit"></span></label><label><input type="checkbox"/><span data-i18n="perm_delete"></span></label><label><input type="checkbox"/><span data-i18n="perm_view_log"></span></label></td><td><button data-i18n="edit"></button><button data-i18n="delete"></button></td></tr>
+</tbody>
+</table>
+</section>
+<button onclick="showToast(translations[currentLang].saved)" data-i18n="save_all"></button>
+<button onclick="showToast(translations[currentLang].canceled)" data-i18n="cancel"></button>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const btn=document.getElementById('addAgentBtn');
+  if(btn) btn.addEventListener('click',async()=>{
+    const u=prompt(translations[currentLang].label_username);
+    if(!u) return;
+    const p=prompt(translations[currentLang].label_password)||'';
+    const r=prompt(translations[currentLang].role_prompt,'reseller')||'reseller';
+    try{await AdminsAPI.create(u,p,r);showToast(translations[currentLang].saved);}catch(err){showToast(err.message,'error');}
+  });
+});
+</script>
+</div>
+</div>
+</body>
+</html>

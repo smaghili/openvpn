@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>Users</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="script.js"></script>
+<script src="api.js"></script>
+</head>
+<body>
+<div class="toast-container"></div>
+<div class="modal"><div class="modal-content"><p class="modal-message"></p><button class="yes" data-i18n="modal_yes"></button><button class="no" data-i18n="modal_no"></button></div></div>
+<div class="drawer" id="userDrawer">
+<h3><span data-i18n="user_details"></span> <span id="userName"></span></h3>
+<button onclick="closeDrawer('userDrawer')" data-i18n="close"></button>
+<p data-i18n="drawer_sections"></p>
+<button data-i18n="disconnect"></button>
+<button data-i18n="reset_password"></button>
+<button data-i18n="regenerate_keys"></button>
+<button data-i18n="save_btn"></button>
+</div>
+<div class="container">
+<nav class="sidebar">
+<h1 data-i18n="sidebar_title"></h1>
+<button onclick="toggleTheme()" data-i18n="btn_theme"></button>
+<select id="langSelect" onchange="setLanguage(this.value)">
+<option value="fa" data-i18n="lang_fa"></option>
+<option value="en" data-i18n="lang_en"></option>
+</select>
+<ul>
+<li><a href="overview.html" data-i18n="nav_overview"></a></li>
+<li><a href="users.html" data-i18n="nav_users"></a></li>
+<li><a href="openvpn.html" data-i18n="nav_openvpn"></a></li>
+<li><a href="wireguard.html" data-i18n="nav_wireguard"></a></li>
+<li><a href="settings.html" data-i18n="nav_settings"></a></li>
+<li><a href="index.html" data-i18n="nav_logout"></a></li>
+</ul>
+</nav>
+<div class="content">
+<header><div><span data-i18n="users_title"></span> <button id="createUserBtn" data-i18n="create_user"></button></div><div><input type="text" placeholder="" data-i18n="search_placeholder" /></div></header>
+<section class="cards" style="margin-top:1rem;">
+<div class="card"><span data-i18n="total_label"></span>:128</div>
+<div class="card"><span data-i18n="online_label"></span>:12</div>
+<div class="card"><span data-i18n="active_label"></span>:74</div>
+<div class="card"><span data-i18n="openvpn_label"></span>:90</div>
+<div class="card"><span data-i18n="wg_label"></span>:38</div>
+</section>
+<section style="margin-top:1rem;">
+<div><span data-i18n="protocol"></span>: <select><option value="all" data-i18n="all"></option></select> <span data-i18n="status"></span>: <select><option value="all" data-i18n="all"></option></select> <span data-i18n="sort"></span>: <select><option value="LastAct" data-i18n="last_act"></option></select></div>
+</section>
+<section style="margin-top:1rem;">
+<table class="table">
+<thead><tr><th data-i18n="username"></th><th data-i18n="protocol"></th><th data-i18n="status"></th><th data-i18n="online_label"></th><th data-i18n="data"></th></tr></thead>
+<tbody id="usersTbody"></tbody>
+</table>
+</section>
+</div>
+</div>
+<script>
+async function loadUsers() {
+  try {
+    const data = await UsersAPI.list();
+    const tbody = document.getElementById('usersTbody');
+    tbody.innerHTML = '';
+    (data.users || []).forEach(u => {
+      const tr = document.createElement('tr');
+      const usage = u.quota_bytes ? `${(u.bytes_used/1073741824).toFixed(2)}G / ${(u.quota_bytes/1073741824).toFixed(2)}G` : `${(u.bytes_used/1073741824).toFixed(2)}G / ∞`;
+      tr.innerHTML = `<td>${u.username}</td><td>${u.auth_types.join('/')}</td><td>${u.status}</td><td>${usage}</td><td><button data-action="quota" data-username="${u.username}" data-i18n="set_quota"></button> <button data-action="delete" data-username="${u.username}" data-i18n="delete"></button></td>`;
+      tbody.appendChild(tr);
+    });
+    setLanguage(currentLang);
+  } catch(err) {
+    showToast(err.message,'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadUsers();
+  document.getElementById('createUserBtn').addEventListener('click', async () => {
+    const u = prompt(translations[currentLang].label_username);
+    if(!u) return;
+    const p = prompt(translations[currentLang].label_password) || '';
+    try {
+      await UsersAPI.create(u,p);
+      showToast(translations[currentLang].saved);
+      loadUsers();
+    } catch(err) { showToast(err.message,'error'); }
+  });
+  document.getElementById('usersTbody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const username = btn.getAttribute('data-username');
+    if(btn.dataset.action === 'delete') {
+      showModal(translations[currentLang].delete+'?', async ()=>{
+        try { await UsersAPI.remove(username); showToast(translations[currentLang].delete); loadUsers(); } catch(err){ showToast(err.message,'error'); }
+      });
+    } else if(btn.dataset.action === 'quota') {
+      const q = prompt(translations[currentLang].set_quota,'0');
+      if(q===null) return;
+      try { await UsersAPI.setQuota(username, parseFloat(q)); showToast(translations[currentLang].applied); loadUsers(); } catch(err){ showToast(err.message,'error'); }
+    }
+  });
+});
+</script>
+</body>
+</html>
