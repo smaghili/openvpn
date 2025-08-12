@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>Overview</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="script.js"></script>
+</head>
+<body>
+<div class="toast-container"></div>
+<div class="modal"><div class="modal-content"><p class="modal-message"></p><button class="yes" data-i18n="modal_yes"></button><button class="no" data-i18n="modal_no"></button></div></div>
+<div class="container">
+<nav class="sidebar">
+<h1 data-i18n="sidebar_title"></h1>
+<button onclick="toggleTheme()" data-i18n="btn_theme"></button>
+<select id="langSelect" onchange="setLanguage(this.value)">
+<option value="fa">FA</option>
+<option value="en">EN</option>
+</select>
+<ul>
+<li><a href="overview.html" data-i18n="nav_overview"></a></li>
+<li><a href="users.html" data-i18n="nav_users"></a></li>
+<li><a href="openvpn.html" data-i18n="nav_openvpn"></a></li>
+<li><a href="wireguard.html" data-i18n="nav_wireguard"></a></li>
+<li><a href="settings.html" data-i18n="nav_settings"></a></li>
+<li><a href="index.html" data-i18n="nav_logout"></a></li>
+</ul>
+</nav>
+<div class="content">
+<header><div><span data-i18n="last_update"></span>: 12:34</div></header>
+<section class="cards" style="margin-top:1rem;">
+<div class="card">CPU 3%<br/>1 Core</div>
+<div class="card">RAM 53%<br/>509/964MB</div>
+<div class="card">Swap 0%<br/>0/0</div>
+<div class="card">Storage57%<br/>13.7/24GB</div>
+</section>
+<section class="cards" style="margin-top:1rem;">
+<div class="card"><span data-i18n="total_users"></span>: 128</div>
+<div class="card"><span data-i18n="total_usage"></span>: 412GB</div>
+</section>
+<section style="margin-top:1rem;">
+<table class="table">
+<thead><tr><th data-i18n="service"></th><th data-i18n="log_based"></th><th data-i18n="service_based"></th><th data-i18n="last_event"></th></tr></thead>
+<tbody>
+<tr><td>API</td><td>OK</td><td>OK</td><td>12:30 Started</td></tr>
+<tr><td>OpenVPN</td><td>OK</td><td>DOWN</td><td>12:28 CrashLoop</td></tr>
+<tr><td>WireGuard</td><td>ERRORS</td><td>OK</td><td>12:20 Recovered</td></tr>
+</tbody>
+</table>
+<button onclick="showModal(translations[currentLang].restart+'?',()=>showToast(translations[currentLang].restart))" data-i18n="restart"></button>
+</section>
+<section style="margin-top:1rem;">
+<div class="card" style="width:100%;" data-i18n="alert_sample"></div>
+</section>
+</div>
+</div>
+</body>
+</html>

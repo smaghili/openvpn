@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>OpenVPN Settings</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="script.js"></script>
+</head>
+<body>
+<div class="toast-container"></div>
+<div class="modal"><div class="modal-content"><p class="modal-message"></p><button class="yes" data-i18n="modal_yes"></button><button class="no" data-i18n="modal_no"></button></div></div>
+<div class="container">
+<nav class="sidebar">
+<h1 data-i18n="sidebar_title"></h1>
+<button onclick="toggleTheme()" data-i18n="btn_theme"></button>
+<select id="langSelect" onchange="setLanguage(this.value)">
+<option value="fa">FA</option>
+<option value="en">EN</option>
+</select>
+<ul>
+<li><a href="overview.html" data-i18n="nav_overview"></a></li>
+<li><a href="users.html" data-i18n="nav_users"></a></li>
+<li><a href="openvpn.html" data-i18n="nav_openvpn"></a></li>
+<li><a href="wireguard.html" data-i18n="nav_wireguard"></a></li>
+<li><a href="settings.html" data-i18n="nav_settings"></a></li>
+<li><a href="index.html" data-i18n="nav_logout"></a></li>
+</ul>
+</nav>
+<div class="content">
+<header><div data-i18n="openvpn_title"></div></header>
+<section style="margin-top:1rem;">
+<div data-i18n="status_running"></div>
+<button onclick="showModal(translations[currentLang].start+'?',()=>showToast(translations[currentLang].start))" data-i18n="start"></button>
+<button onclick="showModal(translations[currentLang].stop+'?',()=>showToast(translations[currentLang].stop))" data-i18n="stop"></button>
+<button onclick="showModal(translations[currentLang].restart+'?',()=>showToast(translations[currentLang].restart))" data-i18n="restart"></button>
+</section>
+<section style="margin-top:1rem;">
+<h3 data-i18n="service_config"></h3>
+<label><span data-i18n="service_port"></span> <input type="text" value="1194"/></label>
+<label><span data-i18n="protocol"></span> <select><option>UDP</option></select></label>
+<label><span data-i18n="status"></span> <select><option data-i18n="on"></option><option data-i18n="off"></option></select></label>
+</section>
+<section style="margin-top:1rem;">
+<h3 data-i18n="login_config"></h3>
+<label><span data-i18n="login_port"></span> <input type="text" value="443"/></label>
+<label><span data-i18n="protocol"></span> <select><option>TCP</option></select></label>
+<label><span data-i18n="status"></span> <select><option data-i18n="on"></option><option data-i18n="off"></option></select></label>
+<button onclick="showToast(translations[currentLang].applied)" data-i18n="apply"></button>
+<button onclick="showToast(translations[currentLang].test_port)" data-i18n="test_port"></button>
+<button onclick="showToast(translations[currentLang].open_firewall)" data-i18n="open_firewall"></button>
+</section>
+<section style="margin-top:1rem;">
+<h3 data-i18n="logs"></h3>
+<textarea style="width:100%;height:150px;">12:34:56 ovpn[123] Started on port 1194 UDP ...
+12:36:02 auth OK user ali ...</textarea>
+</section>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>Login</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="script.js"></script>
+</head>
+<body>
+<div class="toast-container"></div>
+<div class="modal"><div class="modal-content"><p class="modal-message"></p><button class="yes" data-i18n="modal_yes"></button><button class="no" data-i18n="modal_no"></button></div></div>
+<div style="text-align:right;padding:1rem;">
+<button onclick="toggleTheme()" data-i18n="btn_theme"></button>
+<select id="langSelect" onchange="setLanguage(this.value)">
+<option value="fa">FA</option>
+<option value="en">EN</option>
+</select>
+</div>
+<div style="max-width:400px;margin:2rem auto;border:var(--border-style);padding:1rem;text-align:center;">
+<h2 data-i18n="login_title"></h2>
+<form>
+<label><span data-i18n="label_username"></span><input type="text" /></label>
+<label><span data-i18n="label_password"></span><input type="password" /></label>
+<label><input type="checkbox" /><span data-i18n="remember_me"></span></label>
+<button type="button" onclick="location.href='overview.html'" data-i18n="btn_login"></button>
+</form>
+</div>
+</body>
+</html>
