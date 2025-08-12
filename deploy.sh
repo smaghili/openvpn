@@ -11,6 +11,8 @@ PROJECT_DIR="/etc/owpanel"
 ENV_FILE="/etc/owpanel/.env"
 # Use the same database path that the application uses (will be set dynamically)
 DB_PATH=""
+# Directory where this script resides
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Colors for output
 RED='\033[0;31m'
@@ -300,6 +302,7 @@ Type=simple
 User=root
 WorkingDirectory=$absolute_project_dir
 Environment=PATH=$absolute_project_dir/venv/bin
+Environment=UI_PATH=$absolute_project_dir/ui
 EnvironmentFile=$ENV_FILE
 ExecStart=$absolute_project_dir/venv/bin/python -m api.app
 Restart=always
@@ -376,11 +379,23 @@ function setup_project() {
         print_error "requirements.txt not found"
         exit 1
     fi
-    
+
     # Set execute permissions with absolute paths
     chmod +x "$absolute_project_dir/cli/main.py" "$absolute_project_dir/api/app.py" 2>/dev/null || true
     chmod +x "$absolute_project_dir/scripts/"*.py 2>/dev/null || true
-    
+
+    # Ensure UI directory is available in the project path
+    local ui_source="$SCRIPT_DIR/ui"
+    local ui_target="$absolute_project_dir/ui"
+    if [ -d "$ui_source" ]; then
+        if [ ! -e "$ui_target" ]; then
+            ln -s "$ui_source" "$ui_target" || cp -r "$ui_source" "$ui_target"
+        fi
+        print_success "UI directory linked"
+    else
+        print_warning "UI directory not found at $ui_source"
+    fi
+
     print_success "Project setup completed"
 }
 
@@ -410,6 +425,11 @@ function start_services() {
             print_success "API health check passed"
         else
             print_warning "API health check failed, but service is running"
+        fi
+        if curl -f http://localhost:$API_PORT/ | grep -qi '<html'; then
+            print_success "UI served HTML content"
+        else
+            print_warning "UI did not return HTML"
         fi
     else
         print_error "Failed to start API service"
