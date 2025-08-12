@@ -11,7 +11,7 @@ ENV_FILE="/etc/owpanel/.env"
 # Use the same database path that the application uses (will be set dynamically)
 DB_PATH=""
 # Script directory (source repository)
-SCRIPT_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Colors for output
 RED='\033[0;31m'
