@@ -31,34 +31,34 @@
 <section style="margin-top:1rem;">
 <h3 data-i18n="admin_account"></h3>
 <label><span data-i18n="username"></span> <input type="text" value="admin"/></label>
-<button onclick="showToast('username')">تغییر</button>
-<label>رمز عبور <input type="password" value="********"/></label>
-<button onclick="showModal('Reset?',()=>showToast('reset'))">تغییر/Reset</button>
+<button onclick="showToast(translations[currentLang].username)" data-i18n="change"></button>
+<label><span data-i18n="label_password"></span> <input type="password" value="********"/></label>
+<button onclick="showModal(translations[currentLang].reset_confirm,()=>showToast(translations[currentLang].reset))" data-i18n="change_reset"></button>
 </section>
 <section style="margin-top:1rem;">
 <h3 data-i18n="display_language"></h3>
-<label>زبان <select><option>FA</option><option>EN</option></select></label>
-<label>تم <select><option>دارک</option><option>لایت</option></select></label>
-<label>منطقه زمانی <select><option>TZ</option></select></label>
+<label><span data-i18n="btn_language"></span> <select><option value="fa">FA</option><option value="en">EN</option></select></label>
+<label><span data-i18n="btn_theme"></span> <select><option value="dark" data-i18n="dark"></option><option value="light" data-i18n="light"></option></select></label>
+<label><span data-i18n="timezone"></span> <select><option>TZ</option></select></label>
 </section>
 <section style="margin-top:1rem;">
 <h3 data-i18n="network_ports"></h3>
-<label>پورت پنل/لاگین <input type="text" value="443"/></label>
-<button onclick="showModal('Apply?',()=>showToast('applied'))">Apply</button>
+<label><span data-i18n="panel_port"></span> <input type="text" value="443"/></label>
+<button onclick="showModal(translations[currentLang].apply_confirm,()=>showToast(translations[currentLang].applied))" data-i18n="apply"></button>
 </section>
 <section style="margin-top:1rem;">
 <h3 data-i18n="agents"></h3>
-<button onclick="showToast('Add Agent')" data-i18n="add_agent"></button>
+<button onclick="showToast(translations[currentLang].add_agent)" data-i18n="add_agent"></button>
 <table class="table">
 <thead><tr><th data-i18n="name_code"></th><th data-i18n="permissions"></th><th data-i18n="actions"></th></tr></thead>
 <tbody>
-<tr><td>agt-001</td><td><label><input type="checkbox"/>ایجاد</label><label><input type="checkbox"/>ویرایش</label><label><input type="checkbox"/>حذف</label><label><input type="checkbox"/>مشاهده لاگ</label></td><td><button>Edit</button><button>Delete</button></td></tr>
-<tr><td>agt-002</td><td><label><input type="checkbox" checked/>ایجاد</label><label><input type="checkbox" checked/>ویرایش</label><label><input type="checkbox"/>حذف</label><label><input type="checkbox"/>مشاهده لاگ</label></td><td><button>Edit</button><button>Delete</button></td></tr>
+<tr><td>agt-001</td><td><label><input type="checkbox"/><span data-i18n="perm_create"></span></label><label><input type="checkbox"/><span data-i18n="perm_edit"></span></label><label><input type="checkbox"/><span data-i18n="perm_delete"></span></label><label><input type="checkbox"/><span data-i18n="perm_view_log"></span></label></td><td><button data-i18n="edit"></button><button data-i18n="delete"></button></td></tr>
+<tr><td>agt-002</td><td><label><input type="checkbox" checked/><span data-i18n="perm_create"></span></label><label><input type="checkbox" checked/><span data-i18n="perm_edit"></span></label><label><input type="checkbox"/><span data-i18n="perm_delete"></span></label><label><input type="checkbox"/><span data-i18n="perm_view_log"></span></label></td><td><button data-i18n="edit"></button><button data-i18n="delete"></button></td></tr>
 </tbody>
 </table>
 </section>
-<button onclick="showToast('Saved')" data-i18n="save_all"></button>
-<button onclick="showToast('Canceled')" data-i18n="cancel"></button>
+<button onclick="showToast(translations[currentLang].saved)" data-i18n="save_all"></button>
+<button onclick="showToast(translations[currentLang].canceled)" data-i18n="cancel"></button>
 </div>
 </div>
 </body>

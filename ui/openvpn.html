@@ -36,18 +36,18 @@
 </section>
 <section style="margin-top:1rem;">
 <h3 data-i18n="service_config"></h3>
-<label>پورت سرویس <input type="text" value="1194"/></label>
+<label><span data-i18n="service_port"></span> <input type="text" value="1194"/></label>
 <label><span data-i18n="protocol"></span> <select><option>UDP</option></select></label>
-<label><span data-i18n="status"></span> <select><option>روشن</option><option>خاموش</option></select></label>
+<label><span data-i18n="status"></span> <select><option data-i18n="on"></option><option data-i18n="off"></option></select></label>
 </section>
 <section style="margin-top:1rem;">
 <h3 data-i18n="login_config"></h3>
-<label>پورت لاگین <input type="text" value="443"/></label>
+<label><span data-i18n="login_port"></span> <input type="text" value="443"/></label>
 <label><span data-i18n="protocol"></span> <select><option>TCP</option></select></label>
-<label><span data-i18n="status"></span> <select><option>روشن</option><option>خاموش</option></select></label>
-<button onclick="showToast('applied')">Apply</button>
-<button onclick="showToast('Tested')">Test Port</button>
-<button onclick="showToast('Firewall opened')">Open in Firewall</button>
+<label><span data-i18n="status"></span> <select><option data-i18n="on"></option><option data-i18n="off"></option></select></label>
+<button onclick="showToast(translations[currentLang].applied)" data-i18n="apply"></button>
+<button onclick="showToast(translations[currentLang].test_port)" data-i18n="test_port"></button>
+<button onclick="showToast(translations[currentLang].open_firewall)" data-i18n="open_firewall"></button>
 </section>
 <section style="margin-top:1rem;">
 <h3 data-i18n="logs"></h3>
