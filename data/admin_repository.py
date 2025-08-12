@@ -21,19 +21,24 @@ class AdminRepository:
         """
         try:
             password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            
-            query = """
-            INSERT INTO admins (username, password_hash, role) 
-            VALUES (?, ?, ?)
-            """
-            self.db.execute_query(query, (username, password_hash, role))
-            
-            result = self.db.execute_query("SELECT id FROM admins WHERE username = ?", (username,))
-            if not result:
-                raise DatabaseError("Failed to create admin user")
-            
-            return result[0]['id']
-            
+
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO admins (username, password_hash, role)
+                    VALUES (?, ?, ?)
+                    """,
+                    (username, password_hash, role),
+                )
+
+                cursor.execute("SELECT id FROM admins WHERE username = ?", (username,))
+                row = cursor.fetchone()
+                if not row:
+                    raise DatabaseError("Failed to create admin user")
+
+                return row['id']
+
         except Exception as e:
             if "UNIQUE constraint failed" in str(e):
                 raise UserAlreadyExistsError(username)
@@ -81,24 +86,21 @@ class AdminRepository:
         """
         try:
             password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            
-            self.db.execute_query("BEGIN TRANSACTION")
-            
-            query = """
-            UPDATE admins 
-            SET password_hash = ?, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ?
-            """
-            result = self.db.execute_query(query, (password_hash, admin_id))
-            
-            if not self.get_admin_by_id(admin_id):
-                self.db.execute_query("ROLLBACK")
-                raise UserNotFoundError(f"Admin ID {admin_id}")
-            
-            self.db.execute_query("COMMIT")
-            
+
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE admins
+                    SET password_hash = ?, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (password_hash, admin_id),
+                )
+                if cursor.rowcount == 0:
+                    raise UserNotFoundError(f"Admin ID {admin_id}")
+
         except Exception as e:
-            self.db.execute_query("ROLLBACK")
             if isinstance(e, UserNotFoundError):
                 raise e
             raise DatabaseError(f"Failed to update password: {str(e)}")
@@ -107,11 +109,11 @@ class AdminRepository:
         """
         Increment token version to invalidate all existing tokens.
         """
-        query = "UPDATE admins SET token_version = token_version + 1 WHERE id = ?"
-        result = self.db.execute_query(query, (admin_id,))
-        
-        if not self.get_admin_by_id(admin_id):
-            raise UserNotFoundError(f"Admin ID {admin_id}")
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE admins SET token_version = token_version + 1 WHERE id = ?", (admin_id,))
+            if cursor.rowcount == 0:
+                raise UserNotFoundError(f"Admin ID {admin_id}")
     
     def get_all_admins(self) -> List[Dict[str, Any]]:
         """
@@ -138,20 +140,21 @@ class AdminRepository:
         query = f"UPDATE admins SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
         
         values = list(filtered_updates.values()) + [admin_id]
-        self.db.execute_query(query, values)
-        
-        if not self.get_admin_by_id(admin_id):
-            raise UserNotFoundError(f"Admin ID {admin_id}")
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, values)
+            if cursor.rowcount == 0:
+                raise UserNotFoundError(f"Admin ID {admin_id}")
     
     def delete_admin(self, admin_id: int) -> None:
         """
         Delete admin user and all related data.
         """
-        if not self.get_admin_by_id(admin_id):
-            raise UserNotFoundError(f"Admin ID {admin_id}")
-        
-        query = "DELETE FROM admins WHERE id = ?"
-        self.db.execute_query(query, (admin_id,))
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM admins WHERE id = ?", (admin_id,))
+            if cursor.rowcount == 0:
+                raise UserNotFoundError(f"Admin ID {admin_id}")
     
     def get_admin_count(self) -> int:
         """

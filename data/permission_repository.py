@@ -54,23 +54,21 @@ class PermissionRepository:
         """
         Grant multiple permissions to admin user.
         """
-        self.db.execute_query("BEGIN TRANSACTION")
-        
         try:
-            for permission in permissions:
-                if permission not in self.AVAILABLE_PERMISSIONS:
-                    raise DatabaseError(f"Invalid permission: {permission}")
-                
-                query = """
-                INSERT OR IGNORE INTO admin_permissions (admin_id, permission) 
-                VALUES (?, ?)
-                """
-                self.db.execute_query(query, (admin_id, permission))
-            
-            self.db.execute_query("COMMIT")
-            
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                for permission in permissions:
+                    if permission not in self.AVAILABLE_PERMISSIONS:
+                        raise DatabaseError(f"Invalid permission: {permission}")
+
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO admin_permissions (admin_id, permission)
+                        VALUES (?, ?)
+                        """,
+                        (admin_id, permission),
+                    )
         except Exception as e:
-            self.db.execute_query("ROLLBACK")
             raise DatabaseError(f"Failed to grant permissions: {str(e)}")
     
     def revoke_permissions(self, admin_id: int, permissions: List[str]) -> None:

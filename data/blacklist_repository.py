@@ -96,21 +96,25 @@ class BlacklistRepository:
             MAX(blacklisted_at) as newest_blacklisted
         FROM token_blacklist
         """
-        result = self.db.execute_query(stats_query)
-        stats = result[0] if result else {}
-        
-        admin_stats_query = """
-        SELECT 
-            a.username,
-            COUNT(tb.token_id) as blacklisted_count
-        FROM token_blacklist tb
-        JOIN admins a ON tb.admin_id = a.id
-        WHERE tb.expires_at > datetime('now')
-        GROUP BY a.id, a.username
-        ORDER BY blacklisted_count DESC
-        """
-        admin_stats = self.db.execute_query(admin_stats_query)
-        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(stats_query)
+            stats_row = cursor.fetchone()
+            stats = dict(stats_row) if stats_row else {}
+
+            admin_stats_query = """
+            SELECT
+                a.username,
+                COUNT(tb.token_id) as blacklisted_count
+            FROM token_blacklist tb
+            JOIN admins a ON tb.admin_id = a.id
+            WHERE tb.expires_at > datetime('now')
+            GROUP BY a.id, a.username
+            ORDER BY blacklisted_count DESC
+            """
+            cursor.execute(admin_stats_query)
+            admin_stats = [dict(row) for row in cursor.fetchall()]
+
         return {
             'overall': stats,
             'by_admin': admin_stats
