@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html dir="rtl">
+<html>
 <head>
 <meta charset="utf-8" />
-<title>OpenVPN Settings</title>
+<title data-i18n="openvpn_title"></title>
 <link rel="stylesheet" href="styles.css" />
 <script src="script.js"></script>
 </head>
@@ -14,8 +14,9 @@
 <h1 data-i18n="sidebar_title"></h1>
 <button onclick="toggleTheme()" data-i18n="btn_theme"></button>
 <select id="langSelect" onchange="setLanguage(this.value)">
-<option value="fa">FA</option>
-<option value="en">EN</option>
+<option value="fa" data-i18n="lang_fa"></option>
+<option value="en" data-i18n="lang_en"></option>
+<option value="ru" data-i18n="lang_ru"></option>
 </select>
 <ul>
 <li><a href="overview.html" data-i18n="nav_overview"></a></li>
@@ -37,13 +38,13 @@
 <section style="margin-top:1rem;">
 <h3 data-i18n="service_config"></h3>
 <label><span data-i18n="service_port"></span> <input type="text" value="1194"/></label>
-<label><span data-i18n="protocol"></span> <select><option>UDP</option></select></label>
+<label><span data-i18n="protocol"></span> <select><option data-i18n="udp"></option></select></label>
 <label><span data-i18n="status"></span> <select><option data-i18n="on"></option><option data-i18n="off"></option></select></label>
 </section>
 <section style="margin-top:1rem;">
 <h3 data-i18n="login_config"></h3>
 <label><span data-i18n="login_port"></span> <input type="text" value="443"/></label>
-<label><span data-i18n="protocol"></span> <select><option>TCP</option></select></label>
+<label><span data-i18n="protocol"></span> <select><option data-i18n="tcp"></option></select></label>
 <label><span data-i18n="status"></span> <select><option data-i18n="on"></option><option data-i18n="off"></option></select></label>
 <button onclick="showToast(translations[currentLang].applied)" data-i18n="apply"></button>
 <button onclick="showToast(translations[currentLang].test_port)" data-i18n="test_port"></button>

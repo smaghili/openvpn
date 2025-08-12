@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html dir="rtl">
+<html>
 <head>
 <meta charset="utf-8" />
-<title>Login</title>
+<title data-i18n="login_title"></title>
 <link rel="stylesheet" href="styles.css" />
 <script src="script.js"></script>
 </head>
@@ -12,8 +12,9 @@
 <div style="text-align:right;padding:1rem;">
 <button onclick="toggleTheme()" data-i18n="btn_theme"></button>
 <select id="langSelect" onchange="setLanguage(this.value)">
-<option value="fa">FA</option>
-<option value="en">EN</option>
+<option value="fa" data-i18n="lang_fa"></option>
+<option value="en" data-i18n="lang_en"></option>
+<option value="ru" data-i18n="lang_ru"></option>
 </select>
 </div>
 <div style="max-width:400px;margin:2rem auto;border:var(--border-style);padding:1rem;text-align:center;">

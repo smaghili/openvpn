@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html dir="rtl">
+<html>
 <head>
 <meta charset="utf-8" />
-<title>General Settings</title>
+<title data-i18n="settings_title"></title>
 <link rel="stylesheet" href="styles.css" />
 <script src="script.js"></script>
+<script src="settings.js"></script>
 </head>
 <body>
 <div class="toast-container"></div>
@@ -14,8 +15,9 @@
 <h1 data-i18n="sidebar_title"></h1>
 <button onclick="toggleTheme()" data-i18n="btn_theme"></button>
 <select id="langSelect" onchange="setLanguage(this.value)">
-<option value="fa">FA</option>
-<option value="en">EN</option>
+<option value="fa" data-i18n="lang_fa"></option>
+<option value="en" data-i18n="lang_en"></option>
+<option value="ru" data-i18n="lang_ru"></option>
 </select>
 <ul>
 <li><a href="overview.html" data-i18n="nav_overview"></a></li>
@@ -37,9 +39,9 @@
 </section>
 <section style="margin-top:1rem;">
 <h3 data-i18n="display_language"></h3>
-<label><span data-i18n="btn_language"></span> <select><option value="fa">FA</option><option value="en">EN</option></select></label>
+<label><span data-i18n="btn_language"></span> <select id="displayLang" onchange="setLanguage(this.value)"><option value="fa" data-i18n="lang_fa"></option><option value="en" data-i18n="lang_en"></option><option value="ru" data-i18n="lang_ru"></option></select></label>
 <label><span data-i18n="btn_theme"></span> <select><option value="dark" data-i18n="dark"></option><option value="light" data-i18n="light"></option></select></label>
-<label><span data-i18n="timezone"></span> <select><option>TZ</option></select></label>
+<label><span data-i18n="timezone"></span> <select><option data-i18n="tz"></option></select></label>
 </section>
 <section style="margin-top:1rem;">
 <h3 data-i18n="network_ports"></h3>

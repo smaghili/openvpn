@@ -104,7 +104,13 @@ const translations = {
     open_firewall: 'باز کردن در فایروال',
     alert_sample: '⚠︎ OpenVPN: ارتباط تونل X قطع شد (5m ago)\nℹ︎ WireGuard: کلید جدید برای کاربر ali ایجاد شد',
     dark: 'دارک',
-    light: 'لایت'
+    light: 'لایت',
+    lang_fa: 'فارسی',
+    lang_en: 'انگلیسی',
+    lang_ru: 'روسی',
+    udp: 'UDP',
+    tcp: 'TCP',
+    tz: 'TZ'
   },
   en: {
     sidebar_title: 'VPN Panel',
@@ -207,9 +213,18 @@ const translations = {
     open_firewall: 'Open in Firewall',
     alert_sample: '⚠︎ OpenVPN: Tunnel X disconnected (5m ago)\nℹ︎ WireGuard: New key generated for user ali',
     dark: 'Dark',
-    light: 'Light'
+    light: 'Light',
+    lang_fa: 'FA',
+    lang_en: 'EN',
+    lang_ru: 'RU',
+    udp: 'UDP',
+    tcp: 'TCP',
+    tz: 'TZ'
   }
 };
+
+// future Russian translations default to English
+translations.ru = { ...translations.en };
 
 let currentLang = localStorage.getItem('lang') || 'fa';
 
