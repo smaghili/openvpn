@@ -190,16 +190,9 @@ sudo journalctl -u openvpn-monitor.service -n 50
 
 ## 🧪 Testing
 
-Run the comprehensive test suite:
-```bash
-python3 scripts/test_monitor.py
-```
-
-Tests include:
-- ✅ Status parsing with various formats
-- ✅ Database transaction handling
-- ✅ Configuration management
-- ✅ Error handling scenarios
+This legacy monitoring system does not include an automated test suite.
+To verify functionality, deploy the monitor service and confirm expected
+logging and disconnection behavior via system logs and the database.
 
 ## 📈 Performance Characteristics
 
@@ -220,7 +213,7 @@ Tests include:
 ## 📝 License & Support
 
 This monitoring system is part of the OpenVPN management project.
-For issues or questions, check the logs and test suite first.
+For issues or questions, check the logs first.
 
 ---
 

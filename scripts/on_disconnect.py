@@ -6,6 +6,7 @@ Uses environment variables for all paths.
 import os
 import sys
 from datetime import datetime
+from config.paths import VPNPaths
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from data.db import Database
@@ -23,9 +24,6 @@ def load_env_vars():
 
 def get_log_file():
     return os.environ.get('OPENVPN_LOG_FILE', '/var/log/openvpn/traffic_monitor.log')
-
-def get_database_file():
-    return os.environ.get('DATABASE_FILE', '/etc/owpanel/openvpn_data/vpn_manager.db')
 
 def update_traffic_usage():
     """
@@ -66,8 +64,10 @@ def update_traffic_usage():
         sys.exit(0)
 
     try:
-        db_file = get_database_file()
-
+      
+        db_file = os.environ.get("OPENVPN_DB_FILE") or VPNPaths.get_database_file()
+        
+ main
         if not os.path.exists(db_file):
             # If database doesn't exist, just log to file
             with open(log_file, "a") as f:
