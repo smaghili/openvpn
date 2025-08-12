@@ -13,6 +13,7 @@ from .routes.permission_routes import permission_bp
 from .routes.profile_routes import profile_bp
 from .middleware.jwt_middleware import JWTMiddleware
 from .middleware.error_handler import ErrorHandler
+from .middleware.auth_middleware import AuthMiddleware
 
 def create_app() -> Flask:
     """
@@ -27,8 +28,9 @@ def create_app() -> Flask:
     
     CORS(app)
     
-    JWTMiddleware.init_app(app)
-    ErrorHandler.init_app(app)
+      AuthMiddleware.init_app(app)
+      JWTMiddleware.init_app(app)
+      ErrorHandler.init_app(app)
     
     # API routes
     app.register_blueprint(auth_bp, url_prefix='/api/auth')

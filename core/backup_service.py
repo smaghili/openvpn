@@ -2,10 +2,13 @@ import os
 import shutil
 import subprocess
 import tarfile
+import logging
 from datetime import datetime
 from typing import List
 from .backup_interface import IBackupable
 from core.exceptions import BackupError, RestoreError
+
+logger = logging.getLogger(__name__)
 
 class BackupService:
     """
@@ -25,7 +28,7 @@ class BackupService:
         4. Encrypts the tarball with a password.
         5. Cleans up temporary files.
         """
-        print("📦 Creating backup...")
+        logger.info("📦 Creating backup...")
         backup_path = os.path.expanduser(backup_dir)
         os.makedirs(backup_path, exist_ok=True)
         
@@ -68,8 +71,8 @@ class BackupService:
 
             os.remove(tar_path)
             shutil.rmtree(tmp_dir)
-            
-            print(f"✅ Backup created: {gpg_filename}")
+
+            logger.info("✅ Backup created: %s", gpg_filename)
             return gpg_filename
         
         except Exception as e:
@@ -85,7 +88,7 @@ class BackupService:
         3. Replaces system files with the backup contents.
         4. Calls the post-restore hook for all services (e.g., to set permissions and restart daemons).
         """
-        print("🔄 Restoring from backup...")
+        logger.info("🔄 Restoring from backup...")
         gpg_path = os.path.expanduser(gpg_path)
         if not os.path.exists(gpg_path):
             raise RestoreError(f"Backup file not found: {gpg_path}")
@@ -120,7 +123,7 @@ class BackupService:
             for service in self.services:
                 service.post_restore()
 
-            print("✅ Restore completed successfully")
+            logger.info("✅ Restore completed successfully")
         
         finally:
             if os.path.exists(tmp_dir):
