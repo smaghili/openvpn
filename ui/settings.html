@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>General Settings</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="script.js"></script>
+</head>
+<body>
+<div class="toast-container"></div>
+<div class="modal"><div class="modal-content"><p class="modal-message"></p><button class="yes" data-i18n="modal_yes"></button><button class="no" data-i18n="modal_no"></button></div></div>
+<div class="container">
+<nav class="sidebar">
+<h1 data-i18n="sidebar_title"></h1>
+<button onclick="toggleTheme()" data-i18n="btn_theme"></button>
+<select id="langSelect" onchange="setLanguage(this.value)">
+<option value="fa">FA</option>
+<option value="en">EN</option>
+</select>
+<ul>
+<li><a href="overview.html" data-i18n="nav_overview"></a></li>
+<li><a href="users.html" data-i18n="nav_users"></a></li>
+<li><a href="openvpn.html" data-i18n="nav_openvpn"></a></li>
+<li><a href="wireguard.html" data-i18n="nav_wireguard"></a></li>
+<li><a href="settings.html" data-i18n="nav_settings"></a></li>
+<li><a href="index.html" data-i18n="nav_logout"></a></li>
+</ul>
+</nav>
+<div class="content">
+<header><div data-i18n="settings_title"></div></header>
+<section style="margin-top:1rem;">
+<h3 data-i18n="admin_account"></h3>
+<label><span data-i18n="username"></span> <input type="text" value="admin"/></label>
+<button onclick="showToast('username')">تغییر</button>
+<label>رمز عبور <input type="password" value="********"/></label>
+<button onclick="showModal('Reset?',()=>showToast('reset'))">تغییر/Reset</button>
+</section>
+<section style="margin-top:1rem;">
+<h3 data-i18n="display_language"></h3>
+<label>زبان <select><option>FA</option><option>EN</option></select></label>
+<label>تم <select><option>دارک</option><option>لایت</option></select></label>
+<label>منطقه زمانی <select><option>TZ</option></select></label>
+</section>
+<section style="margin-top:1rem;">
+<h3 data-i18n="network_ports"></h3>
+<label>پورت پنل/لاگین <input type="text" value="443"/></label>
+<button onclick="showModal('Apply?',()=>showToast('applied'))">Apply</button>
+</section>
+<section style="margin-top:1rem;">
+<h3 data-i18n="agents"></h3>
+<button onclick="showToast('Add Agent')" data-i18n="add_agent"></button>
+<table class="table">
+<thead><tr><th data-i18n="name_code"></th><th data-i18n="permissions"></th><th data-i18n="actions"></th></tr></thead>
+<tbody>
+<tr><td>agt-001</td><td><label><input type="checkbox"/>ایجاد</label><label><input type="checkbox"/>ویرایش</label><label><input type="checkbox"/>حذف</label><label><input type="checkbox"/>مشاهده لاگ</label></td><td><button>Edit</button><button>Delete</button></td></tr>
+<tr><td>agt-002</td><td><label><input type="checkbox" checked/>ایجاد</label><label><input type="checkbox" checked/>ویرایش</label><label><input type="checkbox"/>حذف</label><label><input type="checkbox"/>مشاهده لاگ</label></td><td><button>Edit</button><button>Delete</button></td></tr>
+</tbody>
+</table>
+</section>
+<button onclick="showToast('Saved')" data-i18n="save_all"></button>
+<button onclick="showToast('Canceled')" data-i18n="cancel"></button>
+</div>
+</div>
+</body>
+</html>

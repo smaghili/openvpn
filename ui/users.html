@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>Users</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="script.js"></script>
+</head>
+<body>
+<div class="toast-container"></div>
+<div class="modal"><div class="modal-content"><p class="modal-message"></p><button class="yes" data-i18n="modal_yes"></button><button class="no" data-i18n="modal_no"></button></div></div>
+<div class="drawer" id="userDrawer">
+<h3>جزئیات کاربر <span id="userName"></span></h3>
+<button onclick="closeDrawer('userDrawer')">بستن</button>
+<p>پروفایل/نقش | کلیدها | سهمیه/انقضا | نشست‌های فعال | Logs</p>
+<button>Disconnect</button>
+<button>Reset Password</button>
+<button>Regenerate Keys</button>
+<button>Save</button>
+</div>
+<div class="container">
+<nav class="sidebar">
+<h1 data-i18n="sidebar_title"></h1>
+<button onclick="toggleTheme()" data-i18n="btn_theme"></button>
+<select id="langSelect" onchange="setLanguage(this.value)">
+<option value="fa">FA</option>
+<option value="en">EN</option>
+</select>
+<ul>
+<li><a href="overview.html" data-i18n="nav_overview"></a></li>
+<li><a href="users.html" data-i18n="nav_users"></a></li>
+<li><a href="openvpn.html" data-i18n="nav_openvpn"></a></li>
+<li><a href="wireguard.html" data-i18n="nav_wireguard"></a></li>
+<li><a href="settings.html" data-i18n="nav_settings"></a></li>
+<li><a href="index.html" data-i18n="nav_logout"></a></li>
+</ul>
+</nav>
+<div class="content">
+<header><div><span data-i18n="users_title"></span> <button data-i18n="create_user" onclick="showToast('')"></button></div><div><input type="text" data-i18n="search_placeholder" /></div></header>
+<section class="cards" style="margin-top:1rem;">
+<div class="card"><span data-i18n="total_label"></span>:128</div>
+<div class="card"><span data-i18n="online_label"></span>:12</div>
+<div class="card"><span data-i18n="active_label"></span>:74</div>
+<div class="card"><span data-i18n="openvpn_label"></span>:90</div>
+<div class="card"><span data-i18n="wg_label"></span>:38</div>
+</section>
+<section style="margin-top:1rem;">
+<div>پروتکل: <select><option>All</option></select> وضعیت: <select><option>All</option></select> مرتب‌سازی: <select><option>LastAct</option></select></div>
+</section>
+<section style="margin-top:1rem;">
+<table class="table">
+<thead><tr><th data-i18n="username"></th><th data-i18n="protocol"></th><th data-i18n="status"></th><th data-i18n="online_label"></th><th data-i18n="data"></th></tr></thead>
+<tbody>
+<tr onclick="document.getElementById('userName').textContent='ali';openDrawer('userDrawer')"><td>ali</td><td>OpenVPN/WG</td><td>Active</td><td>● سبز</td><td>1.2G / 3.4G</td></tr>
+<tr onclick="document.getElementById('userName').textContent='sara';openDrawer('userDrawer')"><td>sara</td><td>OpenVPN</td><td>Expire:5d</td><td>● خاکستری</td><td>120M / 800M</td></tr>
+<tr onclick="document.getElementById('userName').textContent='guest-01';openDrawer('userDrawer')"><td>guest-01</td><td>WG</td><td>Quota Exceeded</td><td>● سبز</td><td>2.9G / 2.0G</td></tr>
+</tbody>
+</table>
+</section>
+</div>
+</div>
+</body>
+</html>
