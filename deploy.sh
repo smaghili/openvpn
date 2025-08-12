@@ -238,13 +238,19 @@ with open('database.sql', 'r') as f:
     schema = f.read()
     cursor.executescript(schema)
 
-# Create admin user
+# Create admin user if it doesn't already exist
 print(f"Creating admin user: {ADMIN_USERNAME}")
-cursor.execute(
-    'INSERT INTO admins (username, password_hash, role) VALUES (?, ?, ?)', 
-    (ADMIN_USERNAME, PASSWORD_HASH, 'admin')
-)
-admin_id = cursor.lastrowid
+cursor.execute('SELECT id FROM admins WHERE username = ?', (ADMIN_USERNAME,))
+row = cursor.fetchone()
+if row:
+    admin_id = row[0]
+    print(f"Admin user {ADMIN_USERNAME} already exists with ID: {admin_id}")
+else:
+    cursor.execute(
+        'INSERT INTO admins (username, password_hash, role) VALUES (?, ?, ?)',
+        (ADMIN_USERNAME, PASSWORD_HASH, 'admin')
+    )
+    admin_id = cursor.lastrowid
 
 # Grant all permissions to admin
 permissions = [
