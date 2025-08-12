@@ -35,9 +35,22 @@ def _load_profile_routes():
         "api.middleware.jwt_middleware.JWTMiddleware.require_permission",
         fake_require_permission,
     ):
-        module = importlib.reload(
-            importlib.import_module("api.routes.profile_routes")
+        import types
+
+        dummy_img = type("Img", (), {"save": lambda self, buf, format=None: None})
+        dummy_qr = type(
+            "QR",
+            (),
+            {
+                "add_data": lambda self, data: None,
+                "make": lambda self, fit=True: None,
+                "make_image": lambda self, **k: dummy_img(),
+            },
         )
+        sys.modules.setdefault(
+            "qrcode", types.SimpleNamespace(QRCode=lambda *a, **k: dummy_qr())
+        )
+        module = importlib.reload(importlib.import_module("api.routes.profile_routes"))
 
     return module
 
@@ -85,5 +98,20 @@ def test_get_profile_link_user_not_found():
         response = client.get("/api/profile/users/99/profile-link")
 
         assert response.status_code == 404
-        repo_instance.get_user_by_id.assert_called_once_with(99)
+    repo_instance.get_user_by_id.assert_called_once_with(99)
+
+
+def test_get_qr_code_returns_png():
+    profile_routes = _load_profile_routes()
+    app = _create_test_app(profile_routes)
+    client = app.test_client()
+
+    with patch.object(profile_routes, "check_ip_rate_limit", return_value=True), \
+         patch.object(profile_routes, "get_security_service") as mock_service:
+        service_instance = mock_service.return_value
+        service_instance.validate_profile_access.return_value = {"username": "user"}
+
+        response = client.get("/api/profile/token/qr-code")
+        assert response.status_code == 200
+        assert response.headers["Content-Type"] == "image/png"
 

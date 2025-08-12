@@ -67,17 +67,21 @@ class AdminRepository:
         admin = self.get_admin_by_username(username)
         if not admin:
             return None
-        
+
         try:
-            password_hash = admin['password_hash'].encode('utf-8')
+            password_hash = admin.get('password_hash')
+            if not isinstance(password_hash, str):
+                raise DatabaseError('Invalid password hash for admin')
+
+            password_hash_bytes = password_hash.encode('utf-8')
             provided_password = password.encode('utf-8')
-            
-            if bcrypt.checkpw(provided_password, password_hash):
+
+            if bcrypt.checkpw(provided_password, password_hash_bytes):
                 return admin
-            
-        except Exception:
-            pass
-        
+
+        except Exception as e:
+            raise DatabaseError(f'Password verification failed: {e}')
+
         return None
     
     def update_password(self, admin_id: int, new_password: str) -> None:

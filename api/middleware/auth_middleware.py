@@ -1,8 +1,6 @@
 import os
-import hashlib
 import hmac
 from functools import wraps
-from typing import Optional
 from flask import request, jsonify, current_app
 
 class AuthMiddleware:
@@ -12,8 +10,18 @@ class AuthMiddleware:
     
     @staticmethod
     def init_app(app) -> None:
-        """Initialize authentication middleware with Flask app."""
-        pass
+        """Initialize authentication middleware with Flask app.
+
+        The middleware requires an ``OPENVPN_API_KEY`` environment variable
+        to be present.  During application setup the key is read once and
+        stored in the Flask configuration so subsequent requests do not need
+        to access the environment repeatedly.
+        """
+        api_key = os.environ.get('OPENVPN_API_KEY')
+        if not api_key:
+            raise RuntimeError('OPENVPN_API_KEY environment variable is required')
+
+        app.config['OPENVPN_API_KEY'] = api_key
     
     @staticmethod
     def require_auth(f):
@@ -28,7 +36,7 @@ class AuthMiddleware:
                     'message': 'Please provide X-API-Key header'
                 }), 401
             
-            expected_key = os.environ.get('OPENVPN_API_KEY')
+            expected_key = current_app.config.get('OPENVPN_API_KEY')
             if not expected_key:
                 return jsonify({
                     'error': 'API not configured',

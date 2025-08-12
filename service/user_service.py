@@ -1,4 +1,7 @@
 from typing import Optional, List, Dict, Any
+import logging
+import bcrypt
+import os
 from data.user_repository import UserRepository
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
@@ -7,13 +10,14 @@ from core.backup_interface import IBackupable
 from core.types import Username, Password, ConfigData, UserData
 from config.shared_config import CLIENT_TEMPLATE, USER_CERTS_TEMPLATE
 from core.exceptions import (
-    UserAlreadyExistsError, 
-    UserNotFoundError, 
+    UserAlreadyExistsError,
+    UserNotFoundError,
     CertificateGenerationError,
-    DatabaseError
+    DatabaseError,
+    ValidationError
 )
-import bcrypt
-import os
+
+logger = logging.getLogger(__name__)
 
 class UserService(IBackupable):
     def __init__(self, user_repo: UserRepository, openvpn_manager: OpenVPNManager, login_manager: LoginUserManager) -> None:
@@ -69,14 +73,14 @@ class UserService(IBackupable):
             raise CertificateGenerationError(username, "Certificate or key content is empty")
         
         self.user_repo.add_user_protocol(user_id, "openvpn", "certificate", cert_content, key_content)
-        
+
         if password:
             self.login_manager.add_user(username, password)
             self.user_repo.add_user_protocol(user_id, "openvpn", "login")
-        
+
         client_config = self._generate_user_certificate_config(username)
-        
-        print(f"✅ User '{username}' created successfully")
+
+        logger.info("✅ User '%s' created successfully", username)
         return client_config
 
     def remove_user(self, username: Username, silent: bool = False) -> None:
@@ -84,14 +88,14 @@ class UserService(IBackupable):
             raise UserNotFoundError(username)
 
         if not silent:
-            print(f"Removing user '{username}'...")
-        
+            logger.info("Removing user '%s'...", username)
+
         self.openvpn_manager.revoke_user_certificate(username)
         self.login_manager.remove_user(username)
         self.user_repo.remove_user(username)
-        
+
         if not silent:
-            print(f"✅ User '{username}' removed successfully.")
+            logger.info("✅ User '%s' removed successfully.", username)
 
     def get_all_users_with_status(self) -> List[Dict[str, Any]]:
         return self.user_repo.get_all_users_with_details()
@@ -111,7 +115,7 @@ class UserService(IBackupable):
             raise UserNotFoundError(username)
         
         self.user_repo.set_user_quota(user['id'], quota_gb)
-        print(f"✅ Quota for user '{username}' set to {quota_gb} GB (0 for unlimited).")
+        logger.info("✅ Quota for user '%s' set to %s GB (0 for unlimited).", username, quota_gb)
 
     def get_user_status(self, username: Username) -> Optional[Dict[str, Any]]:
         """Gets the detailed status including quota and usage for a user."""
@@ -136,8 +140,8 @@ class UserService(IBackupable):
         self.user_repo.update_user_password(username, password_hash)
         
         self.login_manager.change_user_password(username, new_password)
-        
-        print(f"✅ Password changed successfully for user '{username}'")
+
+        logger.info("✅ Password changed successfully for user '%s'", username)
 
     # --- Backup and Restore ---
 

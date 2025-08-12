@@ -2,7 +2,7 @@
 Profile management routes for VPN user profile tokens and public access.
 """
 
-from flask import Blueprint, request, jsonify, render_template_string, g, make_response
+from flask import Blueprint, request, jsonify, render_template_string, g, make_response, send_file
 from api.middleware.jwt_middleware import JWTMiddleware
 from data.db import Database
 from data.user_repository import UserRepository
@@ -10,6 +10,7 @@ from data.blacklist_repository import BlacklistRepository
 from service.security_service import SecurityService
 from core.exceptions import AuthenticationError, ValidationError
 import time
+import io
 
 profile_bp = Blueprint('profile', __name__)
 
@@ -414,25 +415,48 @@ def download_ovpn_config(profile_token):
 @profile_bp.route('/<profile_token>/qr-code', methods=['GET'])
 def get_qr_code(profile_token):
     """
-    Generate QR code for mobile VPN setup.
+    Generate a QR code that encodes the public download URL for the
+    user's OpenVPN configuration.  The QR code is returned as a PNG
+    image so it can be scanned by mobile clients.
     """
     try:
         client_ip = request.remote_addr
-        
+
         if not check_ip_rate_limit(client_ip):
             return jsonify({
                 'error': 'Rate limit exceeded',
                 'message': 'Too many requests. Please try again later.'
             }), 429
-        
-        # For now, return a placeholder response
-        # In production, you would generate an actual QR code image
+
+        security_service = get_security_service()
+        security_service.validate_profile_access(profile_token, client_ip)
+
+        download_url = f"{request.host_url.rstrip('/')}/profile/{profile_token}/config.ovpn"
+
+        try:
+            import qrcode  # Lazy import to allow testing without dependency
+        except ImportError:
+            return jsonify({
+                'error': 'QR code generation error',
+                'message': 'qrcode library not installed'
+            }), 500
+
+        qr = qrcode.QRCode(box_size=10, border=4)
+        qr.add_data(download_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+
+        return send_file(buf, mimetype='image/png')
+
+    except ValidationError as e:
         return jsonify({
-            'message': 'QR code generation not implemented',
-            'download_url': f'/api/profile/{profile_token}/config.ovpn'
-        }), 501
-        
-    except Exception as e:
+            'error': 'Invalid profile',
+            'message': str(e)
+        }), 404
+    except Exception:
         return jsonify({
             'error': 'QR code generation error',
             'message': 'Unable to generate QR code'

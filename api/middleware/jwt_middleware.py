@@ -21,8 +21,23 @@ class JWTMiddleware:
     
     @staticmethod
     def init_app(app) -> None:
-        """Initialize JWT middleware with Flask app."""
-        pass
+        """Initialize JWT middleware with Flask app.
+
+        Ensures that the ``JWT_SECRET`` environment variable is present and
+        stores it in the application configuration.  The middleware also
+        prepares request-level context variables so each request starts with
+        a clean authentication state.
+        """
+        jwt_secret = os.environ.get('JWT_SECRET')
+        if not jwt_secret:
+            raise RuntimeError('JWT_SECRET environment variable is required')
+
+        app.config['JWT_SECRET'] = jwt_secret
+
+        @app.before_request
+        def _reset_auth_context():
+            g.current_admin = None
+            g.auth_service = None
     
     @staticmethod
     def require_auth(f):
