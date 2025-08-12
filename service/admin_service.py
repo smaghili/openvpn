@@ -201,7 +201,7 @@ class AdminService:
         if admin_role == 'admin':
             return True
         
-        user = self.user_repo.find_user_by_username(str(vpn_user_id))
+        user = self.user_repo.get_user_by_id(vpn_user_id)
         if not user:
             return False
         

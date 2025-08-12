@@ -64,7 +64,7 @@ class BackupService:
             process = subprocess.Popen(gpg_command, stdin=subprocess.PIPE, text=True)
             process.communicate(input=password)
             if process.returncode != 0:
-                raise RuntimeError("GPG encryption failed.")
+                raise BackupError("GPG encryption failed")
 
             os.remove(tar_path)
             shutil.rmtree(tmp_dir)
@@ -75,7 +75,7 @@ class BackupService:
         except Exception as e:
             if os.path.exists(tmp_dir):
                 shutil.rmtree(tmp_dir)
-            raise RuntimeError(f"Backup creation failed: {e}")
+            raise BackupError(f"Backup creation failed: {e}")
 
     def restore_system(self, gpg_path: str, password: str) -> None:
         """
@@ -88,7 +88,7 @@ class BackupService:
         print("🔄 Restoring from backup...")
         gpg_path = os.path.expanduser(gpg_path)
         if not os.path.exists(gpg_path):
-            raise FileNotFoundError(f"Backup file not found: {gpg_path}")
+            raise RestoreError(f"Backup file not found: {gpg_path}")
 
         tmp_dir = "/tmp/system_restore_tmp"
         if os.path.exists(tmp_dir):
@@ -108,14 +108,14 @@ class BackupService:
             _, stderr = process.communicate(input=password)
             if process.returncode != 0:
                 if "bad passphrase" in stderr.lower():
-                    raise ValueError("Decryption failed. Incorrect password.")
-                raise RuntimeError(f"GPG decryption failed: {stderr}")
+                    raise RestoreError("Decryption failed. Incorrect password.")
+                raise RestoreError(f"GPG decryption failed: {stderr}")
 
             for service in self.services:
                 service.pre_restore()
 
             with tarfile.open(tar_path, "r:gz") as tar:
-                tar.extractall(path="/")
+                self._safe_extract(tar, path="/")
 
             for service in self.services:
                 service.post_restore()
@@ -125,3 +125,13 @@ class BackupService:
         finally:
             if os.path.exists(tmp_dir):
                 shutil.rmtree(tmp_dir)
+
+    @staticmethod
+    def _safe_extract(tar: tarfile.TarFile, path: str = ".") -> None:
+        """Safely extract a tar archive, preventing path traversal attacks."""
+        abs_path = os.path.abspath(path)
+        for member in tar.getmembers():
+            member_path = os.path.abspath(os.path.join(path, member.name))
+            if not member_path.startswith(abs_path):
+                raise RestoreError("Attempted Path Traversal in Tar File")
+        tar.extractall(path)

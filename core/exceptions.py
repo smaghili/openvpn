@@ -3,6 +3,8 @@ Custom exception classes for VPN Manager.
 Provides specific error handling and better debugging.
 """
 
+from typing import Optional
+
 class VPNManagerError(Exception):
     """Base exception for VPN Manager operations."""
     pass
@@ -59,13 +61,28 @@ class ServiceError(VPNManagerError):
         super().__init__(f"Service '{service_name}' {operation} failed: {reason}")
 
 class ValidationError(VPNManagerError):
-    """Raised when input validation fails."""
-    
-    def __init__(self, field: str, value: str, reason: str):
-        self.field = field
-        self.value = value
-        self.reason = reason
-        super().__init__(f"Validation failed for {field}='{value}': {reason}")
+    """Raised when input validation fails.
+
+    This exception supports two calling patterns:
+
+    1. ``ValidationError("message")`` – for simple validation messages.
+    2. ``ValidationError(field, value, reason)`` – structured details about the
+       failing field.
+    """
+
+    def __init__(self, field_or_message: str, value: Optional[str] = None, reason: Optional[str] = None):
+        if value is None and reason is None:
+            message = field_or_message
+            self.field = None
+            self.value = None
+            self.reason = message
+        else:
+            message = f"Validation failed for {field_or_message}='{value}': {reason}"
+            self.field = field_or_message
+            self.value = value
+            self.reason = reason
+
+        super().__init__(message)
 
 class AuthenticationError(VPNManagerError):
     """Raised when authentication fails."""
