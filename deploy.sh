@@ -462,7 +462,8 @@ function show_completion_info() {
     echo -e "Login Page: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/${NC}"
     echo -e "API URL: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
     echo -e "Health Check: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/api/health${NC}"
-    echo -e "\n${YELLOW}Default username/password: admin/admin${NC}"
+    echo -e "\n${YELLOW}Default Username: admin${NC}"
+    echo -e "${YELLOW}Default Password: admin${NC}"
     echo -e "${YELLOW}Please change the default password immediately from the panel.${NC}"
     
     echo -e "\n${BLUE}=== CLI ACCESS ===${NC}"
