@@ -34,7 +34,7 @@ class SecurityService:
         """
         Generate or retrieve profile token for VPN user.
         """
-        user = self.user_repo.find_user_by_username(str(user_id))
+        user = self.user_repo.get_user_by_id(user_id)
         if not user:
             raise ValidationError(f"User ID {user_id} not found")
         
@@ -63,7 +63,7 @@ class SecurityService:
         """
         Regenerate profile token and reset access stats.
         """
-        user = self.user_repo.find_user_by_username(str(user_id))
+        user = self.user_repo.get_user_by_id(user_id)
         if not user:
             raise ValidationError(f"User ID {user_id} not found")
         
@@ -90,7 +90,7 @@ class SecurityService:
         """
         Revoke profile access by removing token.
         """
-        user = self.user_repo.find_user_by_username(str(user_id))
+        user = self.user_repo.get_user_by_id(user_id)
         if not user:
             raise ValidationError(f"User ID {user_id} not found")
         
@@ -110,7 +110,7 @@ class SecurityService:
         """
         Get profile access statistics.
         """
-        user = self.user_repo.find_user_by_username(str(user_id))
+        user = self.user_repo.get_user_by_id(user_id)
         if not user:
             raise ValidationError(f"User ID {user_id} not found")
         
