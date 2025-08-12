@@ -122,12 +122,10 @@ class OpenVPNManager(IBackupable):
         _run(
             ["debconf-set-selections"],
             input="iptables-persistent iptables-persistent/autosave_v4 boolean true\n",
-            text=True,
         )
         _run(
             ["debconf-set-selections"],
             input="iptables-persistent iptables-persistent/autosave_v6 boolean true\n",
-            text=True,
         )
 
         logger.info("   └── Installing %d packages...", len(packages))
