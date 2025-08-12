@@ -5,6 +5,7 @@ Security service for rate limiting and validation across the system.
 from typing import Dict, Any, List, Optional
 import time
 import secrets
+import threading
 from data.user_repository import UserRepository
 from data.blacklist_repository import BlacklistRepository
 from core.exceptions import ValidationError, AuthenticationError
@@ -18,6 +19,16 @@ class SecurityService:
         self.user_repo = user_repo
         self.blacklist_repo = blacklist_repo
         self._rate_limits = {'profile': {}, 'ip': {}}
+        self._start_cleanup_task()
+
+    def _start_cleanup_task(self, interval: int = 60) -> None:
+        def _cleanup_loop() -> None:
+            while True:
+                time.sleep(interval)
+                self.cleanup_rate_limits()
+
+        thread = threading.Thread(target=_cleanup_loop, daemon=True)
+        thread.start()
     
     def generate_profile_token(self, user_id: int, admin_id: int, admin_role: str) -> Dict[str, Any]:
         """
@@ -222,6 +233,8 @@ class SecurityService:
         
         requests.append(now)
         self._rate_limits[limit_type][key] = requests
+
+        self.cleanup_rate_limits()
         return True
     
     def cleanup_rate_limits(self) -> None:
@@ -239,7 +252,7 @@ class SecurityService:
                     self._rate_limits[limit_type][key] = requests
                 else:
                     del self._rate_limits[limit_type][key]
-    
+
     def get_security_stats(self) -> Dict[str, Any]:
         """
         Get security statistics for monitoring.

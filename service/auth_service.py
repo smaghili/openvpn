@@ -11,19 +11,30 @@ from core.jwt_service import JWTService
 from core.exceptions import AuthenticationError, ValidationError, UserNotFoundError
 import re
 import time
+import threading
 
 class AuthService:
     """
     Service layer for authentication operations with comprehensive security.
     """
     
-    def __init__(self, admin_repo: AdminRepository, permission_repo: PermissionRepository, 
+    def __init__(self, admin_repo: AdminRepository, permission_repo: PermissionRepository,
                  blacklist_repo: BlacklistRepository, jwt_service: JWTService):
         self.admin_repo = admin_repo
         self.permission_repo = permission_repo
         self.blacklist_repo = blacklist_repo
         self.jwt_service = jwt_service
         self._rate_limits = {'login': {}, 'admin': {}}
+        self._start_cleanup_task()
+
+    def _start_cleanup_task(self, interval: int = 60) -> None:
+        def _cleanup_loop() -> None:
+            while True:
+                time.sleep(interval)
+                self.cleanup_rate_limits()
+
+        thread = threading.Thread(target=_cleanup_loop, daemon=True)
+        thread.start()
     
     def login(self, username: str, password: str, client_ip: str) -> Dict[str, Any]:
         """
@@ -39,18 +50,21 @@ class AuthService:
             raise AuthenticationError("Invalid username or password")
         
         token_data = self.jwt_service.generate_token(
-            admin['id'], 
-            admin['username'], 
-            admin['role'], 
+            admin['id'],
+            admin['username'],
+            admin['role'],
             admin['token_version']
         )
-        
-        return {
+
+        result = {
             'token': token_data['token'],
             'role': admin['role'],
             'expires_in': token_data['expires_in'],
             'username': admin['username']
         }
+
+        self.cleanup_rate_limits()
+        return result
     
     def logout(self, token: str) -> None:
         """
@@ -93,7 +107,9 @@ class AuthService:
         """
         Check admin permission with real-time database validation.
         """
-        return self.permission_repo.has_permission(admin_id, permission)
+        has_permission = self.permission_repo.has_permission(admin_id, permission)
+        self.cleanup_rate_limits()
+        return has_permission
     
     def force_logout_admin(self, admin_id: int, by_admin_id: int) -> None:
         """
