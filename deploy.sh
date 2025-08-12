@@ -3,6 +3,7 @@
 # This script sets up the complete system with enterprise-grade security
 
 set -e # Exit immediately if a command exits with a non-zero status.
+set -o pipefail # Fail if any command in a pipeline fails
 
 # --- Configuration ---
 REPO_URL="https://github.com/smaghili/openvpn.git"
@@ -65,11 +66,17 @@ function check_port_available() {
 }
 
 function generate_secure_password() {
-    openssl rand -base64 32 | tr -d "=+/" | cut -c1-16
+    openssl rand -base64 32 | tr -d "=+/" | cut -c1-16 || {
+        print_error "Failed to generate secure password"
+        exit 1
+    }
 }
 
 function generate_jwt_secret() {
-    openssl rand -base64 64 | tr -d '\n' | tr -d '=+/'
+    openssl rand -base64 64 | tr -d '\n' | tr -d '=+/' || {
+        print_error "Failed to generate JWT secret"
+        exit 1
+    }
 }
 
 function get_admin_credentials() {
@@ -161,8 +168,14 @@ OPENVPN_LOG_FILE=/var/log/openvpn/traffic_monitor.log
 # API Configuration
 API_PORT=$API_PORT
 JWT_SECRET=$JWT_SECRET
-API_SECRET_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '=+/')
-OPENVPN_API_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '=+/')
+API_SECRET_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '=+/') || {
+    print_error "Failed to generate API secret key"
+    exit 1
+}
+OPENVPN_API_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '=+/') || {
+    print_error "Failed to generate OpenVPN API key"
+    exit 1
+}
 FLASK_ENV=production
 
 # Admin Configuration
@@ -225,13 +238,19 @@ with open('database.sql', 'r') as f:
     schema = f.read()
     cursor.executescript(schema)
 
-# Create admin user
+# Create admin user if it doesn't already exist
 print(f"Creating admin user: {ADMIN_USERNAME}")
-cursor.execute(
-    'INSERT INTO admins (username, password_hash, role) VALUES (?, ?, ?)', 
-    (ADMIN_USERNAME, PASSWORD_HASH, 'admin')
-)
-admin_id = cursor.lastrowid
+cursor.execute('SELECT id FROM admins WHERE username = ?', (ADMIN_USERNAME,))
+row = cursor.fetchone()
+if row:
+    admin_id = row[0]
+    print(f"Admin user {ADMIN_USERNAME} already exists with ID: {admin_id}")
+else:
+    cursor.execute(
+        'INSERT INTO admins (username, password_hash, role) VALUES (?, ?, ?)',
+        (ADMIN_USERNAME, PASSWORD_HASH, 'admin')
+    )
+    admin_id = cursor.lastrowid
 
 # Grant all permissions to admin
 permissions = [
