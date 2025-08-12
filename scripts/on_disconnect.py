@@ -63,7 +63,8 @@ def update_traffic_usage():
 
     try:
         # Direct database connection to avoid circular imports
-        db_file = VPNPaths.get_database_file()
+        # Allow override via environment variable if provided
+        db_file = os.environ.get("OPENVPN_DB_FILE") or VPNPaths.get_database_file()
         
         if not os.path.exists(db_file):
             # If database doesn't exist, just log to file
