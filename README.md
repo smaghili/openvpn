@@ -20,6 +20,16 @@ This is the original shell-based installer. It is still functional but no longer
 bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/install.sh)
 ```
 
+### API Secret Key
+
+Before starting the API server, set a secret key via the `API_SECRET_KEY` environment variable:
+
+```bash
+export API_SECRET_KEY="your-strong-secret-key"
+```
+
+The application will fail to start if this variable is missing.
+
 ---
 
 - **Main idea inspired by:** [angristan/openvpn-install](https://github.com/angristan/openvpn-install)

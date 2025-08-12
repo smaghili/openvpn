@@ -20,7 +20,10 @@ def create_app() -> Flask:
     Frontend web panel has been removed - only REST API is available.
     """
     app = Flask(__name__)
-    app.config['SECRET_KEY'] = os.environ.get('API_SECRET_KEY', 'dev-secret-key-change-in-production')
+    secret_key = os.environ.get('API_SECRET_KEY')
+    if not secret_key:
+        raise RuntimeError('API_SECRET_KEY environment variable is required')
+    app.config['SECRET_KEY'] = secret_key
     
     CORS(app)
     
