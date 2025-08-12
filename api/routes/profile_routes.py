@@ -78,7 +78,7 @@ def get_profile_link(user_id):
         # Check if user exists and admin has access
         db = Database()
         user_repo = UserRepository(db)
-        user = user_repo.find_user_by_username(str(user_id))
+        user = user_repo.get_user_by_id(user_id)
         
         if not user:
             return jsonify({
