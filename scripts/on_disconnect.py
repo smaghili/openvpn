@@ -5,8 +5,10 @@ Uses environment variables for all paths.
 """
 import os
 import sys
-import sqlite3
 from datetime import datetime
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from data.db import Database
 
 def load_env_vars():
     """Load environment variables from .env file."""
@@ -64,56 +66,42 @@ def update_traffic_usage():
         sys.exit(0)
 
     try:
-        # Direct database connection to avoid circular imports
         db_file = get_database_file()
-        
+
         if not os.path.exists(db_file):
             # If database doesn't exist, just log to file
             with open(log_file, "a") as f:
                 f.write(f"{timestamp} - INFO: User '{username}' disconnected. Sent: {bytes_sent}, Received: {bytes_received} (no database)\n")
             sys.exit(0)
-        
-        conn = sqlite3.connect(db_file)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        # Get user ID from username
-        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
-        user_row = cursor.fetchone()
-        
-        if not user_row:
-            conn.close()
-            with open(log_file, "a") as f:
-                f.write(f"{timestamp} - INFO: User '{username}' disconnected. Sent: {bytes_sent}, Received: {bytes_received} (user not in database)\n")
-            sys.exit(0)
-        
-        user_id = user_row['id']
 
-        # Use transaction to ensure atomicity
-        cursor.execute("BEGIN TRANSACTION")
-        
-        try:
-            # 1. Update the cumulative usage in the user_quotas table
-            cursor.execute("UPDATE user_quotas SET bytes_used = bytes_used + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?", 
-                          (total_session_bytes, user_id))
+        db = Database(db_file)
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
 
-            # 2. Log the session details into traffic_logs for historical analysis
-            cursor.execute("INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)", 
-                          (user_id, bytes_sent, bytes_received))
-            
-            # Commit the transaction
-            cursor.execute("COMMIT")
-            
+            # Get user ID from username
+            cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+            user_row = cursor.fetchone()
+
+            if not user_row:
+                with open(log_file, "a") as f:
+                    f.write(f"{timestamp} - INFO: User '{username}' disconnected. Sent: {bytes_sent}, Received: {bytes_received} (user not in database)\n")
+                return
+
+            user_id = user_row['id']
+
+            # Update the cumulative usage and log the session
+            cursor.execute(
+                "UPDATE user_quotas SET bytes_used = bytes_used + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+                (total_session_bytes, user_id),
+            )
+            cursor.execute(
+                "INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                (user_id, bytes_sent, bytes_received),
+            )
+
             # Log successful update
             with open(log_file, "a") as f:
                 f.write(f"{timestamp} - INFO: Updated usage for user '{username}': +{total_session_bytes} bytes\n")
-                
-        except Exception as e:
-            # Rollback on any error
-            cursor.execute("ROLLBACK")
-            raise e
-        finally:
-            conn.close()
 
     except Exception as e:
         # Log error but don't fail

@@ -110,6 +110,10 @@ class Database:
             
             def __exit__(self, exc_type, exc_val, exc_tb):
                 if self.conn:
+                    if exc_type:
+                        self.conn.rollback()
+                    else:
+                        self.conn.commit()
                     self.conn.close()
                     self.conn = None
                 self.db.conn = None

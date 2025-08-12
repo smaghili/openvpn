@@ -18,11 +18,12 @@ class UserRepository:
             self.db.execute_script(schema)
 
     def add_user(self, username: Username, password_hash: Optional[str] = None) -> Optional[int]:
-        query = "INSERT INTO users (username, password_hash) VALUES (?, ?)"
-        self.db.execute_query(query, (username, password_hash))
-        
-        user_result = self.db.execute_query("SELECT id FROM users WHERE username = ?", (username,))
-        return user_result[0]['id'] if user_result else None
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, password_hash))
+            cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+            row = cursor.fetchone()
+            return row['id'] if row else None
 
     def add_user_protocol(self, user_id: int, protocol: str, auth_type: str, cert_pem: Optional[str] = None, key_pem: Optional[str] = None) -> None:
         query = """
@@ -85,11 +86,11 @@ class UserRepository:
 
     def update_user_password(self, username: Username, password_hash: str) -> None:
         """Updates the password hash for an existing user."""
-        query = "UPDATE users SET password_hash = ? WHERE username = ?"
-        result = self.db.execute_query(query, (password_hash, username))
-        
-        if not result and not self.find_user_by_username(username):
-            raise UserNotFoundError(username)
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET password_hash = ? WHERE username = ?", (password_hash, username))
+            if cursor.rowcount == 0:
+                raise UserNotFoundError(username)
 
     # --- New methods for quota management ---
 
@@ -127,29 +128,19 @@ class UserRepository:
             if total_bytes <= 0:
                 return True  # No traffic to record
             
-            # Use transaction for atomicity
-            self.db.execute_query("BEGIN TRANSACTION")
-            
-            try:
-                # Update cumulative usage
-                self.db.execute_query(
+            # Use a shared connection for atomicity
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
                     "UPDATE user_quotas SET bytes_used = bytes_used + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
                     (total_bytes, user_id)
                 )
-                
-                # Log session details
-                self.db.execute_query(
+                cursor.execute(
                     "INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
                     (user_id, bytes_sent, bytes_received)
                 )
-                
-                self.db.execute_query("COMMIT")
                 return True
-                
-            except Exception as e:
-                self.db.execute_query("ROLLBACK")
-                raise e
-                
+
         except Exception:
             return False
 
