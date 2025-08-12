@@ -25,7 +25,7 @@ def create_app() -> Flask:
     Creates and configures the Flask application with API endpoints only.
     Frontend web panel has been removed - only REST API is available.
     """
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder="../ui", static_url_path="/")
     secret_key = os.environ.get("API_SECRET_KEY")
     if not secret_key:
         secret_key = secrets.token_urlsafe(32)
@@ -77,23 +77,13 @@ def create_app() -> Flask:
 
         return download_config(profile_token)
 
-    # API-only server - no frontend routes
     @app.route("/")
-    def api_info():
-        """API information endpoint"""
-        return {
-            "message": "OpenVPN Manager API Server",
-            "version": "2.0.0",
-            "status": "running",
-            "endpoints": {
-                "health": "/api/health",
-                "auth": "/api/auth/*",
-                "users": "/api/users/*",
-                "system": "/api/system/*",
-                "profiles": "/api/profile/*",
-            },
-            "note": "Web panel has been removed - API only",
-        }
+    def serve_index():
+        return app.send_static_file("index.html")
+
+    @app.route("/<path:path>")
+    def serve_static(path):
+        return app.send_static_file(path)
 
     return app
 
