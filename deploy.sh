@@ -301,8 +301,8 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=$absolute_project_dir
-Environment=PATH=$absolute_project_dir/venv/bin
-Environment=UI_PATH=$absolute_project_dir/ui
+Environment="PATH=$absolute_project_dir/venv/bin"
+Environment="UI_PATH=$absolute_project_dir/ui"
 EnvironmentFile=$ENV_FILE
 ExecStart=$absolute_project_dir/venv/bin/python -m api.app
 Restart=always
@@ -387,10 +387,10 @@ function setup_project() {
     # Ensure UI directory is available in the project path
     local ui_source="$SCRIPT_DIR/ui"
     local ui_target="$absolute_project_dir/ui"
-    if [ -d "$ui_source" ]; then
-        if [ ! -e "$ui_target" ]; then
-            ln -s "$ui_source" "$ui_target" || cp -r "$ui_source" "$ui_target"
-        fi
+    if [ -d "$ui_target" ]; then
+        print_success "UI directory already present"
+    elif [ -d "$ui_source" ]; then
+        ln -s "$ui_source" "$ui_target" || cp -r "$ui_source" "$ui_target"
         print_success "UI directory linked"
     else
         print_warning "UI directory not found at $ui_source"
@@ -429,7 +429,8 @@ function start_services() {
         if curl -f http://localhost:$API_PORT/ | grep -qi '<html'; then
             print_success "UI served HTML content"
         else
-            print_warning "UI did not return HTML"
+            print_error "UI did not return HTML"
+            exit 1
         fi
     else
         print_error "Failed to start API service"
