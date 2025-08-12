@@ -438,8 +438,11 @@ function show_completion_info() {
     echo -e "${BLUE}=== AUTHENTICATION DETAILS ===${NC}"
     echo -e "Admin Username: ${YELLOW}$ADMIN_USERNAME${NC}"
     echo -e "Admin Password: ${YELLOW}$ADMIN_PASSWORD${NC}"
+    echo -e "Login Page: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/${NC}"
     echo -e "API URL: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
     echo -e "Health Check: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/api/health${NC}"
+    echo -e "\n${YELLOW}Default username/password: admin/admin${NC}"
+    echo -e "${YELLOW}Please change the default password immediately from the panel.${NC}"
     
     echo -e "\n${BLUE}=== CLI ACCESS ===${NC}"
     echo -e "CLI Panel: ${YELLOW}owpanel${NC}"
