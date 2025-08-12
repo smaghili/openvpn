@@ -13,6 +13,8 @@ const translations = {
     nav_logout: 'خروج',
     btn_theme: 'تم',
     btn_language: 'زبان',
+    lang_fa: 'FA',
+    lang_en: 'EN',
     modal_yes: 'بله',
     modal_no: 'خیر',
     login_title: 'ورود به پنل مدیریت VPN',
@@ -67,6 +69,7 @@ const translations = {
     change: 'تغییر',
     change_reset: 'تغییر/ریست',
     timezone: 'منطقه زمانی',
+    tz: 'TZ',
     panel_port: 'پورت پنل/لاگین',
     apply: 'اعمال',
     apply_confirm: 'اعمال؟',
@@ -76,6 +79,7 @@ const translations = {
     perm_edit: 'ویرایش',
     perm_delete: 'حذف',
     perm_view_log: 'مشاهده لاگ',
+    set_quota: 'تعیین سهمیه',
     reset: 'ریست',
     reset_confirm: 'ریست؟',
     applied: 'اعمال شد',
@@ -105,12 +109,9 @@ const translations = {
     alert_sample: '⚠︎ OpenVPN: ارتباط تونل X قطع شد (5m ago)\nℹ︎ WireGuard: کلید جدید برای کاربر ali ایجاد شد',
     dark: 'دارک',
     light: 'لایت',
-    lang_fa: 'فارسی',
-    lang_en: 'انگلیسی',
-    lang_ru: 'روسی',
     udp: 'UDP',
     tcp: 'TCP',
-    tz: 'TZ'
+    role_prompt: 'نقش (admin/reseller)'
   },
   en: {
     sidebar_title: 'VPN Panel',
@@ -122,6 +123,8 @@ const translations = {
     nav_logout: 'Logout',
     btn_theme: 'Theme',
     btn_language: 'Language',
+    lang_fa: 'FA',
+    lang_en: 'EN',
     modal_yes: 'Yes',
     modal_no: 'No',
     login_title: 'Login to VPN Admin Panel',
@@ -176,6 +179,7 @@ const translations = {
     change: 'Change',
     change_reset: 'Change/Reset',
     timezone: 'Timezone',
+    tz: 'TZ',
     panel_port: 'Panel/Login Port',
     apply: 'Apply',
     apply_confirm: 'Apply?',
@@ -185,6 +189,7 @@ const translations = {
     perm_edit: 'Edit',
     perm_delete: 'Delete',
     perm_view_log: 'View Log',
+    set_quota: 'Set Quota',
     reset: 'Reset',
     reset_confirm: 'Reset?',
     applied: 'Applied',
@@ -214,17 +219,11 @@ const translations = {
     alert_sample: '⚠︎ OpenVPN: Tunnel X disconnected (5m ago)\nℹ︎ WireGuard: New key generated for user ali',
     dark: 'Dark',
     light: 'Light',
-    lang_fa: 'FA',
-    lang_en: 'EN',
-    lang_ru: 'RU',
     udp: 'UDP',
     tcp: 'TCP',
-    tz: 'TZ'
+    role_prompt: 'role (admin/reseller)'
   }
 };
-
-// future Russian translations default to English
-translations.ru = { ...translations.en };
 
 let currentLang = localStorage.getItem('lang') || 'fa';
 

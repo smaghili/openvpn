@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-import logging
 import os
-import secrets
 import sys
-import secrets
-import logging
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 
 from .routes.user_routes import user_bp
@@ -19,34 +15,29 @@ from .middleware.jwt_middleware import JWTMiddleware
 from .middleware.error_handler import ErrorHandler
 from .middleware.auth_middleware import AuthMiddleware
 
-
 def create_app() -> Flask:
     """
-    Creates and configures the Flask application with API endpoints only.
-    Frontend web panel has been removed - only REST API is available.
+    Creates and configures the Flask application serving both API and web UI.
     """
-    app = Flask(__name__, static_folder="../ui", static_url_path="/")
-    secret_key = os.environ.get("API_SECRET_KEY")
+    app = Flask(__name__, static_folder='../ui', static_url_path='/')
+    secret_key = os.environ.get('API_SECRET_KEY')
     if not secret_key:
-        secret_key = secrets.token_urlsafe(32)
-        logging.warning(
-            "API_SECRET_KEY environment variable is missing; generated temporary key"
-        )
-    app.config["SECRET_KEY"] = secret_key
-
+        raise RuntimeError('API_SECRET_KEY environment variable is required')
+    app.config['SECRET_KEY'] = secret_key
+    
     CORS(app)
 
     AuthMiddleware.init_app(app)
     JWTMiddleware.init_app(app)
     ErrorHandler.init_app(app)
-
+    
     # API routes
-    app.register_blueprint(auth_bp, url_prefix="/api/auth")
-    app.register_blueprint(admin_bp, url_prefix="/api/admins")
-    app.register_blueprint(permission_bp, url_prefix="/api/permissions")
-    app.register_blueprint(user_bp, url_prefix="/api/users")
-    app.register_blueprint(quota_bp, url_prefix="/api/quota")
-    app.register_blueprint(system_bp, url_prefix="/api/system")
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(admin_bp, url_prefix='/api/admins')
+    app.register_blueprint(permission_bp, url_prefix='/api/permissions')
+    app.register_blueprint(user_bp, url_prefix='/api/users')
+    app.register_blueprint(quota_bp, url_prefix='/api/quota')
+    app.register_blueprint(system_bp, url_prefix='/api/system')
 
     # Profile routes
     app.register_blueprint(profile_bp, url_prefix="/api/profile")
@@ -70,21 +61,21 @@ def create_app() -> Flask:
 
         return profile_data(profile_token)
 
-    @app.route("/profile/<profile_token>/config.ovpn")
+ @app.route('/profile/<profile_token>/config.ovpn')
     def download_ovpn_config(profile_token):
         """Download OpenVPN config - delegate to profile routes."""
         from .routes.profile_routes import download_ovpn_config as download_config
-
         return download_config(profile_token)
+    
+    # Serve web UI
+    @app.route('/')
+    def index():
+        return app.send_static_file('index.html')
 
-    @app.route("/")
-    def serve_index():
-        return app.send_static_file("index.html")
-
-    @app.route("/<path:path>")
-    def serve_static(path):
+    @app.route('/<path:path>')
+    def static_proxy(path):
         return send_from_directory(app.static_folder, path)
-
+    
     return app
 
 

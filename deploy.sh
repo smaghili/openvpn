@@ -11,7 +11,7 @@ PROJECT_DIR="/etc/owpanel"
 ENV_FILE="/etc/owpanel/.env"
 # Use the same database path that the application uses (will be set dynamically)
 DB_PATH=""
-# Directory where this script resides
+# Script directory (source repository)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Colors for output
@@ -348,7 +348,6 @@ function install_dependencies() {
     
     print_success "System packages installed"
 }
-
 function setup_project() {
     print_header "Project Setup"
     
@@ -364,6 +363,11 @@ function setup_project() {
     fi
     local absolute_project_dir="$(pwd)"
     DB_PATH="$absolute_project_dir/openvpn_data/vpn_manager.db"
+
+    # Copy web UI assets into the project directory if missing
+    if [ -d "$SCRIPT_DIR/ui" ] && [ ! -d "$absolute_project_dir/ui" ]; then
+        cp -r "$SCRIPT_DIR/ui" "$absolute_project_dir/"
+    fi
     
     echo "Setting up Python environment..."
     if [ ! -d "venv" ]; then
@@ -379,25 +383,14 @@ function setup_project() {
         print_error "requirements.txt not found"
         exit 1
     fi
-
+    
     # Set execute permissions with absolute paths
     chmod +x "$absolute_project_dir/cli/main.py" "$absolute_project_dir/api/app.py" 2>/dev/null || true
     chmod +x "$absolute_project_dir/scripts/"*.py 2>/dev/null || true
-
-    # Ensure UI directory is available in the project path
-    local ui_source="$SCRIPT_DIR/ui"
-    local ui_target="$absolute_project_dir/ui"
-    if [ -d "$ui_target" ]; then
-        print_success "UI directory already present"
-    elif [ -d "$ui_source" ]; then
-        ln -s "$ui_source" "$ui_target" || cp -r "$ui_source" "$ui_target"
-        print_success "UI directory linked"
-    else
-        print_warning "UI directory not found at $ui_source"
-    fi
-
+    
     print_success "Project setup completed"
 }
+
 
 function setup_openvpn() {
     print_header "OpenVPN Installation"
@@ -426,11 +419,10 @@ function start_services() {
         else
             print_warning "API health check failed, but service is running"
         fi
-        if curl -f http://localhost:$API_PORT/ | grep -qi '<html'; then
-            print_success "UI served HTML content"
+        if curl -f http://localhost:$API_PORT/ | grep -qi '<!doctype html'; then
+            print_success "Web panel reachable"
         else
-            print_error "UI did not return HTML"
-            exit 1
+            print_warning "Web panel not reachable"
         fi
     else
         print_error "Failed to start API service"
@@ -459,12 +451,10 @@ function show_completion_info() {
     echo -e "${BLUE}=== AUTHENTICATION DETAILS ===${NC}"
     echo -e "Admin Username: ${YELLOW}$ADMIN_USERNAME${NC}"
     echo -e "Admin Password: ${YELLOW}$ADMIN_PASSWORD${NC}"
-    echo -e "Login Page: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/${NC}"
     echo -e "API URL: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT${NC}"
     echo -e "Health Check: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/api/health${NC}"
-    echo -e "\n${YELLOW}Default Username: admin${NC}"
-    echo -e "${YELLOW}Default Password: admin${NC}"
-    echo -e "${YELLOW}Please change the default password immediately from the panel.${NC}"
+    echo -e "Login Page: ${YELLOW}http://$(hostname -I | awk '{print $1}'):$API_PORT/${NC}"
+    echo -e "${YELLOW}Remember to change the default admin password after first login.${NC}"
     
     echo -e "\n${BLUE}=== CLI ACCESS ===${NC}"
     echo -e "CLI Panel: ${YELLOW}owpanel${NC}"

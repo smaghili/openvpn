@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html dir="rtl">
 <head>
 <meta charset="utf-8" />
-<title data-i18n="users_title"></title>
+<title>Users</title>
 <link rel="stylesheet" href="styles.css" />
 <script src="script.js"></script>
+<script src="api.js"></script>
 </head>
 <body>
 <div class="toast-container"></div>
@@ -25,7 +26,6 @@
 <select id="langSelect" onchange="setLanguage(this.value)">
 <option value="fa" data-i18n="lang_fa"></option>
 <option value="en" data-i18n="lang_en"></option>
-<option value="ru" data-i18n="lang_ru"></option>
 </select>
 <ul>
 <li><a href="overview.html" data-i18n="nav_overview"></a></li>
@@ -37,7 +37,7 @@
 </ul>
 </nav>
 <div class="content">
-<header><div><span data-i18n="users_title"></span> <button data-i18n="create_user" onclick="showToast('')"></button></div><div><input type="text" placeholder="" data-i18n="search_placeholder" /></div></header>
+<header><div><span data-i18n="users_title"></span> <button id="createUserBtn" data-i18n="create_user"></button></div><div><input type="text" placeholder="" data-i18n="search_placeholder" /></div></header>
 <section class="cards" style="margin-top:1rem;">
 <div class="card"><span data-i18n="total_label"></span>:128</div>
 <div class="card"><span data-i18n="online_label"></span>:12</div>
@@ -51,14 +51,56 @@
 <section style="margin-top:1rem;">
 <table class="table">
 <thead><tr><th data-i18n="username"></th><th data-i18n="protocol"></th><th data-i18n="status"></th><th data-i18n="online_label"></th><th data-i18n="data"></th></tr></thead>
-<tbody>
-<tr onclick="document.getElementById('userName').textContent='ali';openDrawer('userDrawer')"><td>ali</td><td>OpenVPN/WG</td><td data-i18n="status_active"></td><td data-i18n="dot_green"></td><td>1.2G / 3.4G</td></tr>
-<tr onclick="document.getElementById('userName').textContent='sara';openDrawer('userDrawer')"><td>sara</td><td>OpenVPN</td><td data-i18n="expire_5d"></td><td data-i18n="dot_gray"></td><td>120M / 800M</td></tr>
-<tr onclick="document.getElementById('userName').textContent='guest-01';openDrawer('userDrawer')"><td>guest-01</td><td>WG</td><td data-i18n="quota_exceeded"></td><td data-i18n="dot_green"></td><td>2.9G / 2.0G</td></tr>
-</tbody>
+<tbody id="usersTbody"></tbody>
 </table>
 </section>
 </div>
 </div>
+<script>
+async function loadUsers() {
+  try {
+    const data = await UsersAPI.list();
+    const tbody = document.getElementById('usersTbody');
+    tbody.innerHTML = '';
+    (data.users || []).forEach(u => {
+      const tr = document.createElement('tr');
+      const usage = u.quota_bytes ? `${(u.bytes_used/1073741824).toFixed(2)}G / ${(u.quota_bytes/1073741824).toFixed(2)}G` : `${(u.bytes_used/1073741824).toFixed(2)}G / ∞`;
+      tr.innerHTML = `<td>${u.username}</td><td>${u.auth_types.join('/')}</td><td>${u.status}</td><td>${usage}</td><td><button data-action="quota" data-username="${u.username}" data-i18n="set_quota"></button> <button data-action="delete" data-username="${u.username}" data-i18n="delete"></button></td>`;
+      tbody.appendChild(tr);
+    });
+    setLanguage(currentLang);
+  } catch(err) {
+    showToast(err.message,'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadUsers();
+  document.getElementById('createUserBtn').addEventListener('click', async () => {
+    const u = prompt(translations[currentLang].label_username);
+    if(!u) return;
+    const p = prompt(translations[currentLang].label_password) || '';
+    try {
+      await UsersAPI.create(u,p);
+      showToast(translations[currentLang].saved);
+      loadUsers();
+    } catch(err) { showToast(err.message,'error'); }
+  });
+  document.getElementById('usersTbody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const username = btn.getAttribute('data-username');
+    if(btn.dataset.action === 'delete') {
+      showModal(translations[currentLang].delete+'?', async ()=>{
+        try { await UsersAPI.remove(username); showToast(translations[currentLang].delete); loadUsers(); } catch(err){ showToast(err.message,'error'); }
+      });
+    } else if(btn.dataset.action === 'quota') {
+      const q = prompt(translations[currentLang].set_quota,'0');
+      if(q===null) return;
+      try { await UsersAPI.setQuota(username, parseFloat(q)); showToast(translations[currentLang].applied); loadUsers(); } catch(err){ showToast(err.message,'error'); }
+    }
+  });
+});
+</script>
 </body>
 </html>

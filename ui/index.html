@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html dir="rtl">
 <head>
 <meta charset="utf-8" />
-<title data-i18n="login_title"></title>
+<title>Login</title>
 <link rel="stylesheet" href="styles.css" />
 <script src="script.js"></script>
+<script src="api.js"></script>
 </head>
 <body>
 <div class="toast-container"></div>
@@ -14,17 +15,29 @@
 <select id="langSelect" onchange="setLanguage(this.value)">
 <option value="fa" data-i18n="lang_fa"></option>
 <option value="en" data-i18n="lang_en"></option>
-<option value="ru" data-i18n="lang_ru"></option>
 </select>
 </div>
 <div style="max-width:400px;margin:2rem auto;border:var(--border-style);padding:1rem;text-align:center;">
 <h2 data-i18n="login_title"></h2>
-<form>
-<label><span data-i18n="label_username"></span><input type="text" /></label>
-<label><span data-i18n="label_password"></span><input type="password" /></label>
+<form id="loginForm">
+<label><span data-i18n="label_username"></span><input type="text" id="loginUser" /></label>
+<label><span data-i18n="label_password"></span><input type="password" id="loginPass" /></label>
 <label><input type="checkbox" /><span data-i18n="remember_me"></span></label>
-<button type="button" onclick="location.href='overview.html'" data-i18n="btn_login"></button>
+<button type="submit" data-i18n="btn_login"></button>
 </form>
 </div>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value.trim();
+  try {
+    await apiLogin(username, password);
+    location.href = 'overview.html';
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+</script>
 </body>
 </html>
