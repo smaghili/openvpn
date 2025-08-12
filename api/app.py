@@ -5,7 +5,7 @@ import secrets
 import sys
 import secrets
 import logging
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 
 from .routes.user_routes import user_bp
@@ -83,7 +83,7 @@ def create_app() -> Flask:
 
     @app.route("/<path:path>")
     def serve_static(path):
-        return app.send_static_file(path)
+        return send_from_directory(app.static_folder, path)
 
     return app
 
