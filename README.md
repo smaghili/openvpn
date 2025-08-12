@@ -1,6 +1,6 @@
 # OpenVPN Manager with UDS Traffic Monitoring
 
-A comprehensive OpenVPN management system with **near-realtime traffic monitoring** using Unix Domain Sockets (UDS), dual authentication, and production-grade monitoring capabilities.
+A comprehensive OpenVPN management system with **near real-time traffic monitoring** using Unix Domain Sockets (UDS), dual authentication, and production-grade monitoring capabilities.
 
 ---
 
@@ -25,7 +25,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/install.
 - **Main idea inspired by:** [angristan/openvpn-install](https://github.com/angristan/openvpn-install)
 - **Supported OS:** Ubuntu 18.04 and newer
 - **Key Features:**
-  - **Near-realtime traffic monitoring** (5-10 second updates via UDS)
+  - **Near real-time traffic monitoring** (5-10 second updates via UDS)
   - **Accurate quota enforcement** with buffer-based cutoff
   - **Zero network exposure** (UDS-based communication, no TCP ports)
   - Dual authentication: each user gets both certificate and login access
