@@ -22,13 +22,13 @@ bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/install.
 
 ### API Secret Key
 
-Before starting the API server, set a secret key via the `API_SECRET_KEY` environment variable:
+Before starting the API server, generate and export a strong secret key using the `API_SECRET_KEY` environment variable:
 
 ```bash
-export API_SECRET_KEY="your-strong-secret-key"
+export API_SECRET_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '=+/')
 ```
 
-The application will fail to start if this variable is missing.
+This command creates a high-entropy random key. Keep this value private. The application will fail to start if this variable is missing.
 
 ---
 
