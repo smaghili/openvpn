@@ -7,6 +7,7 @@ from .backup_interface import IBackupable
 from config.shared_config import CLIENT_TEMPLATE, USER_CERTS_TEMPLATE
 from config.config import VPNConfig, config, InstallSettings
 from config.constants import OpenVPNConstants, ConfigurablePaths
+from config.paths import VPNPaths
 from core.types import Username, ConfigData
 from core.exceptions import (
     InstallationError, 
@@ -165,16 +166,45 @@ class OpenVPNManager(IBackupable):
         if os.path.exists(scripts_dir):
             print("   └── Setting up monitoring scripts...")
             os.makedirs(openvpn_scripts_dir, exist_ok=True)
-            
+
             # Copy scripts to OpenVPN directory
             for script_name in ['on_connect.py', 'on_disconnect.py']:
                 source_script = os.path.join(scripts_dir, script_name)
                 if os.path.exists(source_script):
                     shutil.copy(source_script, os.path.join(openvpn_scripts_dir, script_name))
                     os.chmod(os.path.join(openvpn_scripts_dir, script_name), 0o755)
-            
+
             # Set proper permissions
             os.chmod(openvpn_scripts_dir, 0o755)
+
+            # Copy or link environment file for script access
+            env_source = os.path.join(project_root, '.env')
+            env_target = '/etc/openvpn/.env'
+            if os.path.exists(env_source):
+                try:
+                    if os.path.islink(env_target) or os.path.exists(env_target):
+                        os.remove(env_target)
+                    os.symlink(env_source, env_target)
+                except Exception:
+                    shutil.copy(env_source, env_target)
+                os.chmod(env_target, 0o600)
+
+        # Ensure database file has correct permissions
+        db_file = VPNPaths.get_database_file()
+        db_dir = os.path.dirname(db_file)
+        os.makedirs(db_dir, exist_ok=True)
+        try:
+            shutil.chown(db_dir, user='nobody', group='nogroup')
+            os.chmod(db_dir, 0o770)
+        except Exception as e:
+            print(f"   └── Warning: could not set permissions on {db_dir}: {e}")
+
+        if os.path.exists(db_file) and not os.access(db_file, os.W_OK):
+            try:
+                shutil.chown(db_file, user='nobody', group='nogroup')
+                os.chmod(db_file, 0o660)
+            except Exception as e:
+                print(f"   └── Warning: could not set permissions on {db_file}: {e}")
 
         # Create required system directories
         system_dirs = [

@@ -7,6 +7,7 @@ import os
 import sys
 import sqlite3
 from datetime import datetime
+from config.paths import VPNPaths
 
 def load_env_vars():
     """Load environment variables from .env file."""
@@ -21,9 +22,6 @@ def load_env_vars():
 
 def get_log_file():
     return os.environ.get('OPENVPN_LOG_FILE', '/var/log/openvpn/traffic_monitor.log')
-
-def get_database_file():
-    return os.environ.get('DATABASE_FILE', '/etc/owpanel/openvpn_data/vpn_manager.db')
 
 def check_user_quota():
     """
@@ -51,7 +49,7 @@ def check_user_quota():
 
     try:
         # Direct database connection to avoid circular imports
-        db_file = get_database_file()
+        db_file = VPNPaths.get_database_file()
         
         if not os.path.exists(db_file):
             # If database doesn't exist, allow connection
