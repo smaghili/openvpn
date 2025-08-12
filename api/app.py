@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import logging
 import os
+import secrets
 import sys
 import secrets
 import logging
@@ -28,8 +30,7 @@ def create_app() -> Flask:
     if not secret_key:
         secret_key = secrets.token_urlsafe(32)
         logging.warning(
-            "API_SECRET_KEY environment variable is missing; generated temporary key: %s",
-            secret_key,
+            "API_SECRET_KEY environment variable is missing; generated temporary key"
         )
     app.config["SECRET_KEY"] = secret_key
 
