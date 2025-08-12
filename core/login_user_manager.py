@@ -65,7 +65,11 @@ class LoginUserManager(IBackupable):
             )
         except subprocess.CalledProcessError as e:
             stderr_text = e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else str(e.stderr)
-            raise ServiceError(f"Failed to change password for system user '{username}': {stderr_text}")
+            raise ServiceError(
+                "chpasswd",
+                f"change password for system user '{username}'",
+                stderr_text,
+            )
 
 
 
