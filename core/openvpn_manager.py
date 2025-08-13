@@ -753,11 +753,14 @@ verb 3"""
         else:
             uds_socket = "/run/openvpn-server/ovpn-mgmt-cert.sock"
 
+        on_connect_script = VPNPaths.get_on_connect_script()
+        on_disconnect_script = VPNPaths.get_on_disconnect_script()
+
         return f"""
 # --- Traffic Monitoring Config ---
 script-security 2
-client-connect /etc/openvpn/scripts/on_connect.py
-client-disconnect /etc/openvpn/scripts/on_disconnect.py
+client-connect {on_connect_script}
+client-disconnect {on_disconnect_script}
 management {uds_socket} unix
 """
 
