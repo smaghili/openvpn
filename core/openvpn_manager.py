@@ -237,29 +237,28 @@ class OpenVPNManager(IBackupable):
         logger.info("   └── Creating directory structure...")
         os.makedirs(self.SERVER_CONFIG_DIR, exist_ok=True)
 
-        # Copy scripts to /etc/openvpn/scripts/ for better access
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        scripts_dir = os.path.join(project_root, "scripts")
+        # Link scripts directory instead of copying files
+        scripts_dir = VPNPaths.get_scripts_dir()
         openvpn_scripts_dir = "/etc/openvpn/scripts"
 
         if os.path.exists(scripts_dir):
             logger.info("   └── Setting up monitoring scripts...")
-            os.makedirs(openvpn_scripts_dir, exist_ok=True)
+            if os.path.lexists(openvpn_scripts_dir):
+                if os.path.islink(openvpn_scripts_dir):
+                    os.remove(openvpn_scripts_dir)
+                else:
+                    shutil.rmtree(openvpn_scripts_dir)
+            os.symlink(scripts_dir, openvpn_scripts_dir)
 
-            # Copy scripts to OpenVPN directory
+            # Ensure scripts are executable
             for script_name in ["on_connect.py", "on_disconnect.py"]:
-                source_script = os.path.join(scripts_dir, script_name)
-                if os.path.exists(source_script):
-                    shutil.copy(
-                        source_script, os.path.join(openvpn_scripts_dir, script_name)
-                    )
-                    os.chmod(os.path.join(openvpn_scripts_dir, script_name), 0o755)
+                script_path = os.path.join(scripts_dir, script_name)
+                if os.path.exists(script_path):
+                    os.chmod(script_path, 0o755)
+            os.chmod(scripts_dir, 0o755)
 
-            # Set proper permissions
-            os.chmod(openvpn_scripts_dir, 0o755)
-
-            # Copy or link environment file for script access
-            env_source = os.path.join(project_root, ".env")
+            # Link environment file for script access
+            env_source = os.path.join(VPNPaths.get_project_root(), ".env")
             env_target = "/etc/openvpn/.env"
             if os.path.exists(env_source):
                 try:

@@ -36,4 +36,12 @@ bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/install.
   - Designed for maintainability and real-world production use
   - **Complete TCP monitor removal** - old 7505/7506 ports eliminated
 
+### Environment
+
+Set the `PROJECT_ROOT` environment variable before starting the service so that the `config` package can be located:
+
+```bash
+export PROJECT_ROOT=/path/to/your/project
+```
+
 For a Persian installation guide see [README.fa.md](README.fa.md).
