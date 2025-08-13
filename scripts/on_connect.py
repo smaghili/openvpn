@@ -7,6 +7,9 @@ import os
 import sys
 import sqlite3
 from datetime import datetime
+project_root = os.environ.get("PROJECT_ROOT", "/etc/owpanel")
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 from config.paths import VPNPaths
 
 def load_env_vars():
