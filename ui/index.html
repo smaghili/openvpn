@@ -1,43 +1,16 @@
 <!DOCTYPE html>
-<html dir="rtl">
+<html lang="fa" dir="rtl">
 <head>
-<meta charset="utf-8" />
-<title>Login</title>
-<link rel="stylesheet" href="styles.css" />
-<script src="script.js"></script>
-<script src="api.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>پنل مدیریت VPN</title>
+    <meta http-equiv="refresh" content="0; url=pages/login/login.html" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>" />
 </head>
 <body>
-<div class="toast-container"></div>
-<div class="modal"><div class="modal-content"><p class="modal-message"></p><button class="yes" data-i18n="modal_yes"></button><button class="no" data-i18n="modal_no"></button></div></div>
-<div style="text-align:right;padding:1rem;">
-<button onclick="toggleTheme()" data-i18n="btn_theme"></button>
-<select id="langSelect" onchange="setLanguage(this.value)">
-<option value="fa" data-i18n="lang_fa"></option>
-<option value="en" data-i18n="lang_en"></option>
-</select>
-</div>
-<div style="max-width:400px;margin:2rem auto;border:var(--border-style);padding:1rem;text-align:center;">
-<h2 data-i18n="login_title"></h2>
-<form id="loginForm">
-<label><span data-i18n="label_username"></span><input type="text" id="loginUser" /></label>
-<label><span data-i18n="label_password"></span><input type="password" id="loginPass" /></label>
-<label><input type="checkbox" /><span data-i18n="remember_me"></span></label>
-<button type="submit" data-i18n="btn_login"></button>
-</form>
-</div>
-<script>
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const username = document.getElementById('loginUser').value.trim();
-  const password = document.getElementById('loginPass').value.trim();
-  try {
-    await apiLogin(username, password);
-    location.href = 'overview.html';
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-});
-</script>
+    <div style="text-align: center; padding: 2rem; font-family: Arial, sans-serif;">
+        <h1>در حال انتقال...</h1>
+        <p>اگر به صورت خودکار منتقل نشدید، <a href="pages/login/login.html">اینجا کلیک کنید</a></p>
+    </div>
 </body>
 </html>

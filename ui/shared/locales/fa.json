@@ -1,0 +1,37 @@
+{
+  "login": {
+    "title": "پنل مدیریت VPN",
+    "subtitle": "به سیستم مدیریت VPN خوش آمدید",
+    "username_label": "نام کاربری",
+    "password_label": "رمز عبور",
+    "remember_me": "مرا به خاطر بسپار",
+    "login_button": "ورود",
+    "username_placeholder": "نام کاربری خود را وارد کنید",
+    "password_placeholder": "رمز عبور خود را وارد کنید"
+  },
+  "common": {
+    "loading": "در حال بارگذاری...",
+    "error": "خطا",
+    "success": "موفقیت",
+    "cancel": "لغو",
+    "save": "ذخیره",
+    "delete": "حذف",
+    "edit": "ویرایش",
+    "close": "بستن",
+    "theme": "تم",
+    "language": "زبان",
+    "persian": "فارسی",
+    "english": "English"
+  },
+  "messages": {
+    "login_success": "ورود موفقیت‌آمیز بود",
+    "login_failed": "ورود ناموفق بود",
+    "invalid_credentials": "نام کاربری یا رمز عبور اشتباه است",
+    "network_error": "خطا در ارتباط با سرور",
+    "required_field": "این فیلد الزامی است"
+  },
+  "overview": {
+    "welcome": "خوش آمدید!",
+    "description": "به پنل مدیریت VPN خوش آمدید. اینجا می‌توانید تمام تنظیمات و کاربران VPN را مدیریت کنید."
+  }
+}

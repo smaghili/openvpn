@@ -1,0 +1,236 @@
+/* Themes CSS - سیستم مدیریت تم */
+
+/* Light Theme (Default) */
+[data-theme="light"] {
+    --bg-primary: var(--neutral-50);
+    --bg-secondary: var(--neutral-100);
+    --bg-tertiary: var(--neutral-200);
+    --bg-surface: white;
+    --bg-overlay: rgba(0, 0, 0, 0.5);
+    
+    --text-primary: var(--neutral-900);
+    --text-secondary: var(--neutral-700);
+    --text-tertiary: var(--neutral-500);
+    --text-inverse: white;
+    
+    --border-primary: var(--neutral-200);
+    --border-secondary: var(--neutral-300);
+    --border-focus: var(--primary-500);
+    
+    --shadow-primary: var(--shadow-sm);
+    --shadow-secondary: var(--shadow-md);
+    --shadow-tertiary: var(--shadow-lg);
+    
+    --input-bg: white;
+    --input-border: var(--neutral-300);
+    --input-text: var(--neutral-900);
+    
+    --button-primary-bg: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+    --button-primary-text: white;
+    --button-primary-border: var(--primary-600);
+    
+    --button-secondary-bg: var(--neutral-100);
+    --button-secondary-text: var(--neutral-700);
+    --button-secondary-border: var(--neutral-300);
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+    --bg-primary: var(--neutral-900);
+    --bg-secondary: var(--neutral-800);
+    --bg-tertiary: var(--neutral-700);
+    --bg-surface: var(--neutral-800);
+    --bg-overlay: rgba(0, 0, 0, 0.7);
+    
+    --text-primary: var(--neutral-100);
+    --text-secondary: var(--neutral-300);
+    --text-tertiary: var(--neutral-500);
+    --text-inverse: var(--neutral-900);
+    
+    --border-primary: var(--neutral-700);
+    --border-secondary: var(--neutral-600);
+    --border-focus: var(--primary-400);
+    
+    --shadow-primary: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+    --shadow-secondary: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    --shadow-tertiary: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    
+    --input-bg: var(--neutral-800);
+    --input-border: var(--neutral-600);
+    --input-text: var(--neutral-100);
+    
+    --button-primary-bg: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+    --button-primary-text: var(--neutral-900);
+    --button-primary-border: var(--primary-500);
+    
+    --button-secondary-bg: var(--neutral-700);
+    --button-secondary-text: var(--neutral-200);
+    --button-secondary-border: var(--neutral-600);
+}
+
+/* Theme Transition */
+* {
+    transition: background-color var(--transition-normal),
+                color var(--transition-normal),
+                border-color var(--transition-normal),
+                box-shadow var(--transition-normal);
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+    position: relative;
+    width: 3rem;
+    height: 1.5rem;
+    background: var(--neutral-300);
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border: none;
+    outline: none;
+}
+
+.theme-toggle::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 1.25rem;
+    height: 1.25rem;
+    background: white;
+    border-radius: 50%;
+    transition: transform var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+}
+
+[data-theme="dark"] .theme-toggle {
+    background: var(--primary-600);
+}
+
+[data-theme="dark"] .theme-toggle::before {
+    transform: translateX(1.5rem);
+}
+
+.theme-toggle:hover {
+    transform: scale(1.05);
+}
+
+/* Theme-aware Components */
+.card {
+    background: var(--bg-surface);
+    border-color: var(--border-primary);
+    box-shadow: var(--shadow-primary);
+}
+
+.form-input {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+}
+
+.form-input:focus {
+    border-color: var(--border-focus);
+}
+
+.btn-primary {
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text);
+    border-color: var(--button-primary-border);
+}
+
+.btn-secondary {
+    background: var(--button-secondary-bg);
+    color: var(--button-secondary-text);
+    border-color: var(--button-secondary-border);
+}
+
+/* Language Selector */
+.language-selector {
+    position: relative;
+    display: inline-block;
+}
+
+.language-select {
+    appearance: none;
+    background: var(--bg-surface);
+    border: 2px solid var(--border-primary);
+    color: var(--text-primary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.language-select:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
+}
+
+.language-select:hover {
+    border-color: var(--border-secondary);
+}
+
+/* Theme-aware Backgrounds */
+.bg-primary { background-color: var(--bg-primary); }
+.bg-secondary { background-color: var(--bg-secondary); }
+.bg-surface { background-color: var(--bg-surface); }
+
+/* Theme-aware Text */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }
+
+/* Theme-aware Borders */
+.border-primary { border-color: var(--border-primary); }
+.border-secondary { border-color: var(--border-secondary); }
+
+/* Theme-aware Shadows */
+.shadow-primary { box-shadow: var(--shadow-primary); }
+.shadow-secondary { box-shadow: var(--shadow-secondary); }
+.shadow-tertiary { box-shadow: var(--shadow-tertiary); }
+
+/* Smooth theme switching */
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Theme indicator */
+.theme-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+}
+
+.theme-indicator::before {
+    content: "🌙";
+    font-size: 1rem;
+}
+
+[data-theme="light"] .theme-indicator::before {
+    content: "☀️";
+}
+
+/* Responsive theme controls */
+@media (max-width: 768px) {
+    .theme-toggle {
+        width: 2.5rem;
+        height: 1.25rem;
+    }
+    
+    .theme-toggle::before {
+        width: 1rem;
+        height: 1rem;
+    }
+    
+    [data-theme="dark"] .theme-toggle::before {
+        transform: translateX(1.25rem);
+    }
+}

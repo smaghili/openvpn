@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ورود به پنل VPN</title>
+    
+    <!-- Shared CSS -->
+    <link rel="stylesheet" href="../../shared/css/base.css" />
+    <link rel="stylesheet" href="../../shared/css/components.css" />
+    <link rel="stylesheet" href="../../shared/css/themes.css" />
+    
+    <!-- Page specific CSS -->
+    <link rel="stylesheet" href="login.css" />
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>" />
+</head>
+<body>
+    <!-- Background Pattern -->
+    <div class="background-pattern"></div>
+    
+    <!-- Main Container -->
+    <div class="login-container">
+        <!-- Header Controls -->
+        <div class="header-controls">
+            <div class="control-group">
+                <button class="theme-toggle" id="themeToggle" aria-label="تغییر تم">
+                    <span class="theme-icon">☀️</span>
+                </button>
+                
+                <div class="language-selector">
+                    <select class="language-select" id="languageSelect" aria-label="انتخاب زبان">
+                        <option value="fa">فارسی</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Login Card -->
+        <div class="login-card">
+            <!-- Logo Section -->
+            <div class="logo-section">
+                <div class="logo-icon">🔒</div>
+                <h1 class="logo-title" data-i18n="login.title">پنل مدیریت VPN</h1>
+                <p class="logo-subtitle" data-i18n="login.subtitle">به سیستم مدیریت VPN خوش آمدید</p>
+            </div>
+            
+            <!-- Login Form -->
+            <form class="login-form" id="loginForm" novalidate>
+                <!-- Username Field -->
+                <div class="form-group">
+                    <label for="username" class="form-label" data-i18n="login.username_label">نام کاربری</label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            class="form-input" 
+                            placeholder="نام کاربری خود را وارد کنید"
+                            data-i18n-placeholder="login.username_placeholder"
+                            required 
+                            autocomplete="username"
+                        />
+                        <div class="input-icon">👤</div>
+                    </div>
+                </div>
+                
+                <!-- Password Field -->
+                <div class="form-group">
+                    <label for="password" class="form-label" data-i18n="login.password_label">رمز عبور</label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            class="form-input" 
+                            placeholder="رمز عبور خود را وارد کنید"
+                            data-i18n-placeholder="login.password_placeholder"
+                            required 
+                            autocomplete="current-password"
+                        />
+                        <div class="input-icon">🔐</div>
+                        <button type="button" class="password-toggle" id="passwordToggle" aria-label="نمایش/مخفی کردن رمز عبور">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Remember Me & Forgot Password -->
+                <div class="form-options">
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="rememberMe" name="rememberMe" class="checkbox-input" />
+                        <span class="checkbox-label" data-i18n="login.remember_me">مرا به خاطر بسپار</span>
+                    </label>
+                    
+                    <a href="#" class="forgot-password" data-i18n="common.forgot_password">فراموشی رمز عبور</a>
+                </div>
+                
+                <!-- Login Button -->
+                <button type="submit" class="btn btn-primary btn-lg login-btn" id="loginBtn">
+                    <span class="btn-text" data-i18n="login.login_button">ورود</span>
+                    <span class="btn-spinner spinner" style="display: none;"></span>
+                </button>
+            </form>
+            
+            <!-- Footer -->
+            <div class="login-footer">
+                <p class="footer-text">
+                    <span data-i18n="common.powered_by">قدرت گرفته از</span>
+                    <strong>OpenVPN Manager</strong>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-container"></div>
+    
+    <!-- Shared JavaScript -->
+    <script src="../../shared/js/core.js"></script>
+    
+    <!-- Page specific JavaScript -->
+    <script src="login.js"></script>
+</body>
+</html>

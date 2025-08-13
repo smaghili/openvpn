@@ -1,0 +1,37 @@
+{
+  "login": {
+    "title": "VPN Management Panel",
+    "subtitle": "Welcome to VPN Management System",
+    "username_label": "Username",
+    "password_label": "Password",
+    "remember_me": "Remember me",
+    "login_button": "Login",
+    "username_placeholder": "Enter your username",
+    "password_placeholder": "Enter your password"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "theme": "Theme",
+    "language": "Language",
+    "persian": "فارسی",
+    "english": "English"
+  },
+  "messages": {
+    "login_success": "Login successful",
+    "login_failed": "Login failed",
+    "invalid_credentials": "Invalid username or password",
+    "network_error": "Network error or server unavailable",
+    "required_field": "This field is required"
+  },
+  "overview": {
+    "welcome": "Welcome!",
+    "description": "Welcome to VPN Management Panel. Here you can manage all VPN settings and users."
+  }
+}
