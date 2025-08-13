@@ -61,7 +61,7 @@ def create_app() -> Flask:
 
         return profile_data(profile_token)
 
- @app.route('/profile/<profile_token>/config.ovpn')
+    @app.route('/profile/<profile_token>/config.ovpn')
     def download_ovpn_config(profile_token):
         """Download OpenVPN config - delegate to profile routes."""
         from .routes.profile_routes import download_ovpn_config as download_config
