@@ -13,7 +13,12 @@ if project_root not in sys.path:
 from config.paths import VPNPaths
 
 def load_env_vars():
-    """Load environment variables from .env file."""
+    """Load environment variables from .env file.
+
+    If the file exists but isn't readable (e.g. due to permissions), a
+    warning is logged and execution proceeds. It's still recommended to fix
+    the file permissions so variables can be loaded normally.
+    """
     env_file = os.path.join(os.path.dirname(__file__), '..', '.env')
     if os.path.exists(env_file):
         try:
@@ -24,6 +29,8 @@ def load_env_vars():
                         key, value = line.split('=', 1)
                         os.environ[key] = value
         except PermissionError:
+            # Fall back to logging so quota checks still run; ideally the
+            # file should be readable by this script.
             log_file = get_log_file()
             log_dir = os.path.dirname(log_file)
             try:
@@ -33,7 +40,10 @@ def load_env_vars():
             timestamp = datetime.now().isoformat()
             try:
                 with open(log_file, 'a') as log:
-                    log.write(f"{timestamp} - WARNING: Unable to read env file '{env_file}' (permission denied)\n")
+                    log.write(
+                        f"{timestamp} - WARNING: Unable to read env file '{env_file}' "
+                        "(permission denied). Ensure proper file permissions.\n"
+                    )
             except Exception:
                 pass
 
