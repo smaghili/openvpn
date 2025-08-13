@@ -12,6 +12,8 @@ This method uses the new, refactored Python application for a more robust and ma
 bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/deploy.sh)
 ```
 
+The deployment script configures the entire stack and generates all required secrets automatically—no manual environment variables or additional steps are needed.
+
 ### Legacy Installation (Shell-based)
 
 This is the original shell-based installer. It is still functional but no longer under active development.
@@ -19,16 +21,6 @@ This is the original shell-based installer. It is still functional but no longer
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/install.sh)
 ```
-
-### API Secret Key
-
-Before starting the API server, generate and export a strong secret key using the `API_SECRET_KEY` environment variable:
-
-```bash
-export API_SECRET_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '=+/')
-```
-
-This command creates a high-entropy random key. Keep this value private. The application will fail to start if this variable is missing.
 
 ---
 
@@ -43,3 +35,5 @@ This command creates a high-entropy random key. Keep this value private. The app
   - Robust backup and restore functionality
   - Designed for maintainability and real-world production use
   - **Complete TCP monitor removal** - old 7505/7506 ports eliminated
+
+For a Persian installation guide see [README.fa.md](README.fa.md).
