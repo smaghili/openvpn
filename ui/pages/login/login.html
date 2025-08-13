@@ -17,29 +17,25 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>" />
 </head>
 <body>
-    <!-- Background Pattern -->
-    <div class="background-pattern"></div>
-    
     <!-- Main Container -->
     <div class="login-container">
-        <!-- Header Controls -->
-        <div class="header-controls">
-            <div class="control-group">
-                <button class="theme-toggle" id="themeToggle" aria-label="تغییر تم">
-                    <span class="theme-icon">☀️</span>
-                </button>
-                
-                <div class="language-selector">
-                    <select class="language-select" id="languageSelect" aria-label="انتخاب زبان">
-                        <option value="fa">فارسی</option>
-                        <option value="en">English</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        
         <!-- Login Card -->
         <div class="login-card">
+            <!-- Header Controls inside card -->
+            <div class="header-controls">
+                <div class="control-group">
+                    <button class="theme-toggle" id="themeToggle" aria-label="تغییر تم">
+                        <span class="theme-icon">☀️</span>
+                    </button>
+                    <div class="language-selector">
+                        <select class="language-select" id="languageSelect" aria-label="انتخاب زبان">
+                            <option value="fa">فارسی</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Logo Section -->
             <div class="logo-section">
                 <div class="logo-icon">🔒</div>
@@ -58,7 +54,7 @@
                             id="username" 
                             name="username" 
                             class="form-input" 
-                            placeholder="نام کاربری خود را وارد کنید"
+                            placeholder=""
                             data-i18n-placeholder="login.username_placeholder"
                             required 
                             autocomplete="username"
@@ -76,15 +72,13 @@
                             id="password" 
                             name="password" 
                             class="form-input" 
-                            placeholder="رمز عبور خود را وارد کنید"
+                            placeholder=""
                             data-i18n-placeholder="login.password_placeholder"
                             required 
                             autocomplete="current-password"
                         />
                         <div class="input-icon">🔐</div>
-                        <button type="button" class="password-toggle" id="passwordToggle" aria-label="نمایش/مخفی کردن رمز عبور">
-                            👁️
-                        </button>
+                        <button type="button" class="password-toggle" id="passwordToggle" aria-label="نمایش/مخفی کردن رمز عبور">👁️</button>
                     </div>
                 </div>
                 
@@ -94,7 +88,6 @@
                         <input type="checkbox" id="rememberMe" name="rememberMe" class="checkbox-input" />
                         <span class="checkbox-label" data-i18n="login.remember_me">مرا به خاطر بسپار</span>
                     </label>
-                    
                     <a href="#" class="forgot-password" data-i18n="common.forgot_password">فراموشی رمز عبور</a>
                 </div>
                 
@@ -115,7 +108,7 @@
         </div>
     </div>
     
-    <!-- Notification Container -->
+    <!-- Fixed Notification Container -->
     <div id="notificationContainer" class="notification-container"></div>
     
     <!-- Shared JavaScript -->

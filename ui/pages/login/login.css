@@ -34,88 +34,6 @@
     z-index: 1;
 }
 
-/* Header Controls */
-.header-controls {
-    position: absolute;
-    top: var(--spacing-xl);
-    right: var(--spacing-xl);
-    z-index: 10;
-}
-
-.control-group {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-}
-
-/* Theme Toggle Customization */
-.theme-toggle {
-    width: 3.5rem;
-    height: 2rem;
-    background: var(--neutral-200);
-    border-radius: 1rem;
-    border: 2px solid var(--neutral-300);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    position: relative;
-    overflow: hidden;
-}
-
-.theme-toggle::before {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 1.5rem;
-    height: 1.5rem;
-    background: white;
-    border-radius: 50%;
-    transition: all var(--transition-fast);
-    box-shadow: var(--shadow-md);
-}
-
-[data-theme="dark"] .theme-toggle {
-    background: var(--primary-600);
-    border-color: var(--primary-500);
-}
-
-[data-theme="dark"] .theme-toggle::before {
-    transform: translateX(1.5rem);
-}
-
-.theme-toggle:hover {
-    transform: scale(1.05);
-    box-shadow: var(--shadow-lg);
-}
-
-/* Language Select Customization */
-.language-select {
-    min-width: 120px;
-    background: var(--bg-surface);
-    border: 2px solid var(--border-primary);
-    color: var(--text-primary);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    box-shadow: var(--shadow-sm);
-}
-
-.language-select:focus {
-    outline: none;
-    border-color: var(--border-focus);
-    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
-    transform: translateY(-1px);
-}
-
-.language-select:hover {
-    border-color: var(--border-secondary);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-}
-
 /* Login Card */
 .login-card {
     background: var(--bg-surface);
@@ -417,12 +335,12 @@
     font-weight: 600;
 }
 
-/* Notification Container */
+/* Notification Container fixed top without scroll jump */
 .notification-container {
     position: fixed;
-    top: var(--spacing-xl);
-    right: var(--spacing-xl);
-    z-index: 1000;
+    top: var(--spacing-lg);
+    right: var(--spacing-lg);
+    z-index: 2000;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);

@@ -21,7 +21,13 @@
     "theme": "تم",
     "language": "زبان",
     "persian": "فارسی",
-    "english": "English"
+    "english": "English",
+    "forgot_password": "فراموشی رمز عبور",
+    "powered_by": "قدرت گرفته از",
+    "theme_light": "تم روشن فعال شد",
+    "theme_dark": "تم تاریک فعال شد",
+    "lang_changed_fa": "زبان فارسی انتخاب شد",
+    "lang_changed_en": "Language English selected"
   },
   "messages": {
     "login_success": "ورود موفقیت‌آمیز بود",

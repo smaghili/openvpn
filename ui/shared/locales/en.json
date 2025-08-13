@@ -21,7 +21,13 @@
     "theme": "Theme",
     "language": "Language",
     "persian": "فارسی",
-    "english": "English"
+    "english": "English",
+    "forgot_password": "Forgot password",
+    "powered_by": "Powered by",
+    "theme_light": "Light theme enabled",
+    "theme_dark": "Dark theme enabled",
+    "lang_changed_fa": "زبان فارسی انتخاب شد",
+    "lang_changed_en": "Language English selected"
   },
   "messages": {
     "login_success": "Login successful",
