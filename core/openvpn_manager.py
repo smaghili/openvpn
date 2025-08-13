@@ -599,7 +599,11 @@ tls-version-min 1.2
             "/var/run/openvpn",
         ]
         for path in directories_to_remove:
-            if os.path.exists(path):
+            if not os.path.exists(path):
+                continue
+            if os.path.islink(path) or os.path.isfile(path):
+                os.remove(path)
+            else:
                 shutil.rmtree(path)
 
         if not silent:
