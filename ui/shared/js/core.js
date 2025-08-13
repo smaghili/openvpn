@@ -31,33 +31,36 @@ window.VPNPanel = {
 	
 	// Load translation files
 	async loadTranslations() {
-		try {
-			const response = await fetch(`/ui/shared/locales/${this.currentLanguage}.json`, { cache: 'no-store' });
-			this.translations = await response.json();
-			return true;
-		} catch (error) {
-			console.warn('Failed to load translations:', error);
-			// Fallback to English if current language fails
-			if (this.currentLanguage !== 'en') {
-				try {
-					const response = await fetch('/ui/shared/locales/en.json', { cache: 'no-store' });
-					this.translations = await response.json();
-					return true;
-				} catch (fallbackError) {
-					console.error('Failed to load fallback translations:', fallbackError);
-				}
-			}
-			return false;
-		}
-	},
+                try {
+                        const basePath = window.location.pathname.split('/ui/')[0];
+                        const url = `${basePath}/ui/shared/locales/${this.currentLanguage}.json`;
+                        const response = await fetch(url, { cache: 'no-store' });
+                        this.translations = await response.json();
+                        return true;
+                } catch (error) {
+                        console.warn('Failed to load translations:', error);
+                        if (this.currentLanguage !== 'en') {
+                                try {
+                                        const basePath = window.location.pathname.split('/ui/')[0];
+                                        const response = await fetch(`${basePath}/ui/shared/locales/en.json`, { cache: 'no-store' });
+                                        this.translations = await response.json();
+                                        return true;
+                                } catch (fallbackError) {
+                                        console.error('Failed to load fallback translations:', fallbackError);
+                                }
+                        }
+                        return false;
+                }
+        },
 	
 	// Setup global event listeners
 	setupEventListeners() {
 		// Listen for theme changes
-		document.addEventListener('themeChanged', (event) => {
-			this.currentTheme = event.detail.theme;
-			this.saveSettings();
-		});
+                document.addEventListener('themeChanged', (event) => {
+                        this.currentTheme = event.detail.theme;
+                        this.saveSettings();
+                        this.applyTheme();
+                });
 		
 		// Listen for language changes
 		document.addEventListener('languageChanged', (event) => {
