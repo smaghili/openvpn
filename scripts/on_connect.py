@@ -13,15 +13,39 @@ if project_root not in sys.path:
 from config.paths import VPNPaths
 
 def load_env_vars():
-    """Load environment variables from .env file."""
+    """Load environment variables from .env file.
+
+    If the file exists but isn't readable (e.g. due to permissions), a
+    warning is logged and execution proceeds. It's still recommended to fix
+    the file permissions so variables can be loaded normally.
+    """
     env_file = os.path.join(os.path.dirname(__file__), '..', '.env')
     if os.path.exists(env_file):
-        with open(env_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    os.environ[key] = value
+        try:
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        os.environ[key] = value
+        except PermissionError:
+            # Fall back to logging so quota checks still run; ideally the
+            # file should be readable by this script.
+            log_file = get_log_file()
+            log_dir = os.path.dirname(log_file)
+            try:
+                os.makedirs(log_dir, exist_ok=True)
+            except Exception:
+                pass
+            timestamp = datetime.now().isoformat()
+            try:
+                with open(log_file, 'a') as log:
+                    log.write(
+                        f"{timestamp} - WARNING: Unable to read env file '{env_file}' "
+                        "(permission denied). Ensure proper file permissions.\n"
+                    )
+            except Exception:
+                pass
 
 def get_log_file():
     return os.environ.get('OPENVPN_LOG_FILE', '/var/log/openvpn/traffic_monitor.log')
