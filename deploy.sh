@@ -192,8 +192,8 @@ QUOTA_BUFFER_BYTES=20971520
 MAX_LOG_SIZE=10485760
 EOF
     
-    # Set secure permissions
-    chmod 600 "$ENV_FILE"
+    # Set permissions so OpenVPN hooks can read the file
+    chmod 755 "$ENV_FILE"
     chown root:root "$ENV_FILE"
     
     print_success "Environment configuration created"

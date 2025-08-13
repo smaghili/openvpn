@@ -599,7 +599,11 @@ tls-version-min 1.2
             "/var/run/openvpn",
         ]
         for path in directories_to_remove:
-            if os.path.exists(path):
+            if not os.path.exists(path):
+                continue
+            if os.path.islink(path) or os.path.isfile(path):
+                os.remove(path)
+            else:
                 shutil.rmtree(path)
 
         if not silent:
@@ -667,6 +671,14 @@ tls-version-min 1.2
             "5": 'push "dhcp-option DNS 94.140.14.14"\npush "dhcp-option DNS 94.140.15.15"',
         }.get(self.settings.get("dns", "3"), "")
 
+        cipher_config = self.settings.get("cipher", "AES-256-GCM") + ":AES-128-GCM"
+        cc_cipher_config = (
+            "TLS-ECDHE-RSA-WITH-AES-256-GCM-SHA384:"
+            "TLS-ECDHE-RSA-WITH-CHACHA20-POLY1305-SHA256:"
+            "TLS-ECDHE-RSA-WITH-AES-128-GCM-SHA256:"
+            "TLS-ECDHE-RSA-WITH-AES-256-CBC-SHA384"
+        )
+
         return f"""port {{port}}
 proto {{proto}}
 dev tun
@@ -685,6 +697,10 @@ push "redirect-gateway def1 bypass-dhcp"
 {dns_lines}
 keepalive 10 120
 cipher {self.settings.get("cipher", "AES-256-GCM")}
+ncp-ciphers {cipher_config}
+tls-server
+tls-version-min 1.2
+tls-cipher {cc_cipher_config}
 user nobody
 group nogroup
 persist-key
