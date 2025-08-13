@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>VPN Control Panel</title>
+ <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+ <header class="topbar">
+  <div class="logo">VPN Panel</div>
+  <div class="actions">
+   <input id="global-search" placeholder="Search" aria-label="Search">
+   <button id="theme-toggle" aria-label="Toggle theme">&#9728;</button>
+  </div>
+ </header>
+ <main class="layout">
+  <section class="sidebar">
+   <nav>
+    <button class="nav-btn active" data-panel="dashboard">Dashboard</button>
+    <button class="nav-btn" data-panel="servers">Servers</button>
+    <button class="nav-btn" data-panel="users">Users</button>
+    <button class="nav-btn" data-panel="tunnels">Tunnels</button>
+    <button class="nav-btn" data-panel="settings">Settings</button>
+   </nav>
+  </section>
+  <section class="content">
+   <div id="dashboard" class="panel active">
+    <div class="cards">
+     <div class="card"><h3>Online Servers</h3><p id="online-count">0</p></div>
+     <div class="card"><h3>Active Sessions</h3><p id="session-count">0</p></div>
+     <div class="card"><h3>Tunnel Health</h3><canvas id="tunnel-chart"></canvas></div>
+    </div>
+    <div id="three-container"></div>
+   </div>
+   <div id="servers" class="panel">
+    <div class="list-header">
+     <h2>Servers</h2>
+     <button id="add-server">Add</button>
+    </div>
+    <table class="table" id="server-table">
+     <thead><tr><th>Name</th><th>Status</th><th>CPU</th><th>RAM</th><th>Actions</th></tr></thead>
+     <tbody></tbody>
+    </table>
+   </div>
+   <div id="users" class="panel">
+    <div class="list-header">
+     <h2>Users</h2>
+     <button id="add-user">Create</button>
+    </div>
+    <table class="table" id="user-table">
+     <thead><tr><th>User</th><th>Sessions</th><th>Device</th><th>Actions</th></tr></thead>
+     <tbody></tbody>
+    </table>
+   </div>
+   <div id="tunnels" class="panel">
+    <h2>Tunnels</h2>
+    <div id="tunnel-graph"></div>
+   </div>
+   <div id="settings" class="panel">
+    <h2>Settings</h2>
+    <div class="setting-item"><label>Theme</label><button id="settings-theme-toggle">Toggle</button></div>
+    <div class="setting-item"><label>Density</label><select id="density-select"><option>Comfortable</option><option>Compact</option></select></div>
+    <div class="setting-item"><label>Language</label><select disabled><option>English</option></select></div>
+   </div>
+  </section>
+ </main>
+ <div id="command-palette" class="modal" hidden>
+  <input id="command-input" placeholder="Type a command">
+ </div>
+ <div id="toast-container"></div>
+ <script type="module" src="app.js"></script>
+</body>
+</html>
