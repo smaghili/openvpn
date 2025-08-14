@@ -309,22 +309,6 @@ class OverviewDashboard {
                 this.openLogModal(service);
             });
         });
-
-        document.getElementById('refreshLog').addEventListener('click', () => {
-            if (this.currentLogService) {
-                this.loadLogs(this.currentLogService);
-            }
-        });
-
-        document.getElementById('liveLog').addEventListener('click', () => {
-            this.toggleLiveMode();
-        });
-
-        document.getElementById('downloadLog').addEventListener('click', () => {
-            if (this.currentLogService) {
-                this.downloadLogs(this.currentLogService);
-            }
-        });
     }
 
     openLogModal(service) {
@@ -485,12 +469,19 @@ class OverviewDashboard {
             });
         });
 
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-                if (e.target.id === 'logModal' && this.isLiveMode) {
-                    this.toggleLiveMode();
-                }
+        document.getElementById('refreshLog').addEventListener('click', () => {
+            if (this.currentLogService) {
+                this.loadLogs(this.currentLogService);
+            }
+        });
+
+        document.getElementById('liveLog').addEventListener('click', () => {
+            this.toggleLiveMode();
+        });
+
+        document.getElementById('downloadLog').addEventListener('click', () => {
+            if (this.currentLogService) {
+                this.downloadLogs(this.currentLogService);
             }
         });
 
