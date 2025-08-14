@@ -1,27 +1,17 @@
-/* ===== Login Page Modern Styling (isolated) ===== */
-@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
+/* ===== Login Page Specific Styles ===== */
+@import url('../shared/variables.css');
+@import url('../shared/components.css');
 
-:root {
-  --bg-color: #fff;
-  --text-color: #000;
-  --accent-color: #333;
-  --border-style: 1px dashed #999;
-}
-html.dark {
-  --bg-color: #0f172a;
-  --text-color: #f1f5f9;
-  --accent-color: #cbd5e1;
-  --border-style: 1px solid rgba(148,163,184,0.3);
-}
+/* Base Body */
 body {
   margin: 0;
-  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg-color);
   color: var(--text-color);
   direction: rtl;
-  transition: all 0.3s ease;
+  transition: var(--theme-transition);
 }
 
+/* Animated Background */
 .login-page {
   height: 100vh;
   overflow: hidden;
@@ -57,27 +47,13 @@ html.dark .login-page {
   padding: 1rem;
 }
 
+/* Login specific card styling */
 .auth-card {
   width: 100%;
   max-width: 400px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0.35));
-  border-radius: 18px;
-  border: 1px solid rgba(148,163,184,0.2);
-  box-shadow:
-    0 10px 25px rgba(0,0,0,0.15),
-    0 1px 0 rgba(255,255,255,0.25) inset;
-  padding: 1.5rem;
-  backdrop-filter: blur(20px);
 }
 
-html.dark .auth-card {
-  background: linear-gradient(180deg, rgba(30,41,59,0.8), rgba(15,23,42,0.7));
-  border-color: rgba(59, 130, 246, 0.2);
-  box-shadow:
-    0 20px 40px rgba(0,0,0,0.4),
-    0 1px 0 rgba(59, 130, 246, 0.1) inset;
-}
-
+/* Brand Section */
 .brand {
   display: flex;
   align-items: center;
@@ -106,6 +82,7 @@ html.dark .auth-card {
   margin-top: 0.5rem;
 }
 
+/* Input Groups */
 .input-group {
   display: block;
   margin-top: 1rem;
@@ -117,156 +94,7 @@ html.dark .auth-card {
   font-size: 0.9rem;
 }
 
-.input-wrapper {
-  display: grid;
-  grid-template-columns: 40px 1fr 44px;
-  align-items: center;
-  border-radius: 12px;
-  border: 2px solid rgba(148,163,184,0.3);
-  background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.4));
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-html.dark .input-wrapper {
-  background: linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.75));
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-.input-icon {
-  text-align: center;
-  opacity: 0.65;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.input-wrapper input[type=text],
-.input-wrapper input[type=password] {
-  width: 100%;
-  padding: 0.9rem 0.75rem;
-  border: none;
-  background: transparent;
-  color: var(--text-color);
-  outline: none;
-}
-
-.input-wrapper:focus-within {
-  border-color: #3b82f6;
-  box-shadow: 
-    0 0 0 3px rgba(59, 130, 246, 0.1),
-    0 4px 12px rgba(59, 130, 246, 0.15);
-  background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.7));
-}
-
-html.dark .input-wrapper:focus-within {
-  border-color: #10b981;
-  box-shadow: 
-    0 0 0 3px rgba(16, 185, 129, 0.15),
-    0 4px 12px rgba(16, 185, 129, 0.2);
-  background: linear-gradient(180deg, rgba(30,41,59,0.95), rgba(15,23,42,0.85));
-}
-
-.password-toggle { 
-  border: none; 
-  background: transparent; 
-  cursor: pointer; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  padding: 0; 
-  height: 100%;
-  width: 100%;
-}
-
-.password-toggle .eye { 
-  width: 22px; 
-  height: 22px; 
-  opacity: 0.8;
-  color: #374151;
-}
-
-html.dark .password-toggle .eye {
-  color: #f1f5f9;
-}
-
-.password-toggle .slash { 
-  opacity: 1; 
-}
-
-.password-toggle[data-visible="true"] .slash { 
-  opacity: 0; 
-}
-
-.checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  user-select: none;
-}
-
-.checkbox input { display: none; }
-
-.checkmark {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  border: 1px solid rgba(148,163,184,0.8);
-  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
-  display: inline-block;
-  position: relative;
-}
-
-html.dark .checkmark {
-  background: linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.7));
-  border-color: rgba(16, 185, 129, 0.4);
-}
-
-.checkbox input:checked + .checkmark::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 8px;
-  height: 8px;
-  transform: translate(-50%, -50%);
-  background: linear-gradient(45deg, #4F46E5, #14B8A6);
-  border-radius: 2px;
-}
-
-.checkbox-label { opacity: 0.8; }
-
-.btn-primary {
-  width: 100%;
-  margin-top: 1.25rem;
-  padding: 0.9rem 1rem;
-  border-radius: 12px;
-  border: none;
-  color: white;
-  background: linear-gradient(90deg, #3b82f6, #10b981);
-  box-shadow: 0 8px 18px rgba(16,185,129,0.35);
-  cursor: pointer;
-  position: relative;
-}
-
-.btn-primary:disabled { opacity: 0.6; cursor: default; }
-
-.btn-primary .spinner {
-  position: absolute;
-  inset-inline-end: 14px;
-  top: 50%;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255,255,255,0.6);
-  border-top-color: white;
-  border-radius: 50%;
-  transform: translateY(-50%);
-  opacity: 0;
-}
-
-.btn-primary.loading .spinner { animation: spin 0.9s linear infinite; opacity: 1; }
-
-@keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
-
+/* Controls Row */
 .controls-row {
   display: flex;
   align-items: center;
@@ -275,40 +103,28 @@ html.dark .checkmark {
   margin: 1rem 0 0.5rem;
 }
 
-.dropdown-wrapper {
-  position: relative;
+/* Language Dropdown - Login Specific */
+.flag-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 16px;
 }
 
-.dropdown-btn {
-  display: grid;
-  grid-template-columns: 24px 1fr 16px;
-  align-items: center;
-  column-gap: 8px;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid rgba(148,163,184,0.5);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
-  color: var(--text-color);
-  cursor: pointer;
-  font-size: 0.9rem;
-  min-width: 160px;
+.lang-label {
+  white-space: nowrap;
 }
-.flag-box{display:flex;align-items:center;justify-content:center;width:24px;height:16px}
-.lang-label{white-space:nowrap}
-.dropdown-arrow{justify-self:end}
+
+.dropdown-arrow {
+  justify-self: end;
+  transition: transform 0.2s;
+}
+
 .current-lang {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-}
-
-html.dark .dropdown-btn { 
-  background: linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.7)); 
-  border-color: rgba(100,116,139,0.5); 
-}
-
-.dropdown-arrow {
-  transition: transform 0.2s;
 }
 
 .dropdown-btn[aria-expanded="true"] .dropdown-arrow {
@@ -316,79 +132,30 @@ html.dark .dropdown-btn {
 }
 
 .dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
   right: 0;
-  margin-top: 0.25rem;
-  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
-  border: 1px solid rgba(148,163,184,0.5);
-  border-radius: 12px;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-8px);
-  transition: all 0.2s;
-  z-index: 100;
-  min-width: 160px;
+  width: 140px;
 }
 
-html.dark .dropdown-menu { 
-  background: linear-gradient(180deg, rgba(30,41,59,0.95), rgba(15,23,42,0.85)); 
-  border-color: rgba(100,116,139,0.5); 
-}
-
-.dropdown-menu.open {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 0.8rem;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.dropdown-item:hover {
-  background: rgba(79,70,229,0.1);
-}
-
-.dropdown-item:first-child { border-radius: 12px 12px 0 0; }
-.dropdown-item:last-child { border-radius: 0 0 12px 12px; }
-
-.lang-flag { 
+.lang-flag {
   display: inline-flex;
   align-items: center;
   margin-right: 0.25rem;
 }
+
 .lang-flag svg {
   border-radius: 2px;
   border: 1px solid rgba(0,0,0,0.1);
 }
-.lang-name { font-weight: 500; }
 
-.theme-btn {
-  border: none;
-  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
-  border: 1px solid rgba(148,163,184,0.5);
-  border-radius: 12px;
-  padding: 0.45rem 0.6rem;
-  cursor: pointer;
+.lang-name {
+  font-weight: 500;
 }
 
-html.dark .theme-btn { 
-  background: linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.7)); 
-  border-color: rgba(100,116,139,0.5); 
-}
-
-.auth-footer { 
-  margin-top: 1rem; 
-  text-align: center; 
-  opacity: 0.7; 
+/* Footer */
+.auth-footer {
+  margin-top: 1rem;
+  text-align: center;
+  opacity: 0.7;
 }
 
 /* Toast and Modal styles for login page */
@@ -426,4 +193,4 @@ html.dark .theme-btn {
   padding: 1rem;
   border: var(--border-style);
   min-width: 300px;
-} 
+}

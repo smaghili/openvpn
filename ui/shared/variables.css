@@ -1,0 +1,60 @@
+/* ===== Global CSS Variables ===== */
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
+
+:root {
+  /* Colors */
+  --bg-color: #fff;
+  --text-color: #000;
+  --accent-color: #333;
+  --border-style: 1px dashed #999;
+  
+  /* Theme Colors */
+  --primary-blue: #3b82f6;
+  --primary-green: #10b981;
+  --primary-purple: #8b5cf6;
+  
+  /* Backgrounds */
+  --card-bg: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0.35));
+  --input-bg: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.4));
+  --input-focus-bg: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.7));
+  
+  /* Borders */
+  --card-border: 1px solid rgba(148,163,184,0.2);
+  --input-border: 2px solid rgba(148,163,184,0.3);
+  --input-focus-border: var(--primary-blue);
+  
+  /* Shadows */
+  --card-shadow: 0 10px 25px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.25) inset;
+  --input-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 4px 12px rgba(59, 130, 246, 0.15);
+  
+  /* Transitions */
+  --smooth-transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  --theme-transition: all 0.3s ease;
+}
+
+html.dark {
+  /* Dark Theme Colors */
+  --bg-color: #0f172a;
+  --text-color: #f1f5f9;
+  --accent-color: #cbd5e1;
+  --border-style: 1px solid rgba(148,163,184,0.3);
+  
+  /* Dark Backgrounds */
+  --card-bg: linear-gradient(180deg, rgba(30,41,59,0.8), rgba(15,23,42,0.7));
+  --input-bg: linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.75));
+  --input-focus-bg: linear-gradient(180deg, rgba(30,41,59,0.95), rgba(15,23,42,0.85));
+  
+  /* Dark Borders */
+  --card-border: 1px solid rgba(59, 130, 246, 0.2);
+  --input-border: 2px solid rgba(59, 130, 246, 0.3);
+  --input-focus-border: var(--primary-green);
+  
+  /* Dark Shadows */
+  --card-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 1px 0 rgba(59, 130, 246, 0.1) inset;
+  --input-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15), 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+/* Base Font */
+body {
+  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
