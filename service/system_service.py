@@ -48,9 +48,9 @@ class SystemService:
             
             # Memory Usage (lightweight)
             memory = psutil.virtual_memory()
+            ram_percent = round(memory.percent, 1)
             ram_used_mb = round(memory.used / (1024 * 1024))
             ram_total_mb = round(memory.total / (1024 * 1024))
-            ram_percent = round((ram_used_mb / ram_total_mb * 100), 1)
             
             # Swap Usage (lightweight)
             swap = psutil.swap_memory()
@@ -154,15 +154,20 @@ class SystemService:
         try:
             result = os.popen('systemctl is-active openvpn-uds-monitor 2>/dev/null').read().strip() 
             if result == 'active':
-                log_check = os.popen('systemctl status openvpn-uds-monitor --lines=10 2>/dev/null | grep -c "ERROR"').read().strip()
-                if log_check and int(log_check) > 0:
-                    return {'status': 'error', 'uptime': 'Running with errors'}
-                else:
+                try:
+                    uptime_result = os.popen('systemctl show openvpn-uds-monitor --property=ActiveEnterTimestamp --value 2>/dev/null').read().strip()
+                    if uptime_result:
+                        return {'status': 'up', 'uptime': 'Active'}
+                    else:
+                        return {'status': 'up', 'uptime': 'Active'}
+                except:
                     return {'status': 'up', 'uptime': 'Active'}
             elif result == 'inactive':
                 return {'status': 'down', 'uptime': 'Stopped'}
+            elif result == 'failed':
+                return {'status': 'error', 'uptime': 'Failed'}
             else:
-                return {'status': 'error', 'uptime': 'Error state'}
+                return {'status': 'unknown', 'uptime': 'Unknown'}
         except:
             return {'status': 'unknown', 'uptime': 'Unknown'}
     
@@ -180,6 +185,110 @@ class SystemService:
         except:
             return {'status': 'down', 'uptime': 'Stopped'}
     
+    @staticmethod
+    def control_service(service_name: str, action: str) -> Dict[str, Any]:
+        """Control system service (start, stop, restart)"""
+        try:
+            if action == 'start':
+                result = os.popen(f'systemctl start {service_name} 2>&1').read().strip()
+                success = os.popen(f'systemctl is-active {service_name} 2>/dev/null').read().strip() == 'active'
+            elif action == 'stop':
+                result = os.popen(f'systemctl stop {service_name} 2>&1').read().strip()
+                success = os.popen(f'systemctl is-active {service_name} 2>/dev/null').read().strip() == 'inactive'
+            elif action == 'restart':
+                result = os.popen(f'systemctl restart {service_name} 2>&1').read().strip()
+                success = os.popen(f'systemctl is-active {service_name} 2>/dev/null').read().strip() == 'active'
+            else:
+                return {'success': False, 'message': 'Invalid action'}
+            
+            return {
+                'success': success,
+                'message': f'Service {service_name} {action} {"successful" if success else "failed"}',
+                'output': result
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Failed to {action} service {service_name}: {str(e)}'
+            }
+
+    @staticmethod
+    def get_service_logs(service_name: str, lines: int = 100, follow: bool = False) -> Dict[str, Any]:
+        """Get service logs"""
+        try:
+            if follow:
+                cmd = f'journalctl -u {service_name} -f --no-pager -n {lines}'
+            else:
+                cmd = f'journalctl -u {service_name} --no-pager -n {lines}'
+            
+            logs = os.popen(cmd).read()
+            
+            return {
+                'success': True,
+                'logs': logs,
+                'service': service_name
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Failed to get logs for {service_name}: {str(e)}'
+            }
+
+    @staticmethod
+    def get_log_file_path(service_name: str) -> str:
+        """Get log file path for service"""
+        log_map = {
+            'openvpn': '/var/log/openvpn/openvpn.log',
+            'openvpn-server@server-cert': '/var/log/openvpn/openvpn.log',
+            'openvpn-server@server-login': '/var/log/openvpn/openvpn.log',
+            'openvpn-uds-monitor': '/var/log/openvpn/traffic_monitor.log',
+            'wireguard': '/var/log/syslog',
+            'wg-quick@wg0': '/var/log/syslog',
+            'system': '/var/log/syslog'
+        }
+        return log_map.get(service_name, f'/var/log/{service_name}.log')
+
+    @staticmethod
+    def get_system_uptime() -> Dict[str, Any]:
+        """Get system uptime information"""
+        try:
+            uptime_output = os.popen('uptime -p').read().strip()
+            last_boot = os.popen('who -b | awk \'{print $3, $4}\'').read().strip()
+            
+            uptime_seconds = float(os.popen('cat /proc/uptime | cut -d\' \' -f1').read().strip())
+            
+            days = int(uptime_seconds // 86400)
+            hours = int((uptime_seconds % 86400) // 3600)
+            minutes = int((uptime_seconds % 3600) // 60)
+            
+            uptime_formatted = f"{days}d {hours}h {minutes}m"
+            
+            return {
+                'success': True,
+                'data': {
+                    'uptime_formatted': uptime_formatted,
+                    'uptime_raw': uptime_output,
+                    'last_boot': last_boot,
+                    'uptime_seconds': uptime_seconds,
+                    'uptime_parts': {
+                        'days': days,
+                        'hours': hours,
+                        'minutes': minutes
+                    }
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Failed to get system uptime: {str(e)}'
+            }
+
+    @staticmethod
+    def get_timestamp() -> str:
+        """Get current timestamp for file naming"""
+        import datetime
+        return datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+
     @classmethod
     def _get_total_users(cls) -> int:
         """Get total number of users from database with caching"""

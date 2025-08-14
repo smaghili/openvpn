@@ -8,6 +8,10 @@ class SidebarManager {
 
     init() {
         this.loadSidebar();
+        this.initializeTheme();
+        this.initializeNavigation();
+        this.initializeLogout();
+        this.setActivePage();
     }
 
     loadSidebar() {
@@ -25,14 +29,11 @@ class SidebarManager {
             });
     }
 
-        initializeSidebarFeatures() {
-        // Wait for DOM to be ready
-        setTimeout(() => {
-            this.initializeTheme();
-            this.initializeNavigation();
-            this.initializeLogout();
-            this.setActivePage();
-        }, 100);
+    initializeSidebarFeatures() {
+        this.initializeTheme();
+        this.initializeNavigation(); 
+        this.initializeLogout();
+        this.setActivePage();
     }
 
     getCurrentPage() {
@@ -97,21 +98,45 @@ class SidebarManager {
     }
 
     handleLogout() {
+        const confirmText = window.i18n ? 
+            window.i18n.t('messages.confirm') + ' ' + window.i18n.t('nav_logout') + '?' : 
+            'Are you sure you want to logout?';
+
         if (typeof showModal === 'function') {
-            showModal(
-                'Are you sure you want to logout?',
-                () => {
-                    localStorage.removeItem('token');
-                    window.location.href = '/login';
-                }
-            );
+            showModal(confirmText, () => {
+                this.performLogout();
+            });
         } else {
-            const confirmed = confirm('Are you sure you want to logout?');
+            const confirmed = confirm(confirmText);
             if (confirmed) {
-                localStorage.removeItem('token');
-                window.location.href = '/login';
+                this.performLogout();
             }
         }
+    }
+
+    async performLogout() {
+        try {
+            const token = localStorage.getItem('token');
+            if (token) {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn('Logout API call failed:', error);
+        } finally {
+            localStorage.removeItem('token');
+            localStorage.removeItem('selectedLanguage');
+            window.location.href = '/login';
+        }
+    }
+
+    getCurrentLanguage() {
+        return localStorage.getItem('selectedLanguage') || 'fa';
     }
 }
 

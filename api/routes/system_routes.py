@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify, send_file
 from api.middleware.jwt_middleware import JWTMiddleware
 from service.user_service import UserService
 from service.system_service import SystemService
+from service.secure_storage_service import SecureStorageService
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
 from core.backup_service import BackupService
@@ -19,6 +20,7 @@ def get_services():
     login_manager = LoginUserManager()
     openvpn_manager = OpenVPNManager()
     user_service = UserService(user_repo, openvpn_manager, login_manager)
+    secure_storage = SecureStorageService()
     
     backupable_components = [openvpn_manager, login_manager, user_service]
     backup_service = BackupService(backupable_components)
@@ -26,8 +28,34 @@ def get_services():
     return {
         'user_service': user_service,
         'openvpn_manager': openvpn_manager,
-        'backup_service': backup_service
+        'backup_service': backup_service,
+        'secure_storage': secure_storage
     }
+
+@system_bp.route('/backup/password/check', methods=['GET'])
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('system:config')
+def check_stored_password():
+    """Check if current admin has a stored backup password."""
+    try:
+        from flask import g
+        admin_id = g.current_admin['admin_id']
+        
+        services = get_services()
+        secure_storage = services['secure_storage']
+        
+        has_password = secure_storage.has_stored_password(admin_id)
+        
+        return jsonify({
+            'success': True,
+            'has_stored_password': has_password
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
 
 @system_bp.route('/backup', methods=['POST'])
 @JWTMiddleware.require_auth
@@ -38,29 +66,46 @@ def create_backup():
     
     Request body:
     {
-        "password": "string",
+        "password": "string" (optional if stored),
+        "remember": "boolean" (optional),
+        "use_stored": "boolean" (optional),
         "backup_dir": "string" (optional, defaults to ~/backups)
     }
     """
-    data = request.get_json()
+    from flask import g
+    admin_id = g.current_admin['admin_id']
     
-    if not data or 'password' not in data:
-        return jsonify({
-            'error': 'Missing required field',
-            'message': 'Backup password is required'
-        }), 400
-    
-    password = data['password']
-    if not password:
-        return jsonify({
-            'error': 'Invalid password',
-            'message': 'Backup password cannot be empty'
-        }), 400
-    
-    backup_dir = data.get('backup_dir', '~/backups')
-    
+    data = request.get_json() or {}
     services = get_services()
     backup_service = services['backup_service']
+    secure_storage = services['secure_storage']
+    
+    password = None
+    use_stored = data.get('use_stored', False)
+    remember = data.get('remember', False)
+    
+    # Try to use stored password if requested
+    if use_stored:
+        password = secure_storage.get_password(admin_id)
+        if not password:
+            return jsonify({
+                'error': 'No stored password',
+                'message': 'No stored backup password found for current user'
+            }), 400
+    else:
+        # Use provided password
+        password = data.get('password')
+        if not password:
+            return jsonify({
+                'error': 'Missing required field',
+                'message': 'Backup password is required'
+            }), 400
+        
+        # Store password if remember is checked
+        if remember:
+            secure_storage.store_password(admin_id, password)
+    
+    backup_dir = data.get('backup_dir', '~/backups')
     
     try:
         backup_file = backup_service.create_backup(password, backup_dir)
@@ -68,12 +113,41 @@ def create_backup():
         return jsonify({
             'message': 'Backup created successfully',
             'backup_file': backup_file,
-            'backup_directory': os.path.expanduser(backup_dir)
+            'backup_directory': os.path.expanduser(backup_dir),
+            'download_url': f'/api/system/backup/download/{os.path.basename(backup_file)}'
         }), 200
         
     except Exception as e:
         return jsonify({
             'error': 'Backup failed',
+            'message': str(e)
+        }), 500
+
+@system_bp.route('/backup/download/<filename>', methods=['GET'])
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('system:config')
+def download_backup(filename):
+    """Download a backup file."""
+    try:
+        backup_dir = os.path.expanduser('~/backups')
+        backup_path = os.path.join(backup_dir, filename)
+        
+        if not os.path.exists(backup_path):
+            return jsonify({
+                'error': 'File not found',
+                'message': f'Backup file {filename} not found'
+            }), 404
+        
+        return send_file(
+            backup_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/octet-stream'
+        )
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Download failed',
             'message': str(e)
         }), 500
 
@@ -246,6 +320,79 @@ def get_system_services():
     except Exception as e:
         return jsonify({
             'error': 'Failed to get system services',
+            'message': str(e)
+        }), 500
+
+@system_bp.route('/services/<service_name>/<action>', methods=['POST'])
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('system:config')
+def control_service(service_name, action):
+    """Control system services (start, stop, restart)"""
+    if action not in ['start', 'stop', 'restart']:
+        return jsonify({
+            'error': 'Invalid action',
+            'message': 'Action must be start, stop, or restart'
+        }), 400
+    
+    try:
+        result = SystemService.control_service(service_name, action)
+        return jsonify(result), 200 if result['success'] else 500
+    except Exception as e:
+        return jsonify({
+            'error': 'Service control failed',
+            'message': str(e)
+        }), 500
+
+@system_bp.route('/logs/<service_name>', methods=['GET'])
+@JWTMiddleware.require_auth
+def get_service_logs(service_name):
+    """Get service logs"""
+    lines = request.args.get('lines', 100, type=int)
+    follow = request.args.get('follow', False, type=bool)
+    
+    try:
+        result = SystemService.get_service_logs(service_name, lines, follow)
+        return jsonify(result), 200 if result['success'] else 500
+    except Exception as e:
+        return jsonify({
+            'error': 'Failed to get logs',
+            'message': str(e)
+        }), 500
+
+@system_bp.route('/logs/<service_name>/download', methods=['GET'])
+@JWTMiddleware.require_auth
+def download_service_logs(service_name):
+    """Download service logs as file"""
+    try:
+        log_file = SystemService.get_log_file_path(service_name)
+        if not log_file or not os.path.exists(log_file):
+            return jsonify({
+                'error': 'Log file not found',
+                'message': f'No log file found for service {service_name}'
+            }), 404
+        
+        return send_file(
+            log_file,
+            as_attachment=True,
+            download_name=f"{service_name}_logs_{SystemService.get_timestamp()}.txt",
+            mimetype='text/plain'
+        )
+    except Exception as e:
+        return jsonify({
+            'error': 'Failed to download logs',
+            'message': str(e)
+        }), 500
+
+@system_bp.route('/uptime', methods=['GET'])
+@JWTMiddleware.require_auth
+def get_system_uptime():
+    """Get system uptime information"""
+    try:
+        result = SystemService.get_system_uptime()
+        return jsonify(result), 200 if result['success'] else 500
+    except Exception as e:
+        return jsonify({
+            'error': 'Failed to get uptime',
             'message': str(e)
         }), 500
 

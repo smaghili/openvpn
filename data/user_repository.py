@@ -103,6 +103,28 @@ class UserRepository:
         """
         self.db.execute_query(query, (user_id, quota_bytes))
 
+    def get_total_user_count(self) -> int:
+        """Get total number of users"""
+        query = "SELECT COUNT(DISTINCT username) as total FROM users WHERE status = 'active'"
+        result = self.db.execute_query(query)
+        return result[0]['total'] if result else 0
+
+    def get_online_user_count(self) -> int:
+        """Get number of currently online users (estimate based on recent activity)"""
+        query = """
+        SELECT COUNT(DISTINCT user_id) as online 
+        FROM traffic_logs 
+        WHERE datetime(log_timestamp) > datetime('now', '-15 minutes')
+        """
+        result = self.db.execute_query(query)
+        return result[0]['online'] if result else 0
+
+    def get_total_usage(self) -> int:
+        """Get total data usage across all users in bytes"""
+        query = "SELECT COALESCE(SUM(bytes_used), 0) as total_usage FROM user_quotas"
+        result = self.db.execute_query(query)
+        return result[0]['total_usage'] if result else 0
+
     def get_user_quota_status(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Retrieves a user's quota and current usage."""
         query = """

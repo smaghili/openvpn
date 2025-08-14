@@ -141,6 +141,32 @@ def list_users():
         'users': processed_users
     }), 200
 
+@user_bp.route('/stats', methods=['GET'])
+@JWTMiddleware.require_auth
+@JWTMiddleware.require_permission('users:read')
+def get_user_stats():
+    """Get user statistics for dashboard"""
+    try:
+        user_service = get_user_service()
+        
+        total_users = user_service.get_total_user_count()
+        online_users = user_service.get_online_user_count()
+        total_usage = user_service.get_total_usage()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_users': total_users,
+                'online_users': online_users,
+                'total_usage': total_usage
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to get user stats: {str(e)}'
+        }), 500
+
 @user_bp.route('/<username>/config', methods=['GET'])
 @JWTMiddleware.require_auth
 @JWTMiddleware.require_permission('users:read')

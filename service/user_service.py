@@ -125,6 +125,18 @@ class UserService(IBackupable):
         
         return self.user_repo.get_user_quota_status(user['id'])
 
+    def get_total_user_count(self) -> int:
+        """Get total number of users"""
+        return self.user_repo.get_total_user_count()
+
+    def get_online_user_count(self) -> int:
+        """Get number of currently online users"""
+        return self.user_repo.get_online_user_count()
+
+    def get_total_usage(self) -> int:
+        """Get total data usage across all users in bytes"""
+        return self.user_repo.get_total_usage()
+
     def change_user_password(self, username: Username, new_password: Password) -> None:
         """Changes the password for an existing user in both database and system."""
         user = self.user_repo.find_user_by_username(username)

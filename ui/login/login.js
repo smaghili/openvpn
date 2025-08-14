@@ -172,7 +172,8 @@ function initializeLoginForm() {
     const password = document.getElementById('loginPass')?.value.trim();
 
     if (!username || !password) {
-      showToast('لطفاً نام کاربری و رمز عبور را وارد کنید', 'error');
+      const message = window.i18n ? window.i18n.t('login.validation.required') : 'Please enter username and password';
+      showToast(message, 'error');
       return;
     }
 
@@ -189,7 +190,7 @@ function initializeLoginForm() {
       
     } catch (err) {
       // Show error message
-      const errorMessage = err && err.message ? err.message : 'خطا در ورود به سیستم';
+              const errorMessage = err && err.message ? err.message : (window.i18n ? window.i18n.t('toasts.loginError') : 'Login error');
       showToast(errorMessage, 'error');
       
     } finally {
