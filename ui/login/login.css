@@ -122,9 +122,9 @@ html.dark .auth-card {
   grid-template-columns: 40px 1fr 44px;
   align-items: center;
   border-radius: 12px;
-  border: 1px solid rgba(148,163,184,0.3);
+  border: 2px solid rgba(148,163,184,0.3);
   background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.4));
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 html.dark .input-wrapper {
@@ -147,12 +147,10 @@ html.dark .input-wrapper {
   background: transparent;
   color: var(--text-color);
   outline: none;
-  transition: all 0.3s ease;
 }
 
 .input-wrapper:focus-within {
   border-color: #3b82f6;
-  border-width: 2px;
   box-shadow: 
     0 0 0 3px rgba(59, 130, 246, 0.1),
     0 4px 12px rgba(59, 130, 246, 0.15);
@@ -161,7 +159,6 @@ html.dark .input-wrapper {
 
 html.dark .input-wrapper:focus-within {
   border-color: #10b981;
-  border-width: 2px;
   box-shadow: 
     0 0 0 3px rgba(16, 185, 129, 0.15),
     0 4px 12px rgba(16, 185, 129, 0.2);
