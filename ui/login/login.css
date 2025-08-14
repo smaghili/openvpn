@@ -146,6 +146,18 @@ html.dark .input-wrapper {
   background: transparent;
   color: var(--text-color);
   outline: none;
+  transition: all 0.3s ease;
+}
+
+.input-wrapper:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
+}
+
+html.dark .input-wrapper:focus-within {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .password-toggle { 
@@ -163,7 +175,12 @@ html.dark .input-wrapper {
 .password-toggle .eye { 
   width: 22px; 
   height: 22px; 
-  opacity: 0.8; 
+  opacity: 0.8;
+  color: #374151;
+}
+
+html.dark .password-toggle .eye {
+  color: #f1f5f9;
 }
 
 .password-toggle .slash { 
