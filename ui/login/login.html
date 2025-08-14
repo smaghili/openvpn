@@ -4,9 +4,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Login</title>
-<link rel="stylesheet" href="styles.css" />
-<script src="script.js"></script>
-<script src="api.js"></script>
+<link rel="stylesheet" href="login.css" />
+<script src="../script.js"></script>
+<script src="../api.js"></script>
+<script src="login.js"></script>
 </head>
 <body class="login-page">
 <div class="toast-container"></div>
@@ -48,83 +49,5 @@
 <div class="auth-footer"><small>&copy; <span class="year"></span> OpenVPN Manager</small></div>
 </div>
 </div>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const yearEl = document.querySelector('.year');
-  if (yearEl) yearEl.textContent = String(new Date().getFullYear());
-  // Language dropdown
-  const langDropdown = document.getElementById('langDropdown');
-  const langMenu = document.getElementById('langMenu');
-  const currentLangEl = document.querySelector('.current-lang');
-  const langItems = document.querySelectorAll('.dropdown-item');
-  const langNames = { fa: 'فارسی', en: 'English' };
-  const langFlags = { fa: '🇮🇷', en: '🇬🇧' };
-  function updateCurrentLang() {
-    const lang = window.currentLang || 'fa';
-    currentLangEl.textContent = `${langFlags[lang]} ${langNames[lang]}`;
-  }
-  if (langDropdown && langMenu) {
-    langDropdown.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = langMenu.classList.contains('open');
-      langMenu.classList.toggle('open', !isOpen);
-      langDropdown.setAttribute('aria-expanded', !isOpen);
-    });
-    langItems.forEach(item => {
-      item.addEventListener('click', () => {
-        const lang = item.getAttribute('data-lang');
-        setLanguage(lang);
-        updateCurrentLang();
-        langMenu.classList.remove('open');
-        langDropdown.setAttribute('aria-expanded', 'false');
-      });
-    });
-    document.addEventListener('click', () => {
-      langMenu.classList.remove('open');
-      langDropdown.setAttribute('aria-expanded', 'false');
-    });
-  }
-  updateCurrentLang();
-  // Theme toggle inside card
-  const themeToggle = document.getElementById('themeToggle');
-  if (themeToggle) {
-    themeToggle.addEventListener('click', () => {
-      toggleTheme();
-      themeToggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
-    });
-    themeToggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
-  }
-});
-const loginForm = document.getElementById('loginForm');
-const submitBtn = document.getElementById('loginSubmit');
-const passInput = document.getElementById('loginPass');
-const togglePass = document.getElementById('togglePass');
-if (togglePass && passInput) {
-  togglePass.addEventListener('click', () => {
-    const isHidden = passInput.getAttribute('type') === 'password';
-    passInput.setAttribute('type', isHidden ? 'text' : 'password');
-    togglePass.setAttribute('data-visible', isHidden ? 'true' : 'false');
-  });
-}
-if (loginForm) {
-  loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!loginForm.checkValidity()) { loginForm.reportValidity(); return; }
-    const username = document.getElementById('loginUser').value.trim();
-    const password = document.getElementById('loginPass').value.trim();
-    try {
-      submitBtn.classList.add('loading');
-      submitBtn.disabled = true;
-      await apiLogin(username, password);
-      location.href = 'overview.html';
-    } catch (err) {
-      showToast(err && err.message ? err.message : 'Login failed', 'error');
-    } finally {
-      submitBtn.classList.remove('loading');
-      submitBtn.disabled = false;
-    }
-  });
-}
-</script>
 </body>
-</html>
+</html> 

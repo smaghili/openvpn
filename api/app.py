@@ -70,7 +70,31 @@ def create_app() -> Flask:
     # Serve web UI
     @app.route('/')
     def index():
-        return app.send_static_file('index.html')
+        return app.send_static_file('login/login.html')
+    
+    @app.route('/login')
+    def login():
+        return app.send_static_file('login/login.html')
+    
+    @app.route('/overview')
+    def overview():
+        return app.send_static_file('overview.html')
+    
+    @app.route('/users')
+    def users():
+        return app.send_static_file('users.html')
+    
+    @app.route('/openvpn')
+    def openvpn():
+        return app.send_static_file('openvpn.html')
+    
+    @app.route('/wireguard')
+    def wireguard():
+        return app.send_static_file('wireguard.html')
+    
+    @app.route('/settings')
+    def settings():
+        return app.send_static_file('settings.html')
 
     @app.route('/<path:path>')
     def static_proxy(path):
