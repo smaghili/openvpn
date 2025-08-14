@@ -78,7 +78,7 @@ def create_app() -> Flask:
     
     @app.route('/overview')
     def overview():
-        return app.send_static_file('overview.html')
+        return app.send_static_file('overview/overview.html')
     
     @app.route('/users')
     def users():
@@ -95,6 +95,10 @@ def create_app() -> Flask:
     @app.route('/settings')
     def settings():
         return app.send_static_file('settings.html')
+    
+    @app.route('/shared/sidebar.html')
+    def sidebar():
+        return app.send_static_file('shared/sidebar.html')
 
     @app.route('/<path:path>')
     def static_proxy(path):

@@ -3,6 +3,7 @@ import tempfile
 from flask import Blueprint, request, jsonify, send_file
 from api.middleware.jwt_middleware import JWTMiddleware
 from service.user_service import UserService
+from service.system_service import SystemService
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
 from core.backup_service import BackupService
@@ -187,7 +188,33 @@ def uninstall_vpn():
             'message': str(e)
         }), 500
 
+@system_bp.route('/stats', methods=['GET'])
+@JWTMiddleware.require_auth
+def get_system_stats():
+    """Get real-time system statistics"""
+    try:
+        result = SystemService.get_system_stats()
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @system_bp.route('/services', methods=['GET'])
+@JWTMiddleware.require_auth
+def get_service_status():
+    """Get real-time service status"""
+    try:
+        result = SystemService.get_service_status()
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@system_bp.route('/services/status', methods=['GET'])
 @JWTMiddleware.require_auth
 @JWTMiddleware.require_permission('reports:view')
 def get_system_services():
