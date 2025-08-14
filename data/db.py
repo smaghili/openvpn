@@ -9,8 +9,7 @@ from config.env_loader import get_config_value
 from config.paths import VPNPaths
 
 DATABASE_DIR = VPNPaths.get_database_dir()
-# Check for environment variable first, then fall back to VPNPaths
-DATABASE_FILE = os.environ.get('DATABASE_PATH', VPNPaths.get_database_file())
+DATABASE_FILE = VPNPaths.get_database_file()
 
 class Database:
     """

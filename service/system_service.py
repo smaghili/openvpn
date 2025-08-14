@@ -147,11 +147,20 @@ class SystemService:
     def _check_uds_status() -> Dict[str, str]:
         """Check UDS monitoring service status"""
         try:
-            # Check if UDS monitor script is running
-            if os.path.exists('/var/run/uds-monitor.pid'):
-                return {'status': 'up', 'uptime': 'Active'}
-            else:
+            # Check systemctl status for openvpn-uds-monitor
+            result = os.popen('systemctl is-active openvpn-uds-monitor 2>/dev/null').read().strip()
+            
+            if result == 'active':
+                # Check for errors in recent logs
+                log_check = os.popen('systemctl status openvpn-uds-monitor 2>/dev/null | grep -c "ERROR"').read().strip()
+                if log_check and int(log_check) > 0:
+                    return {'status': 'error', 'uptime': 'Running with errors'}
+                else:
+                    return {'status': 'up', 'uptime': 'Active'}
+            elif result == 'inactive':
                 return {'status': 'down', 'uptime': 'Stopped'}
+            else:
+                return {'status': 'error', 'uptime': 'Error state'}
         except:
             return {'status': 'unknown', 'uptime': 'Unknown'}
     
