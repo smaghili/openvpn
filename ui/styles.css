@@ -17,6 +17,184 @@ body {
   color: var(--text-color);
   direction: rtl;
 }
+/* ===== Login Page Modern Styling (isolated) ===== */
+.login-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(79,70,229,0.25), transparent 60%),
+    radial-gradient(1000px 500px at -10% 110%, rgba(20,184,166,0.25), transparent 60%),
+    linear-gradient(180deg, var(--bg-color), var(--bg-color));
+}
+.login-page .login-topbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 1rem 1.25rem;
+}
+.login-page .login-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+.login-page .login-theme,
+.login-page .login-lang {
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: var(--border-style);
+  background: rgba(255,255,255,0.6);
+  color: var(--text-color);
+  backdrop-filter: blur(6px);
+}
+html.dark .login-page .login-theme,
+html.dark .login-page .login-lang {
+  background: rgba(34,34,34,0.6);
+}
+.auth-wrapper {
+  min-height: calc(100vh - 72px);
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+}
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.75), rgba(255,255,255,0.65));
+  border-radius: 18px;
+  border: 1px solid rgba(148,163,184,0.35);
+  box-shadow:
+    0 10px 25px rgba(0,0,0,0.08),
+    0 1px 0 rgba(255,255,255,0.4) inset;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+}
+html.dark .auth-card {
+  background: linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.65));
+  border-color: rgba(100,116,139,0.35);
+  box-shadow:
+    0 10px 25px rgba(0,0,0,0.35),
+    0 1px 0 rgba(0,0,0,0.2) inset;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.brand-text h1 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.brand-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+.brand-mark {
+  filter: drop-shadow(0 6px 12px rgba(79,70,229,0.35));
+}
+.auth-form {
+  margin-top: 0.5rem;
+}
+.input-group {
+  display: block;
+  margin-top: 1rem;
+}
+.input-label {
+  display: inline-block;
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+}
+.input-wrapper {
+  display: grid;
+  grid-template-columns: 36px 1fr 40px;
+  align-items: center;
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,0.6);
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.75));
+}
+html.dark .input-wrapper {
+  background: linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.75));
+  border-color: rgba(100,116,139,0.6);
+}
+.input-icon {
+  text-align: center;
+  opacity: 0.65;
+}
+.input-wrapper input[type=text],
+.input-wrapper input[type=password] {
+  width: 100%;
+  padding: 0.85rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  outline: none;
+}
+.password-toggle {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.65;
+}
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  user-select: none;
+}
+.checkbox input { display: none; }
+.checkmark {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgba(148,163,184,0.8);
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+  display: inline-block;
+  position: relative;
+}
+html.dark .checkmark {
+  background: linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.7));
+  border-color: rgba(100,116,139,0.8);
+}
+.checkbox input:checked + .checkmark::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(45deg, #4F46E5, #14B8A6);
+  border-radius: 2px;
+}
+.checkbox-label { opacity: 0.8; }
+.btn-primary {
+  width: 100%;
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: none;
+  color: white;
+  background: linear-gradient(90deg, #4F46E5, #14B8A6);
+  box-shadow: 0 8px 18px rgba(20,184,166,0.35);
+  cursor: pointer;
+  position: relative;
+}
+.btn-primary:disabled { opacity: 0.6; cursor: default; }
+.btn-primary .spinner {
+  position: absolute;
+  inset-inline-end: 14px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.6);
+  border-top-color: white;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+.btn-primary.loading .spinner { animation: spin 0.9s linear infinite; opacity: 1; }
+@keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+.auth-footer { margin-top: 1rem; text-align: center; opacity: 0.7; }
+/* ===== End Login Page Styling ===== */
 .container {
   display: flex;
 }
