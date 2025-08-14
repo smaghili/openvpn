@@ -98,6 +98,11 @@ def create_app() -> Flask:
 
     @app.route('/<path:path>')
     def static_proxy(path):
+        # Set proper content type for CSS files
+        if path.endswith('.css'):
+            response = send_from_directory(app.static_folder, path)
+            response.headers['Content-Type'] = 'text/css'
+            return response
         return send_from_directory(app.static_folder, path)
     
     return app

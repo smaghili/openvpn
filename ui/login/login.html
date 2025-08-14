@@ -4,10 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Login</title>
-<link rel="stylesheet" href="login.css" />
-<script src="../script.js"></script>
-<script src="../api.js"></script>
-<script src="login.js"></script>
+<link rel="stylesheet" href="/login/login.css" />
+<script src="/script.js"></script>
+<script src="/api.js"></script>
 </head>
 <body class="login-page">
 <div class="toast-container"></div>
@@ -20,11 +19,12 @@
 </div>
 
 <form id="loginForm" class="auth-form" autocomplete="on">
-<label class="input-group"><span class="input-label" data-i18n="label_username"></span><div class="input-wrapper"><span class="input-icon" aria-hidden="true">&#128100;</span><input type="text" id="loginUser" name="username" autocomplete="username" aria-label="username" required data-i18n="label_username" /></div></label>
-<label class="input-group"><span class="input-label" data-i18n="label_password"></span><div class="input-wrapper"><span class="input-icon" aria-hidden="true">&#128274;</span><input type="password" id="loginPass" name="password" autocomplete="current-password" aria-label="password" required data-i18n="label_password" /><button type="button" id="togglePass" class="password-toggle" aria-label="toggle password" data-visible="false"><svg class="eye" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path class="eye-outline" d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" stroke-width="1.6" fill="none"/><circle class="eye-pupil" cx="12" cy="12" r="3" fill="currentColor"/><path class="slash" d="M3 21L21 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></label>
+<label class="input-group"><span class="input-label" data-i18n="label_username"></span><div class="input-wrapper"><span class="input-icon" aria-hidden="true">&#128100;</span><input type="text" id="loginUser" name="username" autocomplete="username" aria-label="username" required /></div></label>
+<label class="input-group"><span class="input-label" data-i18n="label_password"></span><div class="input-wrapper"><span class="input-icon" aria-hidden="true">&#128274;</span><input type="password" id="loginPass" name="password" autocomplete="current-password" aria-label="password" required /><button type="button" id="togglePass" class="password-toggle" aria-label="toggle password" data-visible="false"><svg class="eye" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path class="eye-outline" d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" stroke-width="1.6" fill="none"/><circle class="eye-pupil" cx="12" cy="12" r="3" fill="currentColor"/><path class="slash" d="M3 21L21 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></label>
 <label class="checkbox"><input type="checkbox" id="rememberMe" /><span class="checkmark"></span><span class="checkbox-label" data-i18n="remember_me"></span></label>
 <button id="loginSubmit" class="btn-primary" type="submit"><span data-i18n="btn_login"></span><span class="spinner" aria-hidden="true"></span></button>
 </form>
+
 <div class="controls-row">
   <div class="dropdown-wrapper">
     <button type="button" class="dropdown-btn" id="langDropdown" aria-haspopup="true" aria-expanded="false">
@@ -46,8 +46,11 @@
   </div>
   <button type="button" class="theme-btn" id="themeToggle" aria-label="theme">🌙</button>
 </div>
+
 <div class="auth-footer"><small>&copy; <span class="year"></span> OpenVPN Manager</small></div>
 </div>
 </div>
+
+<script src="/login/login.js"></script>
 </body>
-</html> 
+</html>
