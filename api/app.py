@@ -105,12 +105,18 @@ def create_app() -> Flask:
         return app.send_static_file('shared/sidebar.html')
 
     @app.route('/<path:path>')
-    @JWTMiddleware.require_web_auth
     def static_proxy(path):
-        if path.endswith('.css'):
-            response = send_from_directory(app.static_folder, path)
-            response.headers['Content-Type'] = 'text/css'
-            return response
+        if path.endswith(('.css', '.js', '.png', '.jpg', '.svg', '.ico', '.woff', '.woff2', '.ttf')):
+            if path.endswith('.css'):
+                response = send_from_directory(app.static_folder, path)
+                response.headers['Content-Type'] = 'text/css'
+                return response
+            return send_from_directory(app.static_folder, path)
+        
+        token = JWTMiddleware._extract_token(request)
+        if not token:
+            return redirect('/login')
+            
         return send_from_directory(app.static_folder, path)
     
     return app
