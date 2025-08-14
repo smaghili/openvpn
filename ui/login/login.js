@@ -3,12 +3,12 @@
 // Language configuration
 const LANG_CONFIG = {
   fa: {
-    flag: '🇮🇷',
+    flag: '<svg width="20" height="15" viewBox="0 0 20 15"><rect width="20" height="5" fill="#239f40"/><rect y="5" width="20" height="5" fill="#fff"/><rect y="10" width="20" height="5" fill="#da0000"/><circle cx="10" cy="7.5" r="2" fill="none" stroke="#da0000" stroke-width="0.5"/></svg>',
     name: 'فارسی',
     flagCode: 'IR'
   },
   en: {
-    flag: '🇺🇸', 
+    flag: '<svg width="20" height="15" viewBox="0 0 20 15"><rect width="20" height="15" fill="#b22234"/><rect y="1" width="20" height="1" fill="#fff"/><rect y="3" width="20" height="1" fill="#fff"/><rect y="5" width="20" height="1" fill="#fff"/><rect y="7" width="20" height="1" fill="#fff"/><rect y="9" width="20" height="1" fill="#fff"/><rect y="11" width="20" height="1" fill="#fff"/><rect y="13" width="20" height="1" fill="#fff"/><rect width="8" height="7" fill="#3c3b6e"/></svg>', 
     name: 'English',
     flagCode: 'US'
   }
@@ -52,7 +52,7 @@ function initializeLanguageDropdown() {
     const lang = window.currentLang || 'fa';
     const config = LANG_CONFIG[lang];
     if (config) {
-      currentLangEl.textContent = `${config.flag} ${config.name}`;
+      currentLangEl.innerHTML = `${config.flag} ${config.name}`;
     }
   }
 
