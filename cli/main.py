@@ -446,10 +446,23 @@ def change_panel_credentials_flow(panel_service: PanelService) -> None:
         print(f"✅ {result['message']}")
         print(f"New admin username: {result['username']}")
         
+        restart_choice = input("\nRestart API service? (y/n) [y]: ").strip().lower()
+        if restart_choice in ('', 'y'):
+            restart_api_service()
+        
     except ValidationError as e:
         print(f"❌ {e}")
     except Exception as e:
         print(f"❌ An unexpected error occurred: {e}")
+
+def restart_api_service() -> bool:
+    os.system("systemctl restart openvpn-api 2>/dev/null")
+    time.sleep(1)
+    if os.system("systemctl is-active --quiet openvpn-api") == 0:
+        print("✅ API service restarted successfully.")
+        return True
+    print("❌ Failed to restart API service.")
+    return False
 
 def change_panel_port_flow(panel_service: PanelService) -> None:
     """Flow to change panel API port."""
@@ -473,7 +486,10 @@ def change_panel_port_flow(panel_service: PanelService) -> None:
         result = panel_service.change_panel_port(port)
         print(f"✅ {result['message']}")
         print(f"New panel port: {result['port']}")
-        print("\n⚠️  You need to restart the API service for changes to take effect.")
+        
+        restart_choice = input("\nRestart API service? (y/n) [y]: ").strip().lower()
+        if restart_choice in ('', 'y'):
+            restart_api_service()
         
     except ValidationError as e:
         print(f"❌ {e}")
