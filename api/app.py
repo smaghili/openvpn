@@ -105,6 +105,7 @@ def create_app() -> Flask:
         return app.send_static_file('shared/sidebar.html')
 
     @app.route('/<path:path>')
+    @JWTMiddleware.require_web_auth
     def static_proxy(path):
         if path.endswith('.css'):
             response = send_from_directory(app.static_folder, path)
