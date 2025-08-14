@@ -8,10 +8,6 @@ class SidebarManager {
 
     init() {
         this.loadSidebar();
-        this.initializeTheme();
-        this.initializeNavigation();
-        this.initializeLogout();
-        this.setActivePage();
     }
 
     loadSidebar() {
@@ -29,11 +25,14 @@ class SidebarManager {
             });
     }
 
-    initializeSidebarFeatures() {
-        this.initializeTheme();
-        this.initializeNavigation(); 
-        this.initializeLogout();
-        this.setActivePage();
+        initializeSidebarFeatures() {
+        // Wait for DOM to be ready
+        setTimeout(() => {
+            this.initializeTheme();
+            this.initializeNavigation();
+            this.initializeLogout();
+            this.setActivePage();
+        }, 100);
     }
 
     getCurrentPage() {

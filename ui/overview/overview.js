@@ -133,7 +133,6 @@ function updateStatDisplay(type, data) {
             break;
             
         case 'ram':
-            console.log('RAM Data:', data); // Debug log
             if (valueEl) valueEl.textContent = `${data.percent}%`;
             if (percentEl) percentEl.textContent = `${data.used_mb}/${Math.round(data.total_mb)}MB`;
             if (progressEl) progressEl.style.width = `${data.percent}%`;

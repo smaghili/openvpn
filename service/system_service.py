@@ -48,9 +48,9 @@ class SystemService:
             
             # Memory Usage (lightweight)
             memory = psutil.virtual_memory()
-            ram_percent = round(memory.percent, 1)
             ram_used_mb = round(memory.used / (1024 * 1024))
             ram_total_mb = round(memory.total / (1024 * 1024))
+            ram_percent = round((ram_used_mb / ram_total_mb * 100), 1)
             
             # Swap Usage (lightweight)
             swap = psutil.swap_memory()
