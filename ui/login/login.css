@@ -60,14 +60,14 @@ html.dark .login-page {
 .auth-card {
   width: 100%;
   max-width: 400px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.5));
+  background: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0.35));
   border-radius: 18px;
-  border: 1px solid rgba(148,163,184,0.25);
+  border: 1px solid rgba(148,163,184,0.2);
   box-shadow:
-    0 10px 25px rgba(0,0,0,0.12),
-    0 1px 0 rgba(255,255,255,0.3) inset;
+    0 10px 25px rgba(0,0,0,0.15),
+    0 1px 0 rgba(255,255,255,0.25) inset;
   padding: 1.5rem;
-  backdrop-filter: blur(15px);
+  backdrop-filter: blur(20px);
 }
 
 html.dark .auth-card {
@@ -122,8 +122,8 @@ html.dark .auth-card {
   grid-template-columns: 40px 1fr 44px;
   align-items: center;
   border-radius: 12px;
-  border: 1px solid rgba(148,163,184,0.4);
-  background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.6));
+  border: 1px solid rgba(148,163,184,0.3);
+  background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.4));
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -156,8 +156,8 @@ html.dark .input-wrapper {
   box-shadow: 
     0 0 0 3px rgba(59, 130, 246, 0.1),
     0 4px 12px rgba(59, 130, 246, 0.15);
-  transform: translateY(-2px) scale(1.02);
-  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9));
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.7));
 }
 
 html.dark .input-wrapper:focus-within {
