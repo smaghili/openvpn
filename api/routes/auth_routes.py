@@ -2,7 +2,7 @@
 Authentication routes for JWT-based login, logout, and token management.
 """
 
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, make_response
 from api.middleware.jwt_middleware import JWTMiddleware
 from data.db import Database
 from data.admin_repository import AdminRepository
@@ -51,7 +51,18 @@ def login():
         auth_service = get_auth_service()
         result = auth_service.login(username, password, client_ip)
         
-        return jsonify(result), 200
+        resp = make_response(jsonify(result), 200)
+        token = result.get('token')
+        if token:
+            resp.set_cookie(
+                'token',
+                token,
+                httponly=True,
+                secure=False,
+                samesite='Lax',
+                max_age=result.get('expires_in')
+            )
+        return resp
         
     except AuthenticationError as e:
         return jsonify({
@@ -76,7 +87,9 @@ def logout():
         token = JWTMiddleware._extract_token(request)
         auth_service = g.auth_service
         result = auth_service.logout(token)
-        return jsonify(result), 200
+        resp = make_response(jsonify(result), 200)
+        resp.delete_cookie('token')
+        return resp
     except Exception as e:
         return jsonify({
             'error': 'Logout error',
@@ -138,11 +151,20 @@ def refresh_token():
             admin['token_version']
         )
         
-        return jsonify({
+        resp = make_response(jsonify({
             'token': token_data['token'],
             'expires_in': token_data['expires_in'],
             'message': 'Token refreshed successfully'
-        }), 200
+        }), 200)
+        resp.set_cookie(
+            'token',
+            token_data['token'],
+            httponly=True,
+            secure=False,
+            samesite='Lax',
+            max_age=token_data['expires_in']
+        )
+        return resp
         
     except Exception as e:
         return jsonify({

@@ -219,17 +219,16 @@ class JWTMiddleware:
     
     @staticmethod
     def _extract_token(request) -> Optional[str]:
-        """Extract JWT token from Authorization header."""
+        """Extract JWT token from Authorization header or HttpOnly cookie."""
         auth_header = request.headers.get('Authorization')
-        
-        if not auth_header:
-            return None
-        
-        parts = auth_header.split(' ')
-        if len(parts) != 2 or parts[0].lower() != 'bearer':
-            return None
-        
-        return parts[1]
+        if auth_header:
+            parts = auth_header.split(' ')
+            if len(parts) == 2 and parts[0].lower() == 'bearer':
+                return parts[1]
+        cookie_token = request.cookies.get('token')
+        if cookie_token:
+            return cookie_token
+        return None
     
     @staticmethod
     def _get_auth_service() -> AuthService:
