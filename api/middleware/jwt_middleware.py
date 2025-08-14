@@ -38,6 +38,33 @@ class JWTMiddleware:
         def _reset_auth_context():
             g.current_admin = None
             g.auth_service = None
+            
+        @app.before_request
+        def _check_web_auth():
+            """Check authentication for web UI routes only."""
+            if request.endpoint is None:
+                return None
+                
+            if request.endpoint.startswith('api.'):
+                return None
+                
+            if request.endpoint in ['login', 'static', 'static_proxy']:
+                return None
+                
+            if request.path.startswith('/login/') or request.path.startswith('/api/'):
+                return None
+                
+            if request.path.endswith(('.css', '.js', '.png', '.jpg', '.svg', '.ico', '.woff', '.woff2', '.ttf')):
+                return None
+                
+            if request.path.startswith('/profile/'):
+                return None
+                
+            token = JWTMiddleware._extract_token(request)
+            if not token:
+                return redirect('/login')
+                
+            return None
     
     @staticmethod
     def require_auth(f):
