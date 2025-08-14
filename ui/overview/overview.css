@@ -208,9 +208,10 @@ html.dark .overview-page {
   margin-bottom: 3rem;
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--border-color);
   border-radius: 16px;
   padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .services-grid {

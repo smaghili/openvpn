@@ -15,6 +15,7 @@
   flex-direction: column;
   position: fixed;
   height: 100vh;
+  left: 0;
   z-index: 50;
   transition: var(--smooth-transition);
 }
@@ -144,7 +145,7 @@ html.dark .nav-item.active .nav-link {
 
 .main-content {
   flex: 1;
-  margin-right: 280px;
+  margin-left: 280px;
   min-height: 100vh;
   background: var(--bg-color);
 }
@@ -162,6 +163,6 @@ html.dark .nav-item.active .nav-link {
   }
   
   .main-content {
-    margin-right: 0;
+    margin-left: 0;
   }
 }
