@@ -66,19 +66,18 @@ class AuthService:
         self.cleanup_rate_limits()
         return result
     
-    def logout(self, token: str) -> None:
-        """
-        Logout by blacklisting current token.
-        """
+    def logout(self, token: str) -> Dict[str, Any]:
         payload = self.jwt_service.validate_token(token)
         token_id = payload['jti']
         admin_id = payload['admin_id']
         exp_timestamp = payload['exp']
-        
         expires_at = datetime.fromtimestamp(exp_timestamp)
-        
         self.jwt_service.blacklist_token(token_id)
         self.blacklist_repo.blacklist_token(token_id, admin_id, expires_at)
+        return {
+            'success': True,
+            'message': 'Logged out successfully'
+        }
     
     def verify_token(self, token: str) -> Dict[str, Any]:
         """
@@ -111,17 +110,16 @@ class AuthService:
         self.cleanup_rate_limits()
         return has_permission
     
-    def force_logout_admin(self, admin_id: int, by_admin_id: int) -> None:
-        """
-        Force logout admin by incrementing token version.
-        """
+    def force_logout_admin(self, admin_id: int, by_admin_id: int) -> Dict[str, Any]:
         if not self.check_permission(by_admin_id, 'tokens:revoke'):
             raise AuthenticationError("Insufficient permissions to revoke tokens")
-        
         self.admin_repo.increment_token_version(admin_id)
-        
         expires_at = datetime.now() + timedelta(days=1)
         self.blacklist_repo.blacklist_all_admin_tokens(admin_id, expires_at)
+        return {
+            'success': True,
+            'message': 'All admin sessions revoked successfully'
+        }
     
     def change_password(self, admin_id: int, current_password: str, new_password: str, by_admin_id: int) -> None:
         """

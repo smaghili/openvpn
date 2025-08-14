@@ -31,7 +31,7 @@ class SidebarManager {
 
     initializeSidebarFeatures() {
         this.initializeTheme();
-        this.initializeNavigation(); 
+        this.initializeNavigation();
         this.initializeLogout();
         this.setActivePage();
     }
@@ -61,12 +61,10 @@ class SidebarManager {
         if (sidebarTheme) {
             const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
             sidebarTheme.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
-            
             sidebarTheme.addEventListener('click', () => {
                 const htmlEl = document.documentElement;
                 const isDark = htmlEl.classList.contains('dark');
                 const newTheme = isDark ? 'light' : 'dark';
-                
                 htmlEl.classList.toggle('dark', newTheme === 'dark');
                 localStorage.setItem('theme', newTheme);
                 sidebarTheme.textContent = newTheme === 'dark' ? '☀️' : '🌙';
@@ -80,7 +78,6 @@ class SidebarManager {
             link.addEventListener('click', (e) => {
                 const href = link.getAttribute('href');
                 if (href && href !== window.location.pathname) {
-                    // Let the browser handle navigation naturally
                     return true;
                 }
                 e.preventDefault();
@@ -91,10 +88,8 @@ class SidebarManager {
     initializeLogout() {
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
-            // Remove any existing listeners first
             logoutBtn.replaceWith(logoutBtn.cloneNode(true));
             const newLogoutBtn = document.getElementById('logoutBtn');
-            
             newLogoutBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -104,8 +99,8 @@ class SidebarManager {
     }
 
     handleLogout() {
-        const confirmText = window.i18n ? 
-            window.i18n.t('messages.confirm') + ' ' + window.i18n.t('nav_logout') + '?' : 
+        const confirmText = window.i18n ?
+            window.i18n.t('messages.confirm') + ' ' + window.i18n.t('logout') + '?' :
             'Are you sure you want to logout?';
 
         if (typeof showModal === 'function') {
@@ -133,7 +128,7 @@ class SidebarManager {
                 });
             }
         } catch (error) {
-            console.warn('Logout API call failed:', error);
+            console.warn('Logout failed:', error);
         } finally {
             localStorage.removeItem('token');
             localStorage.removeItem('selectedLanguage');
@@ -146,10 +141,8 @@ class SidebarManager {
     }
 }
 
-// Auto-initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.sidebarManager = new SidebarManager();
 });
 
-// Export for manual initialization if needed
 window.SidebarManager = SidebarManager;

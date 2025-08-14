@@ -72,19 +72,11 @@ def login():
 @auth_bp.route('/logout', methods=['POST'])
 @JWTMiddleware.require_auth
 def logout():
-    """
-    Logout current user by blacklisting the token.
-    """
     try:
         token = JWTMiddleware._extract_token(request)
         auth_service = g.auth_service
-        
-        auth_service.logout(token)
-        
-        return jsonify({
-            'message': 'Logged out successfully'
-        }), 200
-        
+        result = auth_service.logout(token)
+        return jsonify(result), 200
     except Exception as e:
         return jsonify({
             'error': 'Logout error',

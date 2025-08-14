@@ -234,11 +234,9 @@ def force_logout_admin(admin_id):
         current_admin = g.current_admin
         auth_service = g.auth_service
         
-        auth_service.force_logout_admin(admin_id, current_admin['admin_id'])
+        logout_result = auth_service.force_logout_admin(admin_id, current_admin['admin_id'])
         
-        return jsonify({
-            'message': 'All admin sessions revoked successfully'
-        }), 200
+        return jsonify(logout_result), 200
         
     except UserNotFoundError as e:
         return jsonify({
