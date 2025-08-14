@@ -8,9 +8,9 @@ const LANG_CONFIG = {
     flagCode: 'IR'
   },
   en: {
-    flag: '🇬🇧', 
+    flag: '🇺🇸', 
     name: 'English',
-    flagCode: 'GB'
+    flagCode: 'US'
   }
 };
 

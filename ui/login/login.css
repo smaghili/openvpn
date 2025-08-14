@@ -246,6 +246,7 @@ html.dark .checkmark {
   color: var(--text-color);
   cursor: pointer;
   font-size: 0.9rem;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
 }
 
 html.dark .dropdown-btn { 
@@ -305,7 +306,10 @@ html.dark .dropdown-menu {
 .dropdown-item:first-child { border-radius: 12px 12px 0 0; }
 .dropdown-item:last-child { border-radius: 0 0 12px 12px; }
 
-.lang-flag { font-size: 1.1rem; }
+.lang-flag { 
+  font-size: 1.2rem; 
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
 .lang-name { font-weight: 500; }
 
 .theme-btn {
