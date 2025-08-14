@@ -42,7 +42,7 @@ function initializeLoginPage() {
 function initializeLanguageDropdown() {
   const langDropdown = document.getElementById('langDropdown');
   const langMenu = document.getElementById('langMenu');
-  const langItems = document.querySelectorAll('.dropdown-item');
+  const langItems = document.querySelectorAll('.ui-dropdown-item');
 
   if (!langDropdown || !langMenu) return;
 
