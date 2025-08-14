@@ -42,10 +42,9 @@ function initializeLoginPage() {
 function initializeLanguageDropdown() {
   const langDropdown = document.getElementById('langDropdown');
   const langMenu = document.getElementById('langMenu');
-  const currentLangEl = document.querySelector('.current-lang');
   const langItems = document.querySelectorAll('.dropdown-item');
 
-  if (!langDropdown || !langMenu || !currentLangEl) return;
+  if (!langDropdown || !langMenu) return;
 
   // Update current language display
   function updateCurrentLang() {
