@@ -11,16 +11,23 @@
 <body class="login-page">
 <div class="toast-container"></div>
 <div class="modal"><div class="modal-content"><p class="modal-message"></p><button class="yes" data-i18n="modal_yes"></button><button class="no" data-i18n="modal_no"></button></div></div>
-<div class="login-topbar"><div class="login-controls"><button class="login-theme" onclick="toggleTheme()" data-i18n="btn_theme"></button><select id="langSelect" class="login-lang" onchange="setLanguage(this.value)"><option value="fa" data-i18n="lang_fa"></option><option value="en" data-i18n="lang_en"></option></select></div></div>
 <div class="auth-wrapper">
 <div class="auth-card">
 <div class="brand">
-<svg class="brand-mark" width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4F46E5"/><stop offset="100%" stop-color="#14B8A6"/></linearGradient></defs><path d="M12 2l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-4z" fill="url(#g1)"/><path d="M9.5 11a2.5 2.5 0 115 0v2.2a1.3 1.3 0 01-1.3 1.3h-2.4A1.3 1.3 0 019.5 13.2V11z" fill="white" opacity="0.9"/></svg>
+<svg class="brand-mark" width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4F46E5"/><stop offset="100%" stop-color="#14B8A6"/></linearGradient></defs><path d="M12 2l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-4z" fill="url(#g1)"/><path d="M9.5 11a2.5 2.5 0 115 0v2.2a1.3 1.3 0 01-1.3 1.3h-2.4A1.3 1.3 0 019.5 13.2V11z" fill="white" opacity="0.9"/></svg>
 <div class="brand-text"><h1 data-i18n="login_title"></h1><p class="brand-sub">OpenVPN Manager</p></div>
+</div>
+<div class="controls-row">
+  <div id="langGroup" class="lang-group" role="group" aria-label="language">
+    <button type="button" class="lang-btn" data-lang="fa" aria-pressed="false">🇮🇷 FA</button>
+    <button type="button" class="lang-btn" data-lang="en" aria-pressed="false">🇺🇸 EN</button>
+  </div>
+  <button type="button" class="theme-btn" id="themeToggle" aria-label="theme">🌙</button>
+  <select id="langSelect" class="hidden-select" onchange="setLanguage(this.value)"><option value="fa" data-i18n="lang_fa"></option><option value="en" data-i18n="lang_en"></option></select>
 </div>
 <form id="loginForm" class="auth-form" autocomplete="on">
 <label class="input-group"><span class="input-label" data-i18n="label_username"></span><div class="input-wrapper"><span class="input-icon" aria-hidden="true">&#128100;</span><input type="text" id="loginUser" name="username" autocomplete="username" aria-label="username" required data-i18n="label_username" /></div></label>
-<label class="input-group"><span class="input-label" data-i18n="label_password"></span><div class="input-wrapper"><span class="input-icon" aria-hidden="true">&#128274;</span><input type="password" id="loginPass" name="password" autocomplete="current-password" aria-label="password" required data-i18n="label_password" /><button type="button" id="togglePass" class="password-toggle" aria-label="toggle password">&#128065;</button></div></label>
+<label class="input-group"><span class="input-label" data-i18n="label_password"></span><div class="input-wrapper"><span class="input-icon" aria-hidden="true">&#128274;</span><input type="password" id="loginPass" name="password" autocomplete="current-password" aria-label="password" required data-i18n="label_password" /><button type="button" id="togglePass" class="password-toggle" aria-label="toggle password" data-visible="false"><svg class="eye" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path class="eye-outline" d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" stroke-width="1.6" fill="none"/><circle class="eye-pupil" cx="12" cy="12" r="3" fill="currentColor"/><path class="slash" d="M3 21L21 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></label>
 <label class="checkbox"><input type="checkbox" id="rememberMe" /><span class="checkmark"></span><span class="checkbox-label" data-i18n="remember_me"></span></label>
 <button id="loginSubmit" class="btn-primary" type="submit"><span data-i18n="btn_login"></span><span class="spinner" aria-hidden="true"></span></button>
 </form>
@@ -31,6 +38,31 @@
 document.addEventListener('DOMContentLoaded', () => {
   const yearEl = document.querySelector('.year');
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
+  // Initialize language buttons
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.getAttribute('data-lang');
+      setLanguage(lang);
+      updateLangActive();
+    });
+  });
+  function updateLangActive() {
+    document.querySelectorAll('.lang-btn').forEach(b => {
+      const active = b.getAttribute('data-lang') === (window.currentLang || 'fa');
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+  updateLangActive();
+  // Theme toggle inside card
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      toggleTheme();
+      themeToggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+    });
+    themeToggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+  }
 });
 const loginForm = document.getElementById('loginForm');
 const submitBtn = document.getElementById('loginSubmit');
@@ -38,8 +70,9 @@ const passInput = document.getElementById('loginPass');
 const togglePass = document.getElementById('togglePass');
 if (togglePass && passInput) {
   togglePass.addEventListener('click', () => {
-    const type = passInput.getAttribute('type') === 'password' ? 'text' : 'password';
-    passInput.setAttribute('type', type);
+    const isHidden = passInput.getAttribute('type') === 'password';
+    passInput.setAttribute('type', isHidden ? 'text' : 'password');
+    togglePass.setAttribute('data-visible', isHidden ? 'true' : 'false');
   });
 }
 if (loginForm) {
