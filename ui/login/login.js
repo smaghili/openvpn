@@ -51,9 +51,13 @@ function initializeLanguageDropdown() {
   function updateCurrentLang() {
     const lang = window.currentLang || 'fa';
     const config = LANG_CONFIG[lang];
-    if (config) {
-      currentLangEl.innerHTML = `${config.flag} ${config.name}`;
-    }
+    if (!config) return;
+    const btn = document.getElementById('langDropdown');
+    if (!btn) return;
+    const flagBox = btn.querySelector('.flag-box');
+    const label = btn.querySelector('.lang-label');
+    if (flagBox) flagBox.innerHTML = config.flag;
+    if (label) label.textContent = config.name;
   }
 
   // Dropdown toggle
