@@ -10,7 +10,6 @@ class SidebarManager {
         this.loadSidebar();
         this.initializeTheme();
         this.initializeNavigation();
-        this.initializeLogout();
         this.setActivePage();
     }
 
@@ -32,7 +31,6 @@ class SidebarManager {
     initializeSidebarFeatures() {
         this.initializeTheme();
         this.initializeNavigation();
-        this.initializeLogout();
         this.setActivePage();
     }
 
@@ -85,60 +83,25 @@ class SidebarManager {
         });
     }
 
-    initializeLogout() {
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.replaceWith(logoutBtn.cloneNode(true));
-            const newLogoutBtn = document.getElementById('logoutBtn');
-            newLogoutBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.handleLogout();
-            });
-        }
-    }
-
-    handleLogout() {
-        const confirmText = window.i18n ?
-            window.i18n.t('messages.confirm') + ' ' + window.i18n.t('logout') + '?' :
-            'Are you sure you want to logout?';
-
-        if (typeof showModal === 'function') {
-            showModal(confirmText, () => {
-                this.performLogout();
-            });
-        } else {
-            const confirmed = confirm(confirmText);
-            if (confirmed) {
-                this.performLogout();
-            }
-        }
-    }
-
-    async performLogout() {
-        try {
-            const token = localStorage.getItem('token');
-            if (token) {
-                await fetch('/api/auth/logout', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-            }
-        } catch (error) {
-            console.warn('Logout failed:', error);
-        } finally {
-            localStorage.removeItem('token');
-            localStorage.removeItem('selectedLanguage');
-            window.location.href = '/login';
-        }
-    }
-
     getCurrentLanguage() {
         return localStorage.getItem('selectedLanguage') || 'fa';
     }
+}
+
+async function logout() {
+    const token = localStorage.getItem('token');
+    if (token) {
+        await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+    }
+    localStorage.removeItem('token');
+    localStorage.removeItem('selectedLanguage');
+    window.location.href = '/login';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
