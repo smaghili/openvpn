@@ -1,11 +1,63 @@
 // ===== Overview Dashboard JavaScript ===== 
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Check authentication first
+    if (!checkAuth()) {
+        window.location.href = '/login';
+        return;
+    }
+    
+    // Apply saved language
+    applySavedLanguage();
+    
     initializeOverview();
     initializeServiceActions();
     initializeQuickActions();
     startDataRefresh();
 });
+
+// Check if user is authenticated
+function checkAuth() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        return false;
+    }
+    
+    // Basic JWT validation (check if not expired)
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const currentTime = Math.floor(Date.now() / 1000);
+        
+        if (payload.exp && payload.exp < currentTime) {
+            localStorage.removeItem('token');
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        localStorage.removeItem('token');
+        return false;
+    }
+}
+
+// Apply saved language from localStorage
+function applySavedLanguage() {
+    const savedLang = localStorage.getItem('selectedLanguage') || 'fa';
+    const htmlEl = document.documentElement;
+    
+    if (savedLang === 'fa') {
+        htmlEl.setAttribute('lang', 'fa');
+        htmlEl.setAttribute('dir', 'rtl');
+    } else {
+        htmlEl.setAttribute('lang', 'en');
+        htmlEl.setAttribute('dir', 'ltr');
+    }
+    
+    // Apply translations if available
+    if (typeof window.applyTranslations === 'function') {
+        window.applyTranslations(savedLang);
+    }
+}
 
 // Initialize overview functionality
 function initializeOverview() {
@@ -81,6 +133,7 @@ function updateStatDisplay(type, data) {
             break;
             
         case 'ram':
+            console.log('RAM Data:', data); // Debug log
             if (valueEl) valueEl.textContent = `${data.percent}%`;
             if (percentEl) percentEl.textContent = `${data.used_mb}/${Math.round(data.total_mb)}MB`;
             if (progressEl) progressEl.style.width = `${data.percent}%`;

@@ -16,8 +16,38 @@ const LANG_CONFIG = {
 
 // Login page initialization
 document.addEventListener('DOMContentLoaded', () => {
+  // Check if user is already authenticated
+  if (checkAuth()) {
+    window.location.href = '/overview';
+    return;
+  }
+  
   initializeLoginPage();
 });
+
+// Check if user is authenticated
+function checkAuth() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return false;
+  }
+  
+  // Basic JWT validation (check if not expired)
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const currentTime = Math.floor(Date.now() / 1000);
+    
+    if (payload.exp && payload.exp < currentTime) {
+      localStorage.removeItem('token');
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    localStorage.removeItem('token');
+    return false;
+  }
+}
 
 function initializeLoginPage() {
   // Set current year
