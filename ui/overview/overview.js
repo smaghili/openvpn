@@ -107,9 +107,10 @@ function updateSummaryDisplay(summary) {
 }
 
 // Update service statuses from API
-async function updateServiceStatuses() {
+async function updateServiceStatuses(forceRefresh = false) {
     try {
-        const response = await fetch('/api/system/services', {
+        const url = forceRefresh ? '/api/system/services?force=true' : '/api/system/services';
+        const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
@@ -268,7 +269,7 @@ function handleSystemRestart() {
 
 
 
-// Refresh all data (reuse existing refresh logic)
+// Refresh all data with force cache clear
 async function refreshData() {
     const refreshBtn = document.getElementById('refreshData');
     if (refreshBtn) {
@@ -277,10 +278,10 @@ async function refreshData() {
     }
 
     try {
-        // Reuse the optimized refresh logic
+        // Force refresh with cache clear
         await Promise.all([
             updateSystemStats(),
-            updateServiceStatuses()
+            updateServiceStatuses(true) // Force refresh
         ]);
         showToast('Data refreshed successfully', 'success');
     } catch (error) {

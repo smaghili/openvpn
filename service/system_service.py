@@ -18,6 +18,12 @@ class SystemService:
     _user_cache = None
     _user_cache_time = 0
     _user_cache_duration = 30  # Cache users for 30 seconds
+    
+    @classmethod
+    def clear_service_cache(cls):
+        """Clear service status cache to force refresh"""
+        cls._service_cache = None
+        cls._service_cache_time = 0
     """System monitoring service for real-time statistics"""
     
     @classmethod
@@ -119,10 +125,9 @@ class SystemService:
             # Check actual service status (lightweight checks)
             services = {
                 'uds': cls._check_uds_status(),
-                'openvpn': cls._check_openvpn_status(),
                 'wireguard': cls._check_wireguard_status(),
                 'login': {'status': 'up', 'uptime': 'Active'},
-                'cert': {'status': 'up', 'uptime': 'OK'}
+                'cert': {'status': 'up', 'uptime': 'Active'}
             }
             
             result = {
@@ -151,8 +156,8 @@ class SystemService:
             result = os.popen('systemctl is-active openvpn-uds-monitor 2>/dev/null').read().strip()
             
             if result == 'active':
-                # Check for errors in recent logs
-                log_check = os.popen('systemctl status openvpn-uds-monitor 2>/dev/null | grep -c "ERROR"').read().strip()
+                # Check for recent errors (last 10 lines only to avoid old errors)
+                log_check = os.popen('systemctl status openvpn-uds-monitor --lines=10 2>/dev/null | grep -c "ERROR"').read().strip()
                 if log_check and int(log_check) > 0:
                     return {'status': 'error', 'uptime': 'Running with errors'}
                 else:
@@ -164,18 +169,7 @@ class SystemService:
         except:
             return {'status': 'unknown', 'uptime': 'Unknown'}
     
-    @staticmethod
-    def _check_openvpn_status() -> Dict[str, str]:
-        """Check OpenVPN service status"""
-        try:
-            # Check if OpenVPN is running
-            if os.path.exists('/var/run/openvpn/server.pid'):
-                return {'status': 'up', 'uptime': 'Running'}
-            else:
-                return {'status': 'down', 'uptime': 'Stopped'}
-        except:
-            return {'status': 'unknown', 'uptime': 'Unknown'}
-    
+
     @staticmethod
     def _check_wireguard_status() -> Dict[str, str]:
         """Check WireGuard service status"""

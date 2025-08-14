@@ -206,6 +206,11 @@ def get_system_stats():
 def get_service_status():
     """Get real-time service status"""
     try:
+        # Check if this is a forced refresh
+        force_refresh = request.args.get('force', 'false').lower() == 'true'
+        if force_refresh:
+            SystemService.clear_service_cache()
+            
         result = SystemService.get_service_status()
         if result['success']:
             return jsonify(result), 200

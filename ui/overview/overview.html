@@ -167,29 +167,6 @@
             </div>
           </div>
 
-          <div class="service-card ui-card">
-            <div class="service-header">
-              <div class="service-icon openvpn">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
-              <div class="service-info">
-                <h3 data-i18n="service_openvpn">OpenVPN</h3>
-                <p class="service-desc" data-i18n="openvpn_desc">Main VPN service</p>
-              </div>
-            </div>
-            <div class="service-status">
-              <div class="status-indicator" id="openvpnStatus">
-                <span class="status-dot"></span>
-                <span class="status-text">Loading...</span>
-              </div>
-              <div class="service-time" id="openvpnUptime">Loading...</div>
-            </div>
-            <div class="service-actions">
-              <button class="service-btn restart" data-service="openvpn" data-i18n="restart">Restart</button>
-            </div>
-          </div>
 
           <div class="service-card ui-card">
             <div class="service-header">
@@ -211,7 +188,7 @@
               <div class="service-time" id="wireguardUptime">Loading...</div>
             </div>
             <div class="service-actions">
-              <button class="service-btn start" data-service="wireguard" data-i18n="start">Start</button>
+              <button class="service-btn restart" data-service="wireguard" data-i18n="restart">Restart</button>
             </div>
           </div>
 
@@ -235,7 +212,7 @@
               <div class="service-time" id="loginUptime">Loading...</div>
             </div>
             <div class="service-actions">
-              <button class="service-btn config" data-service="login" data-i18n="config">Config</button>
+              <button class="service-btn restart" data-service="login" data-i18n="restart">Restart</button>
             </div>
           </div>
 
@@ -259,7 +236,7 @@
               <div class="service-time" id="certUptime">Loading...</div>
             </div>
             <div class="service-actions">
-              <button class="service-btn fix" data-service="cert" data-i18n="fix">Fix</button>
+              <button class="service-btn restart" data-service="cert" data-i18n="restart">Restart</button>
             </div>
           </div>
         </div>
