@@ -70,6 +70,7 @@ function initializeLanguageDropdown() {
       const lang = item.getAttribute('data-lang');
       if (lang && LANG_CONFIG[lang]) {
         setLanguage(lang);
+        window.currentLang = lang;
         updateCurrentLang();
         langMenu.classList.remove('open');
         langDropdown.setAttribute('aria-expanded', 'false');
@@ -84,6 +85,7 @@ function initializeLanguageDropdown() {
   });
 
   // Initialize current language display
+  window.currentLang = window.currentLang || localStorage.getItem('lang') || 'fa';
   updateCurrentLang();
 }
 
