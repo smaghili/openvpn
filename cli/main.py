@@ -15,8 +15,10 @@ sys.path.insert(0, project_root)
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
 from service.user_service import UserService
+from service.panel_service import PanelService
 from data.db import Database
 from data.user_repository import UserRepository
+from data.admin_repository import AdminRepository
 from core.backup_service import BackupService
 from config.config import VPNConfig, config, InstallSettings
 from core.types import Username
@@ -158,11 +160,14 @@ def print_management_menu() -> None:
     print("\n📊 Traffic Management:")
     print("  7. Set User Quota")
     print("  8. View User Status (Real-time)")
+    print("\n⚙️  Panel Configuration:")
+    print("  9. Change Panel Credentials")
+    print("  10. Change Panel Port")
     print("\n📦 System:")
-    print("  9. System Backup")
-    print("  10. System Restore")
-    print("  11. Uninstall VPN")
-    print("  12. Exit")
+    print("  11. System Backup")
+    print("  12. System Restore")
+    print("  13. Uninstall VPN")
+    print("  14. Exit")
 
 def add_user_flow(user_service: UserService) -> None:
     # This function remains unchanged
@@ -411,6 +416,70 @@ def change_user_password_flow(user_service: UserService) -> None:
     except Exception as e:
         print(f"❌ An unexpected error occurred: {e}")
 
+def change_panel_credentials_flow(panel_service: PanelService) -> None:
+    """Flow to change panel admin credentials."""
+    try:
+        current_config = panel_service.get_current_config()
+        print(f"\nCurrent admin username: {current_config['username']}")
+        
+        manual_input = input("Do you want to manually enter credentials? (y/n) [n]: ").strip().lower()
+        
+        if manual_input == 'y':
+            username = input("Enter new admin username: ").strip()
+            if not username:
+                print("❌ Username cannot be empty.")
+                return
+                
+            password = getpass("Enter new admin password: ")
+            if not password:
+                print("❌ Password cannot be empty.")
+                return
+        else:
+            credentials = panel_service.generate_random_credentials()
+            username = credentials['username']
+            password = credentials['password']
+            print(f"\nGenerated credentials:")
+            print(f"Username: {username}")
+            print(f"Password: {password}")
+        
+        result = panel_service.change_admin_credentials(username, password)
+        print(f"✅ {result['message']}")
+        print(f"New admin username: {result['username']}")
+        
+    except ValidationError as e:
+        print(f"❌ {e}")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {e}")
+
+def change_panel_port_flow(panel_service: PanelService) -> None:
+    """Flow to change panel API port."""
+    try:
+        current_config = panel_service.get_current_config()
+        print(f"\nCurrent panel port: {current_config['port']}")
+        
+        manual_input = input("Do you want to manually enter port? (y/n) [n]: ").strip().lower()
+        
+        if manual_input == 'y':
+            port_str = input("Enter new port number (1024-65535): ").strip()
+            try:
+                port = int(port_str)
+            except ValueError:
+                print("❌ Invalid port number.")
+                return
+        else:
+            port = panel_service.generate_random_port()
+            print(f"\nGenerated random port: {port}")
+        
+        result = panel_service.change_panel_port(port)
+        print(f"✅ {result['message']}")
+        print(f"New panel port: {result['port']}")
+        print("\n⚠️  You need to restart the API service for changes to take effect.")
+        
+    except ValidationError as e:
+        print(f"❌ {e}")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {e}")
+
 
 def backup_flow(backup_service: BackupService) -> None:
     # This function remains unchanged
@@ -651,8 +720,10 @@ def main() -> None:
     # Initialize services only for management operations
     db = Database()
     user_repo = UserRepository(db)
+    admin_repo = AdminRepository(db)
     login_manager = LoginUserManager()
     user_service = UserService(user_repo, openvpn_manager, login_manager)
+    panel_service = PanelService(admin_repo)
     backupable_components = [openvpn_manager, login_manager, user_service]
     backup_service = BackupService(backupable_components)
 
@@ -682,12 +753,16 @@ def main() -> None:
             elif choice == '8':
                 view_user_status_flow(user_service)
             elif choice == '9':
-                backup_flow(backup_service)
+                change_panel_credentials_flow(panel_service)
             elif choice == '10':
-                restore_flow(backup_service)
+                change_panel_port_flow(panel_service)
             elif choice == '11':
-                uninstall_flow(openvpn_manager)
+                backup_flow(backup_service)
             elif choice == '12':
+                restore_flow(backup_service)
+            elif choice == '13':
+                uninstall_flow(openvpn_manager)
+            elif choice == '14':
                 print("Goodbye!")
                 break
             else:

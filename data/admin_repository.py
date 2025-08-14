@@ -167,3 +167,45 @@ class AdminRepository:
         query = "SELECT COUNT(*) as count FROM admins"
         result = self.db.execute_query(query)
         return result[0]['count'] if result else 0
+    
+    def update_admin_password(self, admin_id: int, new_password: str) -> None:
+        """
+        Update admin password with new encrypted hash.
+        """
+        try:
+            password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE admins SET password_hash = ?, token_version = token_version + 1 WHERE id = ?",
+                    (password_hash, admin_id)
+                )
+                if cursor.rowcount == 0:
+                    raise UserNotFoundError(f"Admin ID {admin_id}")
+                    
+        except Exception as e:
+            if "Admin ID" in str(e):
+                raise
+            raise DatabaseError(f"Failed to update admin password: {str(e)}")
+    
+    def update_admin_username(self, admin_id: int, new_username: str) -> None:
+        """
+        Update admin username.
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE admins SET username = ?, token_version = token_version + 1 WHERE id = ?",
+                    (new_username, admin_id)
+                )
+                if cursor.rowcount == 0:
+                    raise UserNotFoundError(f"Admin ID {admin_id}")
+                    
+        except Exception as e:
+            if "UNIQUE constraint failed" in str(e):
+                raise UserAlreadyExistsError(new_username)
+            if "Admin ID" in str(e):
+                raise
+            raise DatabaseError(f"Failed to update admin username: {str(e)}")
