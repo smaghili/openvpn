@@ -246,6 +246,8 @@ html.dark .checkmark {
   color: var(--text-color);
   cursor: pointer;
   font-size: 0.9rem;
+  min-width: 140px;
+  justify-content: center;
 }
 .current-lang {
   display: flex;
@@ -281,6 +283,7 @@ html.dark .dropdown-btn {
   transform: translateY(-8px);
   transition: all 0.2s;
   z-index: 100;
+  min-width: 140px;
 }
 
 html.dark .dropdown-menu { 

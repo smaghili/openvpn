@@ -4,7 +4,7 @@
 const LANG_CONFIG = {
   fa: {
     flag: '<svg width="20" height="15" viewBox="0 0 20 15"><rect width="20" height="5" fill="#239f40"/><rect y="5" width="20" height="5" fill="#fff"/><rect y="10" width="20" height="5" fill="#da0000"/><circle cx="10" cy="7.5" r="2" fill="none" stroke="#da0000" stroke-width="0.5"/></svg>',
-    name: 'فارسی',
+    name: 'Farsi',
     flagCode: 'IR'
   },
   en: {
