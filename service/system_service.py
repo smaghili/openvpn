@@ -152,11 +152,8 @@ class SystemService:
     def _check_uds_status() -> Dict[str, str]:
         """Check UDS monitoring service status"""
         try:
-            # Check systemctl status for openvpn-uds-monitor
-            result = os.popen('systemctl is-active openvpn-uds-monitor 2>/dev/null').read().strip()
-            
+            result = os.popen('systemctl is-active openvpn-uds-monitor 2>/dev/null').read().strip() 
             if result == 'active':
-                # Check for recent errors (last 10 lines only to avoid old errors)
                 log_check = os.popen('systemctl status openvpn-uds-monitor --lines=10 2>/dev/null | grep -c "ERROR"').read().strip()
                 if log_check and int(log_check) > 0:
                     return {'status': 'error', 'uptime': 'Running with errors'}
