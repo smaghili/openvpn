@@ -91,7 +91,13 @@ class SidebarManager {
     initializeLogout() {
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => {
+            // Remove any existing listeners first
+            logoutBtn.replaceWith(logoutBtn.cloneNode(true));
+            const newLogoutBtn = document.getElementById('logoutBtn');
+            
+            newLogoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 this.handleLogout();
             });
         }

@@ -69,7 +69,8 @@ export default {
         up: 'فعال',
         down: 'متوقف',
         error: 'خطا',
-        unknown: 'نامشخص'
+        unknown: 'نامشخص',
+        loading: 'در حال بارگذاری...'
       } 
     },
     actions: { 

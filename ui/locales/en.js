@@ -70,7 +70,8 @@ export default {
         up: 'Active',
         down: 'Stopped',
         error: 'Error',
-        unknown: 'Unknown'
+        unknown: 'Unknown',
+        loading: 'Loading...'
       } 
     },
     actions: { 

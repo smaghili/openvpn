@@ -170,12 +170,14 @@ class OverviewDashboard {
             
             if (dot) {
                 dot.className = 'status-dot';
-                dot.classList.add(serviceData.status || 'unknown');
+                const status = serviceData.status || 'inactive';
+                dot.classList.add(status);
             }
             
             if (text) {
-                const statusKey = `services.card.status.${serviceData.status || 'unknown'}`;
-                text.textContent = window.i18n ? window.i18n.t(statusKey) : serviceData.status || 'Unknown';
+                const status = serviceData.status || 'inactive';
+                const statusKey = `services.card.status.${status}`;
+                text.textContent = window.i18n ? window.i18n.t(statusKey) : (status === 'active' ? 'Active' : status === 'inactive' ? 'Inactive' : 'Unknown');
             }
         }
 
@@ -208,10 +210,10 @@ class OverviewDashboard {
     }
 
     updateUserStats(stats) {
-        const totalUsersEl = document.getElementById('totalUsers');
+    const totalUsersEl = document.getElementById('totalUsers');
         const onlineUsersEl = document.getElementById('onlineUsers');
-        const totalUsageEl = document.getElementById('totalUsage');
-
+    const totalUsageEl = document.getElementById('totalUsage');
+    
         if (totalUsersEl) totalUsersEl.textContent = stats.total_users || '0';
         if (onlineUsersEl) onlineUsersEl.textContent = stats.online_users || '0';
         if (totalUsageEl) {
@@ -279,11 +281,11 @@ class OverviewDashboard {
         try {
             const response = await fetch(`/api/system/services/${service}/${action}`, {
                 method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
             if (!response.ok) throw new Error(`Service ${action} failed`);
 
@@ -577,7 +579,7 @@ class OverviewDashboard {
                 'Backup created successfully';
             this.showToast(successMsg, 'success');
             
-        } catch (error) {
+    } catch (error) {
             console.error('Backup error:', error);
             const errorMsg = window.i18n ? 
                 window.i18n.t('toasts.backupError') : 
@@ -634,12 +636,12 @@ class OverviewDashboard {
         const container = document.querySelector('.toast-container');
         if (!container) return;
 
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
         toast.textContent = message;
         
         container.appendChild(toast);
-        
+
         setTimeout(() => toast.classList.add('show'), 100);
         
         setTimeout(() => {

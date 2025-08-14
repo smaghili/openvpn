@@ -419,19 +419,45 @@ html.dark .overview-page {
   padding: 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg);
   color: var(--text-color);
   font-size: 0.9rem;
+  font-weight: 500;
   cursor: pointer;
   transition: var(--smooth-transition);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .backup-btn:hover {
   transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-.backup-btn.create:hover { background: #10b981; color: white; }
-.backup-btn.restore:hover { background: #f59e0b; color: white; }
+.backup-btn.create {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--primary-green);
+}
+
+.backup-btn.create:hover { 
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border-color: #10b981;
+}
+
+.backup-btn.restore {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05));
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
+.backup-btn.restore:hover { 
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border-color: #f59e0b;
+}
 
 .backup-btn.has-stored-password {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
@@ -475,8 +501,7 @@ html.dark .overview-page {
   top: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.7);
 }
 
 .modal-content {
@@ -489,6 +514,8 @@ html.dark .overview-page {
   max-width: 800px;
   max-height: 80vh;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  position: relative;
 }
 
 .modal-content.small {
@@ -501,7 +528,7 @@ html.dark .overview-page {
   align-items: center;
   padding: 1.5rem;
   border-bottom: 1px solid var(--border-color);
-  background: var(--glass-bg);
+  background: var(--card-bg);
 }
 
 .modal-header h3 {
