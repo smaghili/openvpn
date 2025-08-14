@@ -5,7 +5,7 @@ JWT middleware for secure authentication with real-time permission checking.
 import os
 from functools import wraps
 from typing import Optional, Dict, Any
-from flask import request, jsonify, g
+from flask import request, jsonify, g, redirect
 from data.db import Database
 from data.admin_repository import AdminRepository
 from data.permission_repository import PermissionRepository
@@ -83,6 +83,16 @@ class JWTMiddleware:
                     'message': 'An unexpected error occurred during authentication'
                 }), 500
         
+        return decorated_function
+    
+    @staticmethod
+    def require_web_auth(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            token = JWTMiddleware._extract_token(request)
+            if not token:
+                return redirect('/login')
+            return f(*args, **kwargs)
         return decorated_function
     
     @staticmethod

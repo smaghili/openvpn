@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, request, redirect, url_for
 from flask_cors import CORS
 
 from .routes.user_routes import user_bp
@@ -51,14 +51,12 @@ def create_app() -> Flask:
     def public_profile_view(profile_token):
         """Public profile view - delegate to profile routes."""
         from .routes.profile_routes import public_profile_view as profile_view
-
         return profile_view(profile_token)
 
     @app.route("/profile/<profile_token>/data")
     def public_profile_data(profile_token):
         """Public profile data API - delegate to profile routes."""
         from .routes.profile_routes import public_profile_data as profile_data
-
         return profile_data(profile_token)
 
     @app.route('/profile/<profile_token>/config.ovpn')
@@ -67,42 +65,47 @@ def create_app() -> Flask:
         from .routes.profile_routes import download_ovpn_config as download_config
         return download_config(profile_token)
     
-    # Serve web UI
+    # Web UI routes
     @app.route('/')
     def index():
-        return app.send_static_file('login/login.html')
+        return redirect('/login')
     
     @app.route('/login')
     def login():
         return app.send_static_file('login/login.html')
     
     @app.route('/overview')
+    @JWTMiddleware.require_web_auth
     def overview():
         return app.send_static_file('overview/overview.html')
     
     @app.route('/users')
+    @JWTMiddleware.require_web_auth
     def users():
         return app.send_static_file('users.html')
     
     @app.route('/openvpn')
+    @JWTMiddleware.require_web_auth
     def openvpn():
         return app.send_static_file('openvpn.html')
     
     @app.route('/wireguard')
+    @JWTMiddleware.require_web_auth
     def wireguard():
         return app.send_static_file('wireguard.html')
     
     @app.route('/settings')
+    @JWTMiddleware.require_web_auth
     def settings():
         return app.send_static_file('settings.html')
     
     @app.route('/shared/sidebar.html')
+    @JWTMiddleware.require_web_auth
     def sidebar():
         return app.send_static_file('shared/sidebar.html')
 
     @app.route('/<path:path>')
     def static_proxy(path):
-        # Set proper content type for CSS files
         if path.endswith('.css'):
             response = send_from_directory(app.static_folder, path)
             response.headers['Content-Type'] = 'text/css'
