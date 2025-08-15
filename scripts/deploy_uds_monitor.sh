@@ -94,10 +94,10 @@ create_systemd_override() {
     log_info "Creating systemd override for OpenVPN service..."
     
     # Create override directory
-    mkdir -p /etc/systemd/system/openvpn-server@server.service.d/
+    mkdir -p /etc/systemd/system/openvpn@server.service.d/
     
     # Create override file
-    cat > /etc/systemd/system/openvpn-server@server.service.d/uds-override.conf << EOF
+    cat > /etc/systemd/system/openvpn@server.service.d/uds-override.conf << EOF
 [Service]
 RuntimeDirectory=openvpn
 UMask=007
@@ -225,15 +225,15 @@ restart_openvpn_for_uds() {
     log_info "Applying UDS configuration..."
     
     # Restart OpenVPN to apply UDS configuration
-    if systemctl is-active --quiet openvpn-server@server-cert; then
+    if systemctl is-active --quiet openvpn@server-cert; then
         log_info "Restarting OpenVPN certificate service to apply UDS configuration..."
-        systemctl restart openvpn-server@server-cert
+        systemctl restart openvpn@server-cert
         sleep 3
     fi
     
-    if systemctl is-active --quiet openvpn-server@server-login; then
+    if systemctl is-active --quiet openvpn@server-login; then
         log_info "Restarting OpenVPN login service to apply UDS configuration..."
-        systemctl restart openvpn-server@server-login
+        systemctl restart openvpn@server-login
         sleep 3
     fi
 }

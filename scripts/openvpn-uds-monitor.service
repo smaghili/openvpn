@@ -1,8 +1,8 @@
 [Unit]
 Description=OpenVPN UDS Traffic Monitor Service
-After=network.target openvpn-server@server-cert.service openvpn-server@server-login.service
-Wants=openvpn-server@server-cert.service
-PartOf=openvpn-server@server-cert.service
+After=network.target openvpn@server-cert.service openvpn@server-login.service
+Wants=openvpn@server-cert.service
+PartOf=openvpn@server-cert.service
 
 [Service]
 Type=simple

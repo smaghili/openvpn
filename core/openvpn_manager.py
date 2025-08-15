@@ -417,8 +417,8 @@ class OpenVPNManager(IBackupable):
         subprocess.run(["systemctl", "daemon-reload"], check=True, capture_output=True)
 
         services_to_manage = [
-            "openvpn-server@server-cert",
-            "openvpn-server@server-login",
+            "openvpn@server-cert",
+            "openvpn@server-login",
         ]
 
         for service in services_to_manage:
@@ -553,8 +553,8 @@ tls-version-min 1.2
             logger.info("   └── Stopping and disabling services...")
         services_to_stop = [
             "openvpn-monitor",
-            "openvpn-server@server-cert",
-            "openvpn-server@server-login",
+            "openvpn@server-cert",
+            "openvpn@server-login",
             "openvpn@server",
         ]
         for service in services_to_stop:
@@ -646,8 +646,8 @@ tls-version-min 1.2
         """Stops all related services before a restore operation."""
         services_to_stop = [
             "openvpn-uds-monitor",
-            "openvpn-server@server-cert",
-            "openvpn-server@server-login",
+            "openvpn@server-cert",
+            "openvpn@server-login",
         ]
         for service in services_to_stop:
             subprocess.run(

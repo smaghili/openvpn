@@ -122,13 +122,13 @@ class OverviewDashboard {
         }
     }
 
-    updateServiceStatus(services) {
-        const serviceMap = {
-            'uds': { statusId: 'udsStatus', uptimeId: 'udsUptime', ramId: 'uds-ram', cpuId: 'uds-cpu' },
-            'wireguard': { statusId: 'wireguardStatus', uptimeId: 'wireguardUptime', ramId: 'wg-ram', cpuId: 'wg-cpu' },
-            'login': { statusId: 'loginStatus', uptimeId: 'loginUptime', ramId: 'ovpn-login-ram', cpuId: 'ovpn-login-cpu' },
-            'cert': { statusId: 'certStatus', uptimeId: 'certUptime', ramId: 'ovpn-cert-ram', cpuId: 'ovpn-cert-cpu' }
-        };
+            updateServiceStatus(services) {
+            const serviceMap = {
+                'uds': { statusId: 'udsStatus', uptimeId: 'udsUptime', ramId: 'uds-ram', cpuId: 'uds-cpu' },
+                'wireguard': { statusId: 'wireguardStatus', uptimeId: 'wireguardUptime', ramId: 'wg-ram', cpuId: 'wg-cpu' },
+                'openvpn@server-login': { statusId: 'loginStatus', uptimeId: 'loginUptime', ramId: 'ovpn-login-ram', cpuId: 'ovpn-login-cpu' },
+                'openvpn@server-cert': { statusId: 'certStatus', uptimeId: 'certUptime', ramId: 'ovpn-cert-ram', cpuId: 'ovpn-cert-cpu' }
+            };
 
         Object.entries(services).forEach(([serviceName, serviceData]) => {
             const mapping = serviceMap[serviceName];

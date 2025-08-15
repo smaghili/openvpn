@@ -127,8 +127,8 @@ class SystemService:
             services = {
                 'uds': cls._check_uds_status(),
                 'wireguard': cls._check_wireguard_status(),
-                'login': cls._check_openvpn_login_status(),
-                'cert': cls._check_openvpn_cert_status()
+                'openvpn@server-login': cls._check_openvpn_login_status(),
+                'openvpn@server-cert': cls._check_openvpn_cert_status()
             }
             
             result = {
@@ -191,7 +191,7 @@ class SystemService:
         """Check OpenVPN login service status with resource usage"""
         try:
             # Check if OpenVPN login service is running
-            result = os.popen('systemctl is-active openvpn-server@server-login 2>/dev/null').read().strip()
+            result = os.popen('systemctl is-active openvpn@server-login 2>/dev/null').read().strip()
             
             if result == 'active':
                 # Get process info for resource usage
@@ -229,7 +229,7 @@ class SystemService:
         """Check OpenVPN cert service status with resource usage"""
         try:
             # Check if OpenVPN cert service is running
-            result = os.popen('systemctl is-active openvpn-server@server-cert 2>/dev/null').read().strip()
+            result = os.popen('systemctl is-active openvpn@server-cert 2>/dev/null').read().strip()
             
             if result == 'active':
                 # Get process info for resource usage
@@ -316,8 +316,8 @@ class SystemService:
         """Get log file path for service"""
         log_map = {
             'openvpn': '/var/log/openvpn/openvpn.log',
-            'openvpn-server@server-cert': '/var/log/openvpn/openvpn.log',
-            'openvpn-server@server-login': '/var/log/openvpn/openvpn.log',
+            'openvpn@server-cert': '/var/log/openvpn/openvpn.log',
+            'openvpn@server-login': '/var/log/openvpn/openvpn.log',
             'openvpn-uds-monitor': '/var/log/openvpn/traffic_monitor.log',
             'wireguard': '/var/log/syslog',
             'wg-quick@wg0': '/var/log/syslog',

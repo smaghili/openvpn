@@ -557,7 +557,7 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
         
         # 1. Stop and remove all systemd services
         print("   └── Stopping and removing systemd services...")
-        services = ['openvpn-api', 'openvpn-server@server-cert', 'openvpn-server@server-login']
+        services = ['openvpn-api', 'openvpn@server-cert', 'openvpn@server-login']
         for service in services:
             os.system(f"systemctl stop {service} 2>/dev/null || true")
             os.system(f"systemctl disable {service} 2>/dev/null || true")

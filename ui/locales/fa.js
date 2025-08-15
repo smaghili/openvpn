@@ -82,8 +82,8 @@ export default {
       restarting: 'در حال راه‌اندازی مجدد...'
     },
     names: {
-      'openvpn-server@server-cert': 'OpenVPN (گواهی)',
-      'openvpn-server@server-login': 'OpenVPN (نام کاربری و رمز عبور)',
+              'openvpn@server-cert': 'OpenVPN (گواهی)',
+        'openvpn@server-login': 'OpenVPN (نام کاربری و رمز عبور)',
       'wireguard': 'وایرگارد',
       'openvpn-uds-monitor': 'پایش ترافیک'
     }

@@ -88,13 +88,13 @@ sudo owpanel
 - **Interface:** tun (مخصوص certificate clients)
 - **Subnet:** 10.8.0.0/24
 - **Config:** `/etc/openvpn/server/server-cert.conf`
-- **Service:** `openvpn-server@server-cert`
+- **Service:** `openvpn@server-cert`
 
 ### Login-based Server  
 - **Interface:** tun1 (مخصوص login clients)
 - **Subnet:** 10.8.0.0/24 (مشترک با certificate)
 - **Config:** `/etc/openvpn/server/server-login.conf`
-- **Service:** `openvpn-server@server-login`
+- **Service:** `openvpn@server-login`
 
 ### Database
 - **File:** `/etc/openvpn/vpn_manager.db`
@@ -105,15 +105,15 @@ sudo owpanel
 
 ### بررسی وضعیت سرویس‌ها
 ```bash
-systemctl status openvpn-server@server-cert
-systemctl status openvpn-server@server-login
+systemctl status openvpn@server-cert
+systemctl status openvpn@server-login
 ```
 
 ### مشاهده لاگ‌ها
 ```bash
 tail -f /var/log/openvpn/openvpn-status.log
-journalctl -u openvpn-server@server-cert -f
-journalctl -u openvpn-server@server-login -f
+journalctl -u openvpn@server-cert -f
+journalctl -u openvpn@server-login -f
 ```
 
 ### بررسی کاربران در دیتابیس

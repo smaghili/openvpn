@@ -83,8 +83,8 @@ export default {
       restarting: 'Restarting...'
     },
     names: {
-      'openvpn-server@server-cert': 'OpenVPN (Certificate)',
-      'openvpn-server@server-login': 'OpenVPN (Login)',
+              'openvpn@server-cert': 'OpenVPN (Certificate)',
+        'openvpn@server-login': 'OpenVPN (Login)',
       'wg-quick@wg0': 'WireGuard',
       'openvpn-uds-monitor': 'UDS Monitor'
     }

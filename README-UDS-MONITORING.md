@@ -192,7 +192,7 @@ LIMIT 20;"
 #### 1. **UDS Socket Not Found**
 ```bash
 # Check if OpenVPN is running
-sudo systemctl status openvpn-server@server
+sudo systemctl status openvpn@server
 
 # Check socket permissions
 ls -la /run/openvpn/ovpn-mgmt.sock

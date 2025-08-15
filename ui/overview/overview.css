@@ -390,6 +390,7 @@ body {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .service-btn {
@@ -407,27 +408,43 @@ body {
   align-items: center;
   justify-content: center;
   min-width: 60px;
+  transition: all 0.2s ease;
 }
 
-.service-btn:hover {
-  background: var(--primary-blue);
-  color: white;
-  border-color: var(--primary-blue);
-}
-
-.service-btn.start:hover {
-  background: var(--primary-green);
-  border-color: var(--primary-green);
-}
-
+/* Stop Button - Red on hover */
 .service-btn.stop:hover {
-  background: var(--primary-red);
-  border-color: var(--primary-red);
+  background: #ef4444;
+  color: white;
+  border-color: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
+/* Stop Button - Active state */
+.service-btn.stop:active {
+  background: #dc2626;
+  color: white;
+  border-color: #b91c1c;
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+/* Restart Button - Orange on hover */
 .service-btn.restart:hover {
-  background: var(--primary-orange);
-  border-color: var(--primary-orange);
+  background: #f97316;
+  color: white;
+  border-color: #ea580c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+}
+
+/* Restart Button - Active state */
+.service-btn.restart:active {
+  background: #ea580c;
+  color: white;
+  border-color: #c2410c;
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
 }
 
 .service-btn:disabled {

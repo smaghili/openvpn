@@ -42,8 +42,8 @@ This project supports **dual deployment methods** with **integrated web panel**:
 
 ### System Integration
 - Create systemd services for:
-  - `openvpn-server@server-cert` (certificate-based)
-  - `openvpn-server@server-login` (username/password-based)  
+  - `openvpn@server-cert` (certificate-based)
+- `openvpn@server-login` (username/password-based)  
   - `openvpn-uds-monitor` (UDS-based traffic monitoring daemon)
   - `openvpn-api` (web panel Flask API server)
 - Enable services with proper dependencies and restart policies
