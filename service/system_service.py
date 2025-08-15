@@ -11,7 +11,7 @@ class SystemService:
     _cpu_cache_duration = 3  # Cache CPU for 3 seconds
     _service_cache = None
     _service_cache_time = 0
-    _service_cache_duration = 15  # Cache services for 15 seconds
+    _service_cache_duration = -1  # Cache services disabled (always fresh)
     _stats_cache = None
     _stats_cache_time = 0
     _stats_cache_duration = 4  # Cache full stats for 4 seconds
@@ -24,6 +24,7 @@ class SystemService:
         """Clear service status cache to force refresh"""
         cls._service_cache = None
         cls._service_cache_time = 0
+        print("Service cache cleared")  # Debug line
     """System monitoring service for real-time statistics"""
     
     @classmethod
@@ -126,8 +127,8 @@ class SystemService:
             services = {
                 'uds': cls._check_uds_status(),
                 'wireguard': cls._check_wireguard_status(),
-                'login': {'status': 'up', 'uptime': 'Active'},
-                'cert': {'status': 'up', 'uptime': 'Active'}
+                'login': cls._check_openvpn_login_status(),
+                'cert': cls._check_openvpn_cert_status()
             }
             
             result = {
@@ -184,6 +185,82 @@ class SystemService:
                 return {'status': 'down', 'uptime': 'Stopped'}
         except:
             return {'status': 'down', 'uptime': 'Stopped'}
+
+    @staticmethod
+    def _check_openvpn_login_status() -> Dict[str, Any]:
+        """Check OpenVPN login service status with resource usage"""
+        try:
+            # Check if OpenVPN login service is running
+            result = os.popen('systemctl is-active openvpn-server@server-login 2>/dev/null').read().strip()
+            
+            if result == 'active':
+                # Get process info for resource usage
+                try:
+                    # Find OpenVPN login process
+                    ps_result = os.popen("ps aux | grep 'openvpn.*server-login' | grep -v grep | head -1").read().strip()
+                    if ps_result:
+                        parts = ps_result.split()
+                        if len(parts) >= 2:
+                            pid = parts[1]
+                            # Get CPU and memory usage
+                            cpu_result = os.popen(f"ps -p {pid} -o %cpu --no-headers 2>/dev/null").read().strip()
+                            mem_result = os.popen(f"ps -p {pid} -o %mem --no-headers 2>/dev/null").read().strip()
+                            
+                            cpu_usage = float(cpu_result) if cpu_result and cpu_result != '' else 0.0
+                            memory_usage = float(mem_result) if mem_result and mem_result != '' else 0.0
+                            
+                            return {
+                                'status': 'up', 
+                                'uptime': 'Active',
+                                'cpu_usage': round(cpu_usage, 1),
+                                'memory_usage': round(memory_usage, 1)
+                            }
+                except:
+                    pass
+                
+                return {'status': 'up', 'uptime': 'Active', 'cpu_usage': 0.0, 'memory_usage': 0.0}
+            else:
+                return {'status': 'down', 'uptime': 'Stopped', 'cpu_usage': 0.0, 'memory_usage': 0.0}
+        except:
+            return {'status': 'unknown', 'uptime': 'Unknown', 'cpu_usage': 0.0, 'memory_usage': 0.0}
+
+    @staticmethod
+    def _check_openvpn_cert_status() -> Dict[str, Any]:
+        """Check OpenVPN cert service status with resource usage"""
+        try:
+            # Check if OpenVPN cert service is running
+            result = os.popen('systemctl is-active openvpn-server@server-cert 2>/dev/null').read().strip()
+            
+            if result == 'active':
+                # Get process info for resource usage
+                try:
+                    # Find OpenVPN cert process
+                    ps_result = os.popen("ps aux | grep 'openvpn.*server-cert' | grep -v grep | head -1").read().strip()
+                    if ps_result:
+                        parts = ps_result.split()
+                        if len(parts) >= 2:
+                            pid = parts[1]
+                            # Get CPU and memory usage
+                            cpu_result = os.popen(f"ps -p {pid} -o %cpu --no-headers 2>/dev/null").read().strip()
+                            mem_result = os.popen(f"ps -p {pid} -o %mem --no-headers 2>/dev/null").read().strip()
+                            
+                            cpu_usage = float(cpu_result) if cpu_result and cpu_result != '' else 0.0
+                            memory_usage = float(mem_result) if mem_result and mem_result != '' else 0.0
+                            
+                            return {
+                                'status': 'up', 
+                                'uptime': 'Active',
+                                'cpu_usage': round(cpu_usage, 1),
+                                'memory_usage': round(memory_usage, 1)
+                            }
+                except:
+                    pass
+                
+                return {'status': 'up', 'uptime': 'Active', 'cpu_usage': 0.0, 'memory_usage': 0.0}
+            else:
+                return {'status': 'down', 'uptime': 'Stopped', 'cpu_usage': 0.0, 'memory_usage': 0.0}
+        except:
+            return {'status': 'unknown', 'uptime': 'Unknown', 'cpu_usage': 0.0, 'memory_usage': 0.0}
     
     @staticmethod
     def control_service(service_name: str, action: str) -> Dict[str, Any]:

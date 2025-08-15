@@ -147,14 +147,6 @@
               </div>
               <div class="service-info">
                 <h3 data-i18n="services.names.openvpn-uds-monitor">UDS Monitor</h3>
-                <div class="service-metrics">
-                  <span class="metric-item">
-                    <small>RAM:</small> <span id="uds-ram">--</span>
-                  </span>
-                  <span class="metric-item">
-                    <small>CPU:</small> <span id="uds-cpu">--</span>
-                  </span>
-                </div>
               </div>
             </div>
             <div class="service-status">
@@ -171,23 +163,13 @@
             </div>
           </div>
 
-          <div class="service-card ui-card" data-service="wg-quick@wg0">
+          <div class="service-card ui-card" data-service="wireguard">
             <div class="service-header">
               <div class="service-icon wireguard">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                </svg>
+                <img src="../image/Wireguard.svg" alt="WireGuard" width="36" height="36">
               </div>
               <div class="service-info">
-                <h3 data-i18n="services.names.wg-quick@wg0">WireGuard</h3>
-                <div class="service-metrics">
-                  <span class="metric-item">
-                    <small>RAM:</small> <span id="wg-ram">--</span>
-                  </span>
-                  <span class="metric-item">
-                    <small>CPU:</small> <span id="wg-cpu">--</span>
-                  </span>
-                </div>
+                <h3 data-i18n="services.names.wireguard">WireGuard</h3>
               </div>
             </div>
             <div class="service-status">
@@ -198,29 +180,19 @@
               <div class="service-uptime" id="wireguardUptime" data-i18n="messages.loading">Loading...</div>
             </div>
             <div class="service-actions">
-              <button class="service-btn start" data-service="wg-quick@wg0" data-action="start" data-i18n="services.actions.start">Start</button>
-              <button class="service-btn stop" data-service="wg-quick@wg0" data-action="stop" data-i18n="services.actions.stop">Stop</button>
-              <button class="service-btn restart" data-service="wg-quick@wg0" data-action="restart" data-i18n="services.actions.restart">Restart</button>
+              <button class="service-btn start" data-service="wireguard" data-action="start" data-i18n="services.actions.start">Start</button>
+              <button class="service-btn stop" data-service="wireguard" data-action="stop" data-i18n="services.actions.stop">Stop</button>
+              <button class="service-btn restart" data-service="wireguard" data-action="restart" data-i18n="services.actions.restart">Restart</button>
             </div>
           </div>
 
           <div class="service-card ui-card" data-service="openvpn-server@server-login">
             <div class="service-header">
               <div class="service-icon openvpn-login">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" fill="currentColor"/>
-                </svg>
+                <img src="../image/OpenVPN.svg" alt="OpenVPN" width="36" height="36">
               </div>
               <div class="service-info">
                 <h3 data-i18n="services.names.openvpn-server@server-login">OpenVPN (Login)</h3>
-                <div class="service-metrics">
-                  <span class="metric-item">
-                    <small>RAM:</small> <span id="ovpn-login-ram">--</span>
-                  </span>
-                  <span class="metric-item">
-                    <small>CPU:</small> <span id="ovpn-login-cpu">--</span>
-                  </span>
-                </div>
               </div>
             </div>
             <div class="service-status">
@@ -240,20 +212,10 @@
           <div class="service-card ui-card" data-service="openvpn-server@server-cert">
             <div class="service-header">
               <div class="service-icon openvpn-cert">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                </svg>
+                <img src="../image/OpenVPN.svg" alt="OpenVPN" width="36" height="36">
               </div>
               <div class="service-info">
                 <h3 data-i18n="services.names.openvpn-server@server-cert">OpenVPN (Certificate)</h3>
-                <div class="service-metrics">
-                  <span class="metric-item">
-                    <small>RAM:</small> <span id="ovpn-cert-ram">--</span>
-                  </span>
-                  <span class="metric-item">
-                    <small>CPU:</small> <span id="ovpn-cert-cpu">--</span>
-                  </span>
-                </div>
               </div>
             </div>
             <div class="service-status">
@@ -287,18 +249,22 @@
               </div>
             </div>
             <div class="card-body">
-              <div class="main-stat">
-                <span class="stat-number" id="totalUsers">--</span>
-                <span class="stat-label" data-i18n="overview.stats.activeConnections">Active Connections</span>
-              </div>
-              <div class="sub-stats">
-                <div class="sub-stat">
-                  <span class="sub-stat-value" id="onlineUsers">--</span>
-                  <span class="sub-stat-label" data-i18n="online_label">Online</span>
+              <div class="user-stats-grid">
+                <div class="user-stat-item">
+                  <span class="user-stat-number" id="totalUsers">--</span>
+                  <span class="user-stat-label" data-i18n="overview.stats.totalUsers">Total Users</span>
                 </div>
-                <div class="sub-stat">
-                  <span class="sub-stat-value" id="totalUsage">--</span>
-                  <span class="sub-stat-label" data-i18n="overview.stats.totalUsage">Total Usage</span>
+                <div class="user-stat-item">
+                  <span class="user-stat-number" id="activeConnections">--</span>
+                  <span class="user-stat-label" data-i18n="overview.stats.activeConnections">Active Connections</span>
+                </div>
+                <div class="user-stat-item">
+                  <span class="user-stat-number" id="onlineUsers">--</span>
+                  <span class="user-stat-label" data-i18n="online_label">Online</span>
+                </div>
+                <div class="user-stat-item">
+                  <span class="user-stat-number" id="totalUsage">--</span>
+                  <span class="user-stat-label" data-i18n="overview.stats.totalUsage">Total Usage</span>
                 </div>
               </div>
             </div>
@@ -318,14 +284,14 @@
               </div>
             </div>
             <div class="card-body">
-              <div class="main-stat">
-                <span class="stat-number" id="systemUptime">--</span>
-                <span class="stat-label" data-i18n="uptime">Uptime</span>
-              </div>
-              <div class="sub-stats">
-                <div class="sub-stat">
-                  <span class="sub-stat-value" id="lastBoot">--</span>
-                  <span class="sub-stat-label">Last Boot</span>
+              <div class="uptime-stats-grid">
+                <div class="uptime-stat-item">
+                  <span class="uptime-stat-number" id="systemUptime">--</span>
+                  <span class="uptime-stat-label" data-i18n="uptime">Uptime</span>
+                </div>
+                <div class="uptime-stat-item">
+                  <span class="uptime-stat-number" id="lastBoot">--</span>
+                  <span class="uptime-stat-label">Last Boot</span>
                 </div>
               </div>
             </div>

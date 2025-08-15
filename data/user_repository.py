@@ -80,6 +80,11 @@ class UserRepository:
         """
         return self.db.execute_query(query)
 
+    def get_all_users(self) -> List[Dict[str, Any]]:
+        """Retrieves all users from the users table."""
+        query = "SELECT * FROM users ORDER BY username"
+        return self.db.execute_query(query)
+
     def remove_user(self, username: Username) -> None:
         query = "DELETE FROM users WHERE username = ?"
         self.db.execute_query(query, (username,))

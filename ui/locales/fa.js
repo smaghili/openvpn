@@ -83,9 +83,9 @@ export default {
     },
     names: {
       'openvpn-server@server-cert': 'OpenVPN (گواهی)',
-      'openvpn-server@server-login': 'OpenVPN (ورود)',
-      'wg-quick@wg0': 'WireGuard',
-      'openvpn-uds-monitor': 'UDS Monitor'
+      'openvpn-server@server-login': 'OpenVPN (نام کاربری و رمز عبور)',
+      'wireguard': 'وایرگارد',
+      'openvpn-uds-monitor': 'پایش ترافیک'
     }
   },
   logs: {

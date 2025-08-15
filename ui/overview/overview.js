@@ -56,12 +56,17 @@ class OverviewDashboard {
     }
 
     updateSystemStats(data) {
-        const stats = data.data || {};
-        
-        this.updateStatCard('cpu', stats.cpu_usage || 0);
-        this.updateStatCard('ram', stats.memory_usage || 0);
-        this.updateStatCard('swap', stats.swap_usage || 0);
-        this.updateStatCard('storage', stats.disk_usage || 0);
+        const stats = (data && data.data) ? data.data : {};
+
+        const cpuPercent = stats.cpu && typeof stats.cpu.percent === 'number' ? stats.cpu.percent : 0;
+        const ramPercent = stats.ram && typeof stats.ram.percent === 'number' ? stats.ram.percent : 0;
+        const swapPercent = stats.swap && typeof stats.swap.percent === 'number' ? stats.swap.percent : 0;
+        const storagePercent = stats.storage && typeof stats.storage.percent === 'number' ? stats.storage.percent : 0;
+
+        this.updateStatCard('cpu', cpuPercent);
+        this.updateStatCard('ram', ramPercent);
+        this.updateStatCard('swap', swapPercent);
+        this.updateStatCard('storage', storagePercent);
     }
 
     async checkStoredPassword() {
@@ -119,10 +124,10 @@ class OverviewDashboard {
 
     updateServiceStatus(services) {
         const serviceMap = {
-            'openvpn-uds-monitor': { statusId: 'udsStatus', uptimeId: 'udsUptime', ramId: 'uds-ram', cpuId: 'uds-cpu' },
-            'wg-quick@wg0': { statusId: 'wireguardStatus', uptimeId: 'wireguardUptime', ramId: 'wg-ram', cpuId: 'wg-cpu' },
-            'openvpn-server@server-login': { statusId: 'loginStatus', uptimeId: 'loginUptime', ramId: 'ovpn-login-ram', cpuId: 'ovpn-login-cpu' },
-            'openvpn-server@server-cert': { statusId: 'certStatus', uptimeId: 'certUptime', ramId: 'ovpn-cert-ram', cpuId: 'ovpn-cert-cpu' }
+            'uds': { statusId: 'udsStatus', uptimeId: 'udsUptime', ramId: 'uds-ram', cpuId: 'uds-cpu' },
+            'wireguard': { statusId: 'wireguardStatus', uptimeId: 'wireguardUptime', ramId: 'wg-ram', cpuId: 'wg-cpu' },
+            'login': { statusId: 'loginStatus', uptimeId: 'loginUptime', ramId: 'ovpn-login-ram', cpuId: 'ovpn-login-cpu' },
+            'cert': { statusId: 'certStatus', uptimeId: 'certUptime', ramId: 'ovpn-cert-ram', cpuId: 'ovpn-cert-cpu' }
         };
 
         Object.entries(services).forEach(([serviceName, serviceData]) => {
@@ -185,11 +190,13 @@ class OverviewDashboard {
     }
 
     updateUserStats(stats) {
-    const totalUsersEl = document.getElementById('totalUsers');
+        const totalUsersEl = document.getElementById('totalUsers');
+        const activeConnectionsEl = document.getElementById('activeConnections');
         const onlineUsersEl = document.getElementById('onlineUsers');
-    const totalUsageEl = document.getElementById('totalUsage');
-    
+        const totalUsageEl = document.getElementById('totalUsage');
+        
         if (totalUsersEl) totalUsersEl.textContent = stats.total_users || '0';
+        if (activeConnectionsEl) activeConnectionsEl.textContent = stats.active_connections || '0';
         if (onlineUsersEl) onlineUsersEl.textContent = stats.online_users || '0';
         if (totalUsageEl) {
             const usage = stats.total_usage || 0;
@@ -243,16 +250,6 @@ class OverviewDashboard {
     }
 
     async handleServiceAction(service, action, button) {
-        const confirmMsg = window.i18n ? 
-            window.i18n.t(`services.actions.${action}`) + ` ${window.i18n.t('service')} ${service}?` :
-            `${action} service ${service}?`;
-
-        if (!confirm(confirmMsg)) return;
-
-        const originalText = button.textContent;
-        button.disabled = true;
-        button.textContent = window.i18n ? window.i18n.t(`services.actions.${action}ing`) : `${action}ing...`;
-
         try {
             const response = await fetch(`/api/system/services/${service}/${action}`, {
                 method: 'POST',
@@ -271,9 +268,6 @@ class OverviewDashboard {
         } catch (error) {
             console.error(`Service ${action} error:`, error);
             this.showToast(window.i18n ? window.i18n.t('toasts.serviceActionError') : 'Service operation error', 'error');
-        } finally {
-            button.disabled = false;
-            button.textContent = originalText;
         }
     }
 

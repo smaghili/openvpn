@@ -121,6 +121,10 @@ def main() -> None:
     print(f"📊 Health Check: http://YOUR_IP:{port}/api/health")
 
     from waitress import serve
+    import logging
+    
+    # Suppress Waitress queue warnings
+    logging.getLogger('waitress.queue').setLevel(logging.ERROR)
 
     serve(app, host="0.0.0.0", port=port, threads=4)
 
