@@ -350,7 +350,7 @@ function install_dependencies() {
     print_success "System packages installed"
 }
 function setup_project() {
-    print_header "Project Setup"
+    print_header "Project Setup..."
     
     if [ -d "$PROJECT_DIR" ]; then
         echo "Project directory exists. Fetching latest version..."
