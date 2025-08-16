@@ -355,14 +355,72 @@ function setup_project() {
     if [ -d "$PROJECT_DIR" ]; then
         echo "Project directory exists. Fetching latest version..."
         cd "$PROJECT_DIR"
-        git reset --hard HEAD
-        git pull origin ui-version
+        
+        # Check if this is a git repository
+        if [ -d ".git" ]; then
+            echo "Cleaning up any local changes..."
+            git reset --hard HEAD || {
+                print_error "Failed to reset git repository"
+                exit 1
+            }
+            git clean -fd || {
+                print_warning "Failed to clean git repository, continuing..."
+            }
+            
+            # Check current branch and handle conflicts
+            current_branch=$(git branch --show-current 2>/dev/null || echo "main")
+            echo "Current branch: $current_branch"
+            
+            # Fetch latest changes
+            echo "Fetching latest changes from remote..."
+            git fetch origin || {
+                print_error "Failed to fetch from remote repository"
+                exit 1
+            }
+            
+            # Check if we can fast-forward or need to reset
+            if git merge-base --is-ancestor HEAD origin/ui-version 2>/dev/null; then
+                echo "Fast-forward merge possible"
+                git pull origin ui-version || {
+                    print_error "Failed to pull from ui-version branch"
+                    exit 1
+                }
+            else
+                echo "Divergent branches detected, resetting to origin/ui-version"
+                git reset --hard origin/ui-version || {
+                    print_error "Failed to reset to origin/ui-version"
+                    exit 1
+                }
+            fi
+            
+            echo "Successfully updated repository"
+        else
+            echo "Directory exists but not a git repository. Removing and cloning fresh..."
+            cd ..
+            rm -rf "$PROJECT_DIR"
+            git clone "$REPO_URL" "$PROJECT_DIR" || {
+                print_error "Failed to clone repository"
+                exit 1
+            }
+            cd "$PROJECT_DIR"
+            git checkout ui-version || {
+                print_error "Failed to checkout ui-version branch"
+                exit 1
+            }
+        fi
     else
         echo "Cloning project repository..."
-        git clone "$REPO_URL" "$PROJECT_DIR"
+        git clone "$REPO_URL" "$PROJECT_DIR" || {
+            print_error "Failed to clone repository"
+            exit 1
+        }
         cd "$PROJECT_DIR"
-        git checkout ui-version
+        git checkout ui-version || {
+            print_error "Failed to checkout ui-version branch"
+            exit 1
+        }
     fi
+    
     local absolute_project_dir="$(pwd)"
     DB_PATH="$absolute_project_dir/openvpn_data/vpn_manager.db"
 
@@ -371,16 +429,37 @@ function setup_project() {
         cp -r "$SCRIPT_DIR/ui" "$absolute_project_dir/"
     fi
     
+    # Validate that essential files exist
+    echo "Validating repository contents..."
+    if [ ! -f "requirements.txt" ]; then
+        print_error "requirements.txt not found in repository"
+        exit 1
+    fi
+    
+    if [ ! -d "cli" ] || [ ! -d "api" ]; then
+        print_error "Essential directories (cli, api) not found in repository"
+        exit 1
+    fi
+    
     echo "Setting up Python environment..."
     if [ ! -d "venv" ]; then
-        python3 -m venv venv
+        python3 -m venv venv || {
+            print_error "Failed to create Python virtual environment"
+            exit 1
+        }
     fi
     
     source venv/bin/activate
-    pip install --upgrade pip
+    pip install --upgrade pip || {
+        print_error "Failed to upgrade pip"
+        exit 1
+    }
     
     if [ -f "requirements.txt" ]; then
-        pip install -r requirements.txt
+        pip install -r requirements.txt || {
+            print_error "Failed to install Python dependencies"
+            exit 1
+        }
     else
         print_error "requirements.txt not found"
         exit 1
