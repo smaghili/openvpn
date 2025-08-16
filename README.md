@@ -9,7 +9,7 @@ A comprehensive OpenVPN management system with **near real-time traffic monitori
 This method uses the new, refactored Python application for a more robust and maintainable installation. It is the recommended way to set up your VPN server.
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/deploy.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/ui-version/deploy.sh)
 ```
 
 The deployment script configures the entire stack and generates all required secrets automatically—no manual environment variables or additional steps are needed.
@@ -19,7 +19,7 @@ The deployment script configures the entire stack and generates all required sec
 This is the original shell-based installer. It is still functional but no longer under active development.
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/ui-version/install.sh)
 ```
 
 ---

@@ -9,13 +9,13 @@
 کافی است دستور زیر را اجرا کنید تا تمام اجزاء مورد نیاز همراه با کلیدهای لازم به صورت خودکار ایجاد شوند:
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/deploy.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/ui-version/deploy.sh)
 ```
 
 ## نصب قدیمی (مبتنی بر شِل)
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/smaghili/openvpn/ui-version/install.sh)
 ```
 
 هیچ پیکربندی اضافی از جمله ساخت کلید مخفی برای API لازم نیست؛ اسکریپت نصب همه چیز را انجام می‌دهد.
