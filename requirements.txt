@@ -1,9 +1,13 @@
 # Python requirements for VPN Manager project
-# sqlite3 is built-in, but others may be needed for future features
 bcrypt==4.0.1
+psutil==5.9.5
 pyopenssl==23.2.0
 flask==2.3.3
 flask-cors==4.0.0
 pyjwt==2.8.0
 waitress==2.1.2
 qrcode==7.4.2
+python-dotenv==1.0.0
+structlog==23.1.0
+pytest==7.4.2
+pytest-mock==3.11.1
