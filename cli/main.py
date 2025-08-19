@@ -15,10 +15,8 @@ sys.path.insert(0, project_root)
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
 from service.user_service import UserService
-from service.panel_service import PanelService
 from data.db import Database
 from data.user_repository import UserRepository
-from data.admin_repository import AdminRepository
 from core.backup_service import BackupService
 from config.config import VPNConfig, config, InstallSettings
 from core.types import Username
@@ -54,7 +52,7 @@ def get_install_settings() -> Dict[str, str]:
         print(f"Detected Public IP: {public_ip}")
         settings["public_ip"] = input(f"Enter Public IP or press Enter to use detected IP [{public_ip}]: ").strip() or public_ip
     except Exception as e:
-        logger.warning("Could not auto-detect public IP", error=str(e))
+        print(f"Could not auto-detect public IP: {e}")
         settings["public_ip"] = input("Please enter the server's public IP address: ").strip()
 
     print("\n--- Certificate-based Authentication ---")
@@ -67,9 +65,9 @@ def get_install_settings() -> Dict[str, str]:
             settings["cert_proto"] = cert_proto
             break
         else:
-            logger.error("Invalid protocol. Please enter 'udp' or 'tcp'.")
+            print("❌ Invalid protocol. Please enter 'udp' or 'tcp'.")
 
-    logger.info("Username/Password-based Authentication")
+    print("\n--- Username/Password-based Authentication ---")
     settings["login_port"] = input("Port [1195]: ").strip() or "1195"
     
     # Improved protocol validation for login server
@@ -79,16 +77,16 @@ def get_install_settings() -> Dict[str, str]:
             settings["login_proto"] = login_proto
             break
         else:
-            logger.error("Invalid protocol. Please enter 'udp' or 'tcp'.")
+            print("❌ Invalid protocol. Please enter 'udp' or 'tcp'.")
 
-    logger.info("DNS Configuration")
-    logger.info("1) System DNS\n2) Unbound (self-hosted)\n3) Cloudflare\n4) Google\n5) AdGuard DNS")
+    print("\n--- DNS Configuration ---")
+    print("1) System DNS\n2) Unbound (self-hosted)\n3) Cloudflare\n4) Google\n5) AdGuard DNS")
     dns_choice = ""
     while dns_choice not in ("1", "2", "3", "4", "5"):
         dns_choice = input("DNS [3]: ").strip() or "3"
     settings["dns"] = dns_choice
 
-    logger.info("Encryption Settings")
+    print("\n--- Encryption Settings ---")
     settings["cipher"] = input("Cipher (e.g., AES-256-GCM) [AES-256-GCM]: ").strip() or "AES-256-GCM"
     settings["cert_size"] = input("Certificate Size (e.g., 2048) [2048]: ").strip() or "2048"
 
@@ -96,8 +94,8 @@ def get_install_settings() -> Dict[str, str]:
 
 def install_flow(openvpn_manager: OpenVPNManager) -> None:
     """Installation flow with improved error handling and recovery."""
-    if os.path.exists(config.SETTINGS_FILE):
-        logger.warning("Installation already detected - aborting")
+    if os.path.exists(OpenVPNManager.SETTINGS_FILE):
+        print("Installation already detected. Aborting.")
         return
 
     while True:
@@ -108,27 +106,30 @@ def install_flow(openvpn_manager: OpenVPNManager) -> None:
             settings = raw_settings
             break
         except ConfigurationError as e:
-            logger.error("Configuration error", error=str(e))
+            print(f"❌ Configuration error: {e}")
             retry = input("Would you like to re-enter the settings? (y/n): ").strip().lower()
             if retry != 'y':
-                logger.warning("Installation aborted")
+                print("Installation aborted.")
                 return
             continue
     
-    logger.info("Starting installation with settings", settings=settings)
+    print("\nStarting installation with the following settings:")
+    for key, value in settings.items():
+        print(f"  - {key}: {value}")
     
     confirm = input("Proceed with installation? (y/n): ").strip().lower()
     if confirm != 'y':
-        logger.warning("Installation aborted")
+        print("Installation aborted.")
         return
 
     try:
         openvpn_manager.install_openvpn(settings)
         _install_owpanel_command()
 
-        logger.info("Installation completed successfully")
+        print("From now on, you can run the panel from anywhere by typing: owpanel")
     except Exception as e:
-        logger.error("Installation failed", error=str(e))
+        print(f"\n❌ Installation failed: {e}")
+        print("You may need to clean up partial installation files manually.")
         sys.exit(1)
 
 
@@ -143,7 +144,7 @@ def _install_owpanel_command() -> None:
             os.remove(command_path)
         os.symlink(script_path, command_path)
     except Exception as e:
-        logger.warning("Could not create system-wide command", error=str(e))
+        print(f"⚠️  Warning: Could not create system-wide command. Error: {e}")
 
 def print_management_menu() -> None:
     print("\n--- VPN Management Menu ---")
@@ -157,14 +158,11 @@ def print_management_menu() -> None:
     print("\n📊 Traffic Management:")
     print("  7. Set User Quota")
     print("  8. View User Status (Real-time)")
-    print("\n⚙️  Panel Configuration:")
-    print("  9. Change Panel Credentials")
-    print("  10. Change Panel Port")
     print("\n📦 System:")
-    print("  11. System Backup")
-    print("  12. System Restore")
-    print("  13. Uninstall VPN")
-    print("  14. Exit")
+    print("  9. System Backup")
+    print("  10. System Restore")
+    print("  11. Uninstall VPN")
+    print("  12. Exit")
 
 def add_user_flow(user_service: UserService) -> None:
     # This function remains unchanged
@@ -174,7 +172,7 @@ def add_user_flow(user_service: UserService) -> None:
             validated_username = config.validate_username(username)
             break
         except ValidationError as e:
-            logger.error("Invalid username", error=str(e))
+            print(f"❌ {e}")
             continue
     password = getpass("Enter a password for the user (optional, press Enter to skip): ")
 
@@ -184,19 +182,19 @@ def add_user_flow(user_service: UserService) -> None:
             config_path = os.path.join(os.path.expanduser("~"), f"{username}-cert.ovpn")
             with open(config_path, "w") as f:
                 f.write(config_data)
-            logger.info("Certificate-based config saved", path=config_path)
+            print(f"✅ Certificate-based config saved to: {config_path}")
             
         if password:
             shared_config = user_service.get_shared_config()
             shared_path = os.path.join(os.path.expanduser("~"), "shared-login.ovpn")
             with open(shared_path, "w") as f:
                 f.write(shared_config)
-            logger.info("Login-based config saved", path=shared_path)
+            print(f"✅ Login-based config is available at: {shared_path}")
             
     except UserAlreadyExistsError as e:
-        logger.error("User already exists", error=str(e))
+        print(f"❌ {e}")
     except (ValidationError, VPNManagerError, Exception) as e:
-        logger.error("Unexpected error creating user", error=str(e))
+        print(f"❌ Unexpected error creating user: {e}")
 
 def remove_user_flow(user_service: UserService) -> None:
     # This function remains unchanged
@@ -204,9 +202,9 @@ def remove_user_flow(user_service: UserService) -> None:
     try:
         user_service.remove_user(username)
     except UserNotFoundError as e:
-        logger.error("User not found", error=str(e))
+        print(f"❌ {e}")
     except (VPNManagerError, Exception) as e:
-        logger.error("Unexpected error removing user", error=str(e))
+        print(f"❌ Unexpected error removing user: {e}")
 
 def list_users_flow(user_service: UserService) -> None:
     try:
@@ -243,7 +241,7 @@ def list_users_flow(user_service: UserService) -> None:
         print("-" * 75)
 
     except Exception as e:
-        logger.error("Error listing users", error=str(e))
+        print(f"❌ Error listing users: {e}")
 
 def get_user_config_flow(user_service: UserService) -> None:
     # This function remains unchanged
@@ -256,7 +254,7 @@ def get_user_config_flow(user_service: UserService) -> None:
         else:
             print("User or config not found.")
     except Exception as e:
-        logger.error("Error retrieving config", error=str(e))
+        print(f"❌ Error retrieving config: {e}")
 
 def get_shared_config_flow(openvpn_manager: OpenVPNManager) -> None:
     # This function remains unchanged
@@ -269,9 +267,9 @@ def get_shared_config_flow(openvpn_manager: OpenVPNManager) -> None:
             config_path = os.path.join(os.path.expanduser("~"), "shared-login.ovpn")
             with open(config_path, "w") as f:
                 f.write(config)
-            logger.info("Shared login config saved", path=config_path)
+            print(f"✅ Shared login config saved to: {config_path}")
     except Exception as e:
-        logger.error("Error retrieving shared config", error=str(e))
+        print(f"❌ Error retrieving shared config: {e}")
 
 # --- New Flows for Quota Management ---
 
@@ -282,17 +280,17 @@ def set_user_quota_flow(user_service: UserService) -> None:
         quota_gb_str = input(f"Enter quota for '{username}' in GB (e.g., 10). Enter 0 for unlimited: ").strip()
         quota_gb = float(quota_gb_str)
         if quota_gb < 0:
-            logger.error("Quota cannot be negative")
+            print("❌ Quota cannot be negative.")
             return
             
         user_service.set_quota_for_user(username, quota_gb)
         
     except ValueError:
-        logger.error("Invalid quota input - must be a number")
+        print("❌ Invalid input. Please enter a number (e.g., 10, 2.5, or 0).")
     except UserNotFoundError as e:
-        logger.error("User not found", error=str(e))
+        print(f"❌ {e}")
     except Exception as e:
-        logger.error("Unexpected error setting quota", error=str(e))
+        print(f"❌ An unexpected error occurred: {e}")
 
 def view_user_status_flow(user_service: UserService) -> None:
     """Flow to view the detailed traffic status of a user with real-time updates."""
@@ -302,7 +300,7 @@ def view_user_status_flow(user_service: UserService) -> None:
         # Verify user exists first
         status = user_service.get_user_status(username)
         if not status:
-            logger.error("Could not retrieve user status")
+            print("Could not retrieve status for this user.")
             return
 
         print(f"\n--- Real-time Traffic Monitor for {username} ---")
@@ -317,7 +315,7 @@ def view_user_status_flow(user_service: UserService) -> None:
                 # Get current status
                 status = user_service.get_user_status(username)
                 if not status:
-                    logger.error("Could not retrieve user status during monitoring")
+                    print("❌ Could not retrieve status for this user.")
                     break
 
                 quota = status.get('quota_bytes', 0)
@@ -371,13 +369,13 @@ def view_user_status_flow(user_service: UserService) -> None:
                     print(f"  Final Usage: {percentage:.2f}%")
                 break
             except Exception as e:
-                logger.error("Error updating status", error=str(e))
+                print(f"❌ Error updating status: {e}")
                 break
         
     except UserNotFoundError as e:
-        logger.error("User not found", error=str(e))
+        print(f"❌ {e}")
     except Exception as e:
-        logger.error("Unexpected error in status monitoring", error=str(e))
+        print(f"❌ An unexpected error occurred: {e}")
 
 def change_user_password_flow(user_service: UserService) -> None:
     """Flow to change password for an existing user."""
@@ -386,109 +384,32 @@ def change_user_password_flow(user_service: UserService) -> None:
     try:
         user = user_service.user_repo.find_user_by_username(username)
         if not user:
-            logger.error("User not found", username=username)
+            print(f"❌ User '{username}' not found.")
             return
             
         if not user.get('password_hash'):
-            logger.error("User does not have password authentication enabled", username=username)
+            print(f"❌ User '{username}' does not have password authentication enabled.")
+            print("Only users with password authentication can have their password changed.")
             return
         
         new_password = getpass("Enter new password: ")
         if not new_password:
-            logger.error("Password cannot be empty")
+            print("❌ Password cannot be empty.")
             return
             
         confirm_password = getpass("Confirm new password: ")
         if new_password != confirm_password:
-            logger.error("Passwords do not match")
+            print("❌ Passwords do not match.")
             return
         
         user_service.change_user_password(username, new_password)
         
     except UserNotFoundError as e:
-        logger.error("User not found", error=str(e))
+        print(f"❌ {e}")
     except ValidationError as e:
-        logger.error("Validation error", error=str(e))
+        print(f"❌ {e}")
     except Exception as e:
-        logger.error("Unexpected error changing password", error=str(e))
-
-def change_panel_credentials_flow(panel_service: PanelService) -> None:
-    """Flow to change panel admin credentials."""
-    try:
-        current_config = panel_service.get_current_config()
-        print(f"\nCurrent admin username: {current_config['username']}")
-        
-        manual_input = input("Do you want to manually enter credentials? (y/n) [n]: ").strip().lower()
-        
-        if manual_input == 'y':
-            username = input("Enter new admin username: ").strip()
-                    if not username:
-            logger.error("Username cannot be empty")
-            return
-                
-        password = getpass("Enter new admin password: ")
-        if not password:
-            logger.error("Password cannot be empty")
-            return
-        else:
-            credentials = panel_service.generate_random_credentials()
-            username = credentials['username']
-            password = credentials['password']
-            print(f"\nGenerated credentials:")
-            print(f"Username: {username}")
-            print(f"Password: {password}")
-        
-        result = panel_service.change_admin_credentials(username, password)
-        logger.info("Credentials changed successfully", username=result['username'])
-        
-        restart_choice = input("\nRestart API service? (y/n) [y]: ").strip().lower()
-        if restart_choice in ('', 'y'):
-            restart_api_service()
-        
-    except ValidationError as e:
-        logger.error("Validation error", error=str(e))
-    except Exception as e:
-        logger.error("Unexpected error changing credentials", error=str(e))
-
-def restart_api_service() -> bool:
-    os.system("systemctl restart openvpn-api 2>/dev/null")
-    time.sleep(1)
-    if os.system("systemctl is-active --quiet openvpn-api") == 0:
-        logger.info("API service restarted successfully")
-        return True
-    logger.error("Failed to restart API service")
-    return False
-
-def change_panel_port_flow(panel_service: PanelService) -> None:
-    """Flow to change panel API port."""
-    try:
-        current_config = panel_service.get_current_config()
-        print(f"\nCurrent panel port: {current_config['port']}")
-        
-        manual_input = input("Do you want to manually enter port? (y/n) [n]: ").strip().lower()
-        
-        if manual_input == 'y':
-            port_str = input("Enter new port number (1024-65535): ").strip()
-            try:
-                port = int(port_str)
-            except ValueError:
-                logger.error("Invalid port number")
-                return
-        else:
-            port = panel_service.generate_random_port()
-            print(f"\nGenerated random port: {port}")
-        
-        result = panel_service.change_panel_port(port)
-        logger.info("Panel port changed successfully", port=result['port'])
-        
-        restart_choice = input("\nRestart API service? (y/n) [y]: ").strip().lower()
-        if restart_choice in ('', 'y'):
-            restart_api_service()
-        
-    except ValidationError as e:
-        logger.error("Validation error", error=str(e))
-    except Exception as e:
-        logger.error("Unexpected error changing port", error=str(e))
+        print(f"❌ An unexpected error occurred: {e}")
 
 
 def backup_flow(backup_service: BackupService) -> None:
@@ -496,41 +417,41 @@ def backup_flow(backup_service: BackupService) -> None:
     try:
         password = getpass("Enter a password to encrypt the backup: ")
         if not password:
-            logger.error("Backup password cannot be empty - cancelled")
+            print("Password cannot be empty. Backup cancelled.")
             return
         
         backup_dir = input("Enter backup directory path [~/]: ").strip() or "~/"
         backup_file = backup_service.create_backup(password, backup_dir)
-        logger.info("Backup created successfully", path=backup_file)
+        print(f"Backup created at: {backup_file}")
     except Exception as e:
-        logger.error("Backup failed", error=str(e))
+        print(f"❌ Backup failed: {e}")
 
 def restore_flow(backup_service: BackupService) -> None:
     # This function remains unchanged
     backup_path = input("Enter path to the backup file (local path or URL): ").strip()
     if not backup_path:
-                logger.error("Backup path cannot be empty - restore cancelled")
+        print("Backup path cannot be empty. Restore cancelled.")
         return
 
     local_path = backup_path
     if backup_path.startswith(('http://', 'https://')):
         try:
-            logger.info("Downloading backup", url=backup_path)
+            print(f"Downloading backup from {backup_path}...")
             local_path = os.path.join("/tmp", os.path.basename(backup_path))
             urllib.request.urlretrieve(backup_path, local_path)
-            logger.info("Download complete", path=local_path)
+            print(f"Download complete. Saved to {local_path}")
         except Exception as e:
-            logger.error("Failed to download backup file", error=str(e))
+            print(f"❌ Failed to download backup file: {e}")
             return
 
     password = getpass("Enter the password for the backup file: ")
     try:
         backup_service.restore_system(local_path, password)
-        logger.info("System restore completed successfully")
+        print("✅ System restore completed successfully.")
     except ValueError as e:
-        logger.error("Restore failed", error=str(e))
+        print(f"❌ Restore failed: {e}")
     except Exception as e:
-        logger.error("Restore failed", error=str(e))
+        print(f"❌ Restore failed: {e}")
         sys.exit(1)
     finally:
         if backup_path.startswith(('http://', 'https://')) and os.path.exists(local_path):
@@ -543,15 +464,15 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
     
     confirm = input("\nProceed with complete removal? (Y/n): ").strip().lower()
     if confirm not in ('', 'y', 'yes'):
-        logger.info("Uninstallation cancelled by user")
+        print("Uninstallation cancelled.")
         return
         
     try:
-        logger.info("Complete system removal in progress")
+        print("🗑️  Complete system removal in progress...")
         
         # 1. Stop and remove all systemd services
         print("   └── Stopping and removing systemd services...")
-        services = ['openvpn-api', 'openvpn@server-cert', 'openvpn@server-login']
+        services = ['openvpn-api', 'openvpn-server@server-cert', 'openvpn-server@server-login']
         for service in services:
             os.system(f"systemctl stop {service} 2>/dev/null || true")
             os.system(f"systemctl disable {service} 2>/dev/null || true")
@@ -565,11 +486,11 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             try:
                 if os.path.exists(service_file):
                     os.remove(service_file)
-                    logger.info("Removed service file", file=service_file)
+                    print(f"     ├── Removed {service_file}")
                 else:
-                    logger.info("Service file not found", file=service_file)
+                    print(f"     ├── Service file not found: {service_file}")
             except Exception as e:
-                logger.warning("Could not remove service file", file=service_file, error=str(e))
+                print(f"     ├── Warning: Could not remove service file {service_file}: {e}")
         
         os.system("systemctl daemon-reload")
         
@@ -580,11 +501,11 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             try:
                 if os.path.exists(path):
                     os.remove(path)
-                    logger.info("Removed command", path=path)
+                    print(f"     ├── Removed {path}")
                 else:
-                    logger.info("Command not found", path=path)
+                    print(f"     ├── Command not found: {path}")
             except Exception as e:
-                logger.warning("Could not remove command", path=path, error=str(e))
+                print(f"     ├── Warning: Could not remove command {path}: {e}")
         
         # 3. Remove all VPN users and configurations
         print("   └── Removing VPN users and configurations...")
@@ -601,7 +522,7 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
                 for username in unique_users:
                     user_service.remove_user(username, silent=True)
         except Exception as e:
-            logger.warning("Could not remove users cleanly", error=str(e))
+            print(f"     ├── Warning: Could not remove users cleanly: {e}")
         
         # 4. Stop OpenVPN and remove all configurations
         print("   └── Stopping OpenVPN services and removing configurations...")
@@ -618,11 +539,11 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             try:
                 if os.path.exists(db_path):
                     os.remove(db_path)
-                    logger.info("Removed database", path=db_path)
+                    print(f"     ├── Removed database: {db_path}")
                 else:
-                    logger.info("Database not found", path=db_path)
+                    print(f"     ├── Database not found: {db_path}")
             except Exception as e:
-                logger.warning("Could not remove database", path=db_path, error=str(e))
+                print(f"     ├── Warning: Could not remove database {db_path}: {e}")
         
         # 6. Remove environment files
         print("   └── Removing environment configurations...")
@@ -636,11 +557,11 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             try:
                 if os.path.exists(env_file):
                     os.remove(env_file)
-                    logger.info("Removed environment file", file=env_file)
+                    print(f"     ├── Removed {env_file}")
                 else:
-                    logger.info("Environment file not found", file=env_file)
+                    print(f"     ├── Environment file not found: {env_file}")
             except Exception as e:
-                logger.warning("Could not remove environment file", file=env_file, error=str(e))
+                print(f"     ├── Warning: Could not remove environment file {env_file}: {e}")
         
         # 7. Remove databases
         print("   └── Removing databases...")
@@ -652,11 +573,11 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             try:
                 if os.path.exists(db_file):
                     os.remove(db_file)
-                    logger.info("Removed database", file=db_file)
+                    print(f"     ├── Removed database: {db_file}")
                 else:
-                    logger.info("Database not found", file=db_file)
+                    print(f"     ├── Database not found: {db_file}")
             except Exception as e:
-                logger.warning("Could not remove database", file=db_file, error=str(e))
+                print(f"     ├── Warning: Could not remove database {db_file}: {e}")
         
         # 8. Remove system directories
         print("   └── Removing system directories...")
@@ -668,11 +589,11 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             try:
                 if os.path.exists(sys_dir):
                     os.system(f"rm -rf '{sys_dir}'")
-                    logger.info("Removed directory", path=sys_dir)
+                    print(f"     ├── Removed directory: {sys_dir}")
                 else:
-                    logger.info("Directory not found", path=sys_dir)
+                    print(f"     ├── Directory not found: {sys_dir}")
             except Exception as e:
-                logger.warning("Could not remove directory", path=sys_dir, error=str(e))
+                print(f"     ├── Warning: Could not remove directory {sys_dir}: {e}")
         
         print("   └── Removing project directory...")
         try:
@@ -682,44 +603,45 @@ def uninstall_flow(openvpn_manager: OpenVPNManager) -> None:
             except OSError:
                 # If current directory doesn't exist, try to get it from environment
                 project_root = os.environ.get('PWD', '/tmp')
-                logger.info("Current directory not accessible", using=project_root)
+                print(f"     ├── Current directory not accessible, using: {project_root}")
             
             # Change to a safe directory first
             try:
                 os.chdir("/root")
             except OSError:
                 os.chdir("/tmp")
-                logger.info("Could not change to /root, using /tmp instead")
+                print("     ├── Could not change to /root, using /tmp instead")
             
             # Remove project directory if it exists and is not the current directory
             if os.path.exists(project_root) and project_root != os.getcwd():
                 os.system(f"rm -rf '{project_root}'")
-                logger.info("Removed project directory", path=project_root)
+                print(f"     ├── Removed project directory: {project_root}")
             else:
-                logger.info("Project directory not found or is current directory", path=project_root)
+                print(f"     ├── Project directory not found or is current directory: {project_root}")
                 
         except Exception as e:
-            logger.warning("Could not remove project directory", error=str(e))
+            print(f"     ├── Warning: Could not remove project directory: {e}")
 
-        logger.info("Complete removal finished - all OpenVPN services, configurations, and project files have been removed")
+        print("\n✅ Complete removal finished")
+        print("   All OpenVPN services, configurations, and project files have been removed.")
         sys.exit(0)
         
     except Exception as e:
-        logger.error("Uninstallation failed", error=str(e))
-        logger.warning("Some components may not have been removed completely")
+        print(f"\n❌ Uninstallation failed: {e}")
+        print("Some components may not have been removed completely.")
         sys.exit(1)
 
 def main() -> None:
     if os.geteuid() != 0:
-        logger.error("This script must be run as root")
+        print("This script must be run as root.")
         sys.exit(1)
     
-    openvpn_manager = OpenVPNManager(config)
+    openvpn_manager = OpenVPNManager()
 
-    if not os.path.exists(config.SETTINGS_FILE):
-        logger.info("Fresh installation detected")
+    if not os.path.exists(OpenVPNManager.SETTINGS_FILE):
+        print("Welcome! It looks like this is a fresh installation.")
         install_flow(openvpn_manager)
-        if not os.path.exists(config.SETTINGS_FILE):
+        if not os.path.exists(OpenVPNManager.SETTINGS_FILE):
              sys.exit(0)
 
     # If INSTALL_ONLY environment variable is set, exit after installation
@@ -729,10 +651,8 @@ def main() -> None:
     # Initialize services only for management operations
     db = Database()
     user_repo = UserRepository(db)
-    admin_repo = AdminRepository(db)
     login_manager = LoginUserManager()
     user_service = UserService(user_repo, openvpn_manager, login_manager)
-    panel_service = PanelService(admin_repo)
     backupable_components = [openvpn_manager, login_manager, user_service]
     backup_service = BackupService(backupable_components)
 
@@ -742,7 +662,7 @@ def main() -> None:
             try:
                 choice = input("Enter your choice: ").strip()
             except KeyboardInterrupt:
-                logger.info("Application terminated")
+                print("\n\nGoodbye!")
                 sys.exit(0)
             
             if choice == '1':
@@ -762,22 +682,18 @@ def main() -> None:
             elif choice == '8':
                 view_user_status_flow(user_service)
             elif choice == '9':
-                change_panel_credentials_flow(panel_service)
-            elif choice == '10':
-                change_panel_port_flow(panel_service)
-            elif choice == '11':
                 backup_flow(backup_service)
-            elif choice == '12':
+            elif choice == '10':
                 restore_flow(backup_service)
-            elif choice == '13':
+            elif choice == '11':
                 uninstall_flow(openvpn_manager)
-            elif choice == '14':
-                logger.info("Application terminated")
+            elif choice == '12':
+                print("Goodbye!")
                 break
             else:
-                logger.warning("Invalid choice - please try again")
+                print("Invalid choice. Please try again.")
     except KeyboardInterrupt:
-        logger.info("Application terminated by user")
+        print("\n\nGoodbye!")
         sys.exit(0)
 
 if __name__ == "__main__":

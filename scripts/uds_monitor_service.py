@@ -21,7 +21,6 @@ if temp_project_root not in sys.path:
 
 from config.env_loader import get_config_value, get_int_config
 from config.paths import VPNPaths
-from config.constants import OpenVPNConstants
 from data.db import Database
 from data.user_repository import UserRepository
 
@@ -114,7 +113,7 @@ class UDSOpenVPNMonitor:
                     os.remove(backup_file)
                 os.rename(LOG_FILE, backup_file)
         except Exception:
-            logger.error("Log error", error=str(e))
+            pass
     
     def connect(self) -> bool:
         """Connect to OpenVPN management interface via UDS."""
