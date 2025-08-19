@@ -7,7 +7,7 @@ import os
 import re
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
-from config.constants import OpenVPNConstants, ConfigurablePaths
+from config.constants import OpenVPNConstants
 
 # Lazy import function to avoid circular dependency
 def _get_exceptions():
@@ -33,11 +33,11 @@ class VPNConfig:
     """Central configuration class for VPN Manager."""
     
     # Directory paths
-    OPENVPN_DIR: str = field(default_factory=ConfigurablePaths.get_database_dir)
+    OPENVPN_DIR: str = "/etc/owpanel/openvpn_data"
     SERVER_CONFIG_DIR: str = OpenVPNConstants.SERVER_CONFIG_DIR
     EASYRSA_DIR: str = OpenVPNConstants.EASYRSA_DIR
     PKI_DIR: str = OpenVPNConstants.PKI_DIR
-    DATABASE_FILE: str = field(default_factory=ConfigurablePaths.get_database_file)
+    DATABASE_FILE: str = "/etc/owpanel/openvpn_data/vpn_manager.db"
     SETTINGS_FILE: str = field(init=False)
     
     # Network defaults
@@ -143,5 +143,3 @@ class VPNConfig:
             "5": 'push "dhcp-option DNS 94.140.14.14"\npush "dhcp-option DNS 94.140.15.15"'
         }
         return dns_configs.get(dns_choice, dns_configs["3"])
-
-config = VPNConfig()

@@ -45,88 +45,64 @@ def bytes_to_human(byte_count: int) -> str:
     return f"{byte_count:.2f} {power_labels[n]}"
 
 def get_install_settings() -> Dict[str, str]:
-    """Get installation settings with improved validation."""
+    """Get installation settings automatically - no user interaction."""
+    # Always use automatic settings
+    return _get_interactive_settings()
+
+def _get_interactive_settings() -> Dict[str, str]:
+    """Get settings with automatic defaults - no user interaction."""
     settings = {}
-    print("--- Initial VPN Setup ---")
     
+    # Auto-detect public IP
     try:
-        public_ip = urllib.request.urlopen('https://api.ipify.org').read().decode('utf8')
-        print(f"Detected Public IP: {public_ip}")
-        settings["public_ip"] = input(f"Enter Public IP or press Enter to use detected IP [{public_ip}]: ").strip() or public_ip
-    except Exception as e:
-        logger.warning("Could not auto-detect public IP", error=str(e))
-        settings["public_ip"] = input("Please enter the server's public IP address: ").strip()
-
-    print("\n--- Certificate-based Authentication ---")
-    settings["cert_port"] = input("Port [1194]: ").strip() or "1194"
+        import subprocess
+        result = subprocess.run(['hostname', '-I'], capture_output=True, text=True, timeout=10)
+        public_ip = result.stdout.strip().split()[0] if result.returncode == 0 else "127.0.0.1"
+    except Exception:
+        public_ip = "127.0.0.1"
     
-    # Improved protocol validation for certificate server
-    while True:
-        cert_proto = input("Protocol (udp/tcp) [udp]: ").strip().lower() or "udp"
-        if cert_proto in ["udp", "tcp"]:
-            settings["cert_proto"] = cert_proto
-            break
-        else:
-            logger.error("Invalid protocol. Please enter 'udp' or 'tcp'.")
-
-    logger.info("Username/Password-based Authentication")
-    settings["login_port"] = input("Port [1195]: ").strip() or "1195"
+    logger.info(f"Auto-detected public IP: {public_ip}")
     
-    # Improved protocol validation for login server
-    while True:
-        login_proto = input("Protocol (udp/tcp) [udp]: ").strip().lower() or "udp"
-        if login_proto in ["udp", "tcp"]:
-            settings["login_proto"] = login_proto
-            break
-        else:
-            logger.error("Invalid protocol. Please enter 'udp' or 'tcp'.")
-
-    logger.info("DNS Configuration")
-    logger.info("1) System DNS\n2) Unbound (self-hosted)\n3) Cloudflare\n4) Google\n5) AdGuard DNS")
-    dns_choice = ""
-    while dns_choice not in ("1", "2", "3", "4", "5"):
-        dns_choice = input("DNS [3]: ").strip() or "3"
-    settings["dns"] = dns_choice
-
-    logger.info("Encryption Settings")
-    settings["cipher"] = input("Cipher (e.g., AES-256-GCM) [AES-256-GCM]: ").strip() or "AES-256-GCM"
-    settings["cert_size"] = input("Certificate Size (e.g., 2048) [2048]: ").strip() or "2048"
-
+    # Use automatic defaults for all settings
+    settings = {
+        "public_ip": public_ip,
+        "cert_port": "7015",
+        "cert_proto": "udp",
+        "login_port": "7016", 
+        "login_proto": "udp",
+        "dns": "3",
+        "cipher": "AES-256-GCM",
+        "cert_size": "2048"
+    }
+    
+    logger.info("Using automatic installation settings", settings=settings)
     return settings
 
 def install_flow(openvpn_manager: OpenVPNManager) -> None:
-    """Installation flow with improved error handling and recovery."""
+    """Fully automated installation flow - no user interaction."""
     if os.path.exists(config.SETTINGS_FILE):
         logger.warning("Installation already detected - aborting")
         return
 
-    while True:
+    try:
+        # Get settings automatically
         raw_settings = get_install_settings()
         
+        # Validate settings
         try:
             validated_settings = config.validate_install_settings(raw_settings)
             settings = raw_settings
-            break
         except ConfigurationError as e:
-            logger.error("Configuration error", error=str(e))
-            retry = input("Would you like to re-enter the settings? (y/n): ").strip().lower()
-            if retry != 'y':
-                logger.warning("Installation aborted")
-                return
-            continue
-    
-    logger.info("Starting installation with settings", settings=settings)
-    
-    confirm = input("Proceed with installation? (y/n): ").strip().lower()
-    if confirm != 'y':
-        logger.warning("Installation aborted")
-        return
-
-    try:
+            logger.error("Configuration validation failed", error=str(e))
+            sys.exit(1)
+        
+        logger.info("Starting automated installation with settings", settings=settings)
+        
+        # Execute installation automatically
         openvpn_manager.install_openvpn(settings)
         _install_owpanel_command()
-
         logger.info("Installation completed successfully")
+        
     except Exception as e:
         logger.error("Installation failed", error=str(e))
         sys.exit(1)
