@@ -355,7 +355,12 @@ function setup_project() {
         echo "Project directory exists. Fetching latest version..."
         cd "$PROJECT_DIR"
         git reset --hard HEAD
-        git pull origin main
+        current_branch=$(git branch --show-current)
+        if [ "$current_branch" = "ui-version" ]; then
+            git pull origin ui-version
+        else
+            git pull origin main
+        fi
     else
         echo "Cloning project repository..."
         git clone "$REPO_URL" "$PROJECT_DIR"
@@ -543,7 +548,7 @@ function show_installation_menu() {
             1)
                 print_header "Updating System"
                 systemctl stop openvpn-api
-                cd "$PROJECT_DIR" && git reset --hard HEAD && git pull origin main
+                cd "$PROJECT_DIR" && git reset --hard HEAD && current_branch=$(git branch --show-current) && if [ "$current_branch" = "ui-version" ]; then git pull origin ui-version; else git pull origin main; fi
                 chmod +x cli/main.py && ln -sf "$(pwd)/cli/main.py" /usr/local/bin/owpanel
                 systemctl restart openvpn-api
                 print_success "System updated successfully"
