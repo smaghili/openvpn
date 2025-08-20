@@ -19,8 +19,9 @@ from config.paths import VPNPaths
 from data.db import Database
 from data.user_repository import UserRepository
 
-UDS_SOCKET_PATH = get_config_value("OPENVPN_UDS_SOCKET", "/run/openvpn-server/ovpn-mgmt-cert.sock")
-FLUSH_INTERVAL = get_int_config("FLUSH_INTERVAL", 500) / 1000.0
+UDS_SOCKET_PATH_CERT = get_config_value("OPENVPN_UDS_SOCKET", "/run/openvpn-server/ovpn-mgmt-cert.sock")
+UDS_SOCKET_PATH_LOGIN = "/run/openvpn-server/ovpn-mgmt-login.sock"
+FLUSH_INTERVAL = 0.5  # Flush every 0.5 seconds for real-time updates
 LOG_FILE = VPNPaths.get_log_file()
 MAX_LOG_SIZE = get_int_config("MAX_LOG_SIZE", 10485760)
 MAX_SESSIONS = get_int_config("MAX_SESSIONS", 1000)
@@ -51,10 +52,13 @@ class BackgroundDBWriter:
 
     def setup_database(self):
         self.conn = sqlite3.connect(self.database_file, check_same_thread=False)
+        # Optimize SQLite for high-performance updates
         self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA synchronous=NORMAL")
-        self.conn.execute("PRAGMA cache_size=10000")
+        self.conn.execute("PRAGMA synchronous=NORMAL")  
+        self.conn.execute("PRAGMA cache_size=50000")  # Increased cache
         self.conn.execute("PRAGMA temp_store=MEMORY")
+        self.conn.execute("PRAGMA mmap_size=268435456")  # 256MB memory map
+        self.conn.execute("PRAGMA optimize")
 
     def queue_updates(self, updates: Dict[str, Tuple[int, int]]):
         if updates:
@@ -93,31 +97,42 @@ class BackgroundDBWriter:
                     time.sleep(2 ** attempt)
 
     def bulk_update(self, updates: Dict[str, Tuple[int, int]]):
-        with self.conn:
-            cursor = self.conn.cursor()
-            for username, (bytes_sent, bytes_received) in updates.items():
-                try:
-                    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
-                    user_row = cursor.fetchone()
-                    if user_row:
-                        user_id = user_row[0]
-                        total_bytes = bytes_sent + bytes_received
-                        cursor.execute("""
-                            INSERT INTO user_quotas (user_id, bytes_used)
-                            VALUES (?, ?)
-                            ON CONFLICT(user_id) DO UPDATE SET
-                                bytes_used = user_quotas.bytes_used + excluded.bytes_used,
-                                updated_at = CURRENT_TIMESTAMP
-                        """, (user_id, total_bytes))
-                        cursor.execute("""
-                            INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp)
-                            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                        """, (user_id, bytes_sent, bytes_received))
-                    else:
-                        self._log_error(f"User not found in database: {username}")
-                except Exception as e:
-                    self._log_error(f"Failed to update user {username}: {e}")
-                    raise
+        if not updates:
+            return
+            
+        try:
+            with self.conn:
+                cursor = self.conn.cursor()
+                
+                # Prepare batch data for maximum efficiency
+                quota_updates = []
+                log_inserts = []
+                
+                for username, (bytes_sent, bytes_received) in updates.items():
+                    total_bytes = bytes_sent + bytes_received
+                    quota_updates.append((total_bytes, username))
+                    
+                    # Only log every 10th update to reduce database load
+                    if len(log_inserts) < len(updates) // 10 and total_bytes > 10240:
+                        log_inserts.append((bytes_sent, bytes_received, username))
+                
+                # Batch execute quota updates
+                if quota_updates:
+                    cursor.executemany("""
+                        UPDATE user_quotas 
+                        SET bytes_used = ?, updated_at = CURRENT_TIMESTAMP 
+                        WHERE user_id = (SELECT id FROM users WHERE username = ?)
+                    """, quota_updates)
+                
+                # Batch execute log inserts (reduced frequency)
+                if log_inserts:
+                    cursor.executemany("""
+                        INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp)
+                        SELECT id, ?, ?, CURRENT_TIMESTAMP FROM users WHERE username = ?
+                    """, log_inserts)
+                    
+        except Exception as e:
+            self._log_error(f"Bulk update failed: {e}")
 
     def _log_error(self, message: str):
         timestamp = datetime.datetime.now().isoformat()
@@ -134,9 +149,12 @@ class BackgroundDBWriter:
 
 class OptimizedUDSMonitor:
     def __init__(self):
-        self.socket_path = UDS_SOCKET_PATH
-        self.sock = None
-        self.file_handle = None
+        self.socket_path_cert = UDS_SOCKET_PATH_CERT
+        self.socket_path_login = UDS_SOCKET_PATH_LOGIN
+        self.sock_cert = None
+        self.sock_login = None
+        self.file_handle_cert = None
+        self.file_handle_login = None
         self.traffic_buffer: Dict[str, Tuple[int, int]] = {}
         self.dirty_users: Set[str] = set()
         self.sessions: Dict[Tuple[str, str], SessionData] = {}
@@ -171,32 +189,59 @@ class OptimizedUDSMonitor:
             pass
 
     def connect(self) -> bool:
+        connected = False
         try:
-            if not os.path.exists(self.socket_path):
-                self._log(f"ERROR: UDS socket not found: {self.socket_path}")
-                return False
-            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self.sock.connect(self.socket_path)
-            self.file_handle = self.sock.makefile('rwb', buffering=0)
-            welcome = self.file_handle.readline().decode('utf-8', errors='ignore').strip()
-            self._log(f"Connected to OpenVPN: {welcome}")
-            self.file_handle.write(b"bytecount 1\n")
-            self.file_handle.flush()
-            self.file_handle.write(b"state on\n")
-            self.file_handle.flush()
-            return True
+            # Connect to certificate server
+            if os.path.exists(self.socket_path_cert):
+                self.sock_cert = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self.sock_cert.connect(self.socket_path_cert)
+                self.file_handle_cert = self.sock_cert.makefile('rwb', buffering=0)
+                welcome = self.file_handle_cert.readline().decode('utf-8', errors='ignore').strip()
+                self._log(f"Connected to OpenVPN cert: {welcome}")
+                # Close connection immediately after welcome
+                self.file_handle_cert.close()
+                self.sock_cert.close()
+                self.file_handle_cert = None
+                self.sock_cert = None
+                connected = True
+            else:
+                self._log(f"WARNING: Cert socket not found: {self.socket_path_cert}")
+            
+            # Connect to login server
+            if os.path.exists(self.socket_path_login):
+                self.sock_login = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self.sock_login.connect(self.socket_path_login)
+                self.file_handle_login = self.sock_login.makefile('rwb', buffering=0)
+                welcome = self.file_handle_login.readline().decode('utf-8', errors='ignore').strip()
+                self._log(f"Connected to OpenVPN login: {welcome}")
+                # Close connection immediately after welcome
+                self.file_handle_login.close()
+                self.sock_login.close()
+                self.file_handle_login = None
+                self.sock_login = None
+                connected = True
+            else:
+                self._log(f"WARNING: Login socket not found: {self.socket_path_login}")
+            
+            return connected
         except Exception as e:
             self._log(f"ERROR: Connection failed: {e}")
             return False
 
     def disconnect(self):
         try:
-            if self.file_handle:
-                self.file_handle.close()
-                self.file_handle = None
-            if self.sock:
-                self.sock.close()
-                self.sock = None
+            if self.file_handle_cert:
+                self.file_handle_cert.close()
+                self.file_handle_cert = None
+            if self.sock_cert:
+                self.sock_cert.close()
+                self.sock_cert = None
+            if self.file_handle_login:
+                self.file_handle_login.close()
+                self.file_handle_login = None
+            if self.sock_login:
+                self.sock_login.close()
+                self.sock_login = None
         except Exception as e:
             self._log(f"ERROR: Disconnect error: {e}")
 
@@ -242,44 +287,83 @@ class OptimizedUDSMonitor:
 
     def _update_status_cache(self):
         try:
-            if time.time() - self.last_status_update < 30:
-                return
-            status_output = self._send_command("status 3")
-            if not status_output:
-                return
-            self.status_cache.clear()
-            for line in status_output.split('\n'):
-                if line.startswith("OpenVPN CLIENT LIST"):
-                    continue
-                if line.startswith("Common Name"):
-                    continue
-                if line.startswith("ROUTING TABLE"):
-                    break
-                parts = line.split(',')
-                if len(parts) >= 4:
-                    client_id = parts[0]
-                    common_name = parts[1]
-                    self.status_cache[client_id] = common_name
-            self.last_status_update = time.time()
+            # Always update (remove timing restriction for debugging)
+            # Get status from cert server only (most users are here)
+            status_output = self._send_command("status", "cert")
+            if status_output:
+                self._parse_status_output(status_output)
+                self.last_status_update = time.time()
+            else:
+                self._log("No status output received")
         except Exception as e:
             self._log(f"ERROR: Status cache update failed: {e}")
+            # Don't crash on error, just continue
+    
+    def _parse_status_output(self, status_output: str):
+        for line in status_output.split('\n'):
+            if line.startswith("OpenVPN CLIENT LIST"):
+                continue
+            if line.startswith("Common Name"):
+                continue
+            if line.startswith("ROUTING TABLE"):
+                break
+            parts = line.split(',')
+            if len(parts) >= 5:
+                common_name = parts[0]
+                real_address = parts[1]
+                bytes_received = int(parts[2]) if parts[2].isdigit() else 0
+                bytes_sent = int(parts[3]) if parts[3].isdigit() else 0
+                # No need for status_cache in polling mode
+                
+                # Update traffic data
+                if common_name and (bytes_sent > 0 or bytes_received > 0):
+                    self._update_traffic_data(common_name, bytes_sent, bytes_received)
+    
+    def _update_traffic_data(self, common_name: str, bytes_sent: int, bytes_received: int):
+        try:
+            with self.lock:
+                # Always update with absolute values (not incremental)
+                self.traffic_buffer[common_name] = (bytes_sent, bytes_received)
+                self.dirty_users.add(common_name)
+                
+                # Log every update for debugging
+                self._log(f"Traffic update for {common_name}: sent={bytes_sent}, received={bytes_received}")
+        except Exception as e:
+            self._log(f"ERROR: Traffic update failed: {e}")
 
     def _get_common_name_for_client(self, client_id: str) -> Optional[str]:
         self._update_status_cache()
         return self.status_cache.get(client_id)
 
-    def _send_command(self, command: str) -> Optional[str]:
+    def _send_command(self, command: str, socket_type: str = "cert") -> Optional[str]:
         try:
-            if not self.file_handle:
+            socket_path = self.socket_path_cert if socket_type == "cert" else self.socket_path_login
+            if not os.path.exists(socket_path):
                 return None
-            self.file_handle.write(f"{command}\n".encode())
-            self.file_handle.flush()
+            
+            # Create temporary connection
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(socket_path)
+            file_handle = sock.makefile('rwb', buffering=0)
+            
+            # Read welcome message
+            welcome = file_handle.readline().decode('utf-8', errors='ignore').strip()
+            
+            # Send command
+            file_handle.write(f"{command}\n".encode())
+            file_handle.flush()
+            
             response_lines = []
             while True:
-                line = self.file_handle.readline().decode('utf-8', errors='ignore').strip()
+                line = file_handle.readline().decode('utf-8', errors='ignore').strip()
                 if line == "END" or line == "SUCCESS:" or line == "ERROR:":
                     break
                 response_lines.append(line)
+            
+            # Close connection
+            file_handle.close()
+            sock.close()
+            
             return "\n".join(response_lines)
         except Exception as e:
             self._log(f"ERROR: Command failed: {e}")
@@ -294,6 +378,7 @@ class OptimizedUDSMonitor:
                 if user in self.traffic_buffer:
                     updates[user] = self.traffic_buffer[user]
             if updates:
+                self._log(f"Flushing updates for {len(updates)} users")
                 self.db_writer.queue_updates(updates)
             self.dirty_users.clear()
             self.last_flush = time.time()
@@ -338,7 +423,9 @@ class OptimizedUDSMonitor:
                         sessions_to_disconnect.append(session_key)
             for session_key in sessions_to_disconnect:
                 client_id = session_key[1]
-                self._send_command(f"kill {client_id}")
+                # Try to disconnect from both servers
+                self._send_command(f"kill {client_id}", "cert")
+                self._send_command(f"kill {client_id}", "login")
                 self._log(f"Disconnected user {common_name}")
         except Exception as e:
             self._log(f"ERROR: Disconnect user failed: {e}")
@@ -362,17 +449,11 @@ class OptimizedUDSMonitor:
 
     def _read_events(self):
         try:
-            while self.running and self.file_handle:
-                line = self.file_handle.readline()
-                if not line:
-                    break
-                line_str = line.decode('utf-8', errors='ignore').strip()
-                if not line_str:
-                    continue
-                if line_str.startswith(">BYTECOUNT:"):
-                    self._parse_bytecount_event(line_str)
-                elif line_str.startswith(">STATE:"):
-                    self._parse_state_event(line_str)
+            while self.running:
+                # Poll status every 5 seconds instead of waiting for events
+                self._update_status_cache()
+                self._check_quotas_and_enforce()
+                time.sleep(5)
         except Exception as e:
             self._log(f"ERROR: Event reading failed: {e}")
 
@@ -410,43 +491,44 @@ class OptimizedUDSMonitor:
 
     def run_forever(self):
         self.running = True
-        self._log("Starting optimized OpenVPN traffic monitor")
-        while self.running:
-            try:
-                if not self.connect():
-                    self._log("Failed to connect, retrying in 30 seconds")
-                    time.sleep(30)
-                    continue
-                event_thread = threading.Thread(target=self._read_events, daemon=True)
-                event_thread.start()
-                last_quota_check = time.time()
-                last_cleanup = time.time()
-                last_cache_cleanup = time.time()
-                while self.running:
-                    current_time = time.time()
-                    if current_time - last_quota_check >= 10:
+        self._log("Starting optimized OpenVPN traffic monitor for high-load")
+        
+        try:
+            iteration_count = 0
+            while self.running:
+                try:
+                    iteration_count += 1
+                    
+                    # Update status every 2 iterations (every 1 second)
+                    if iteration_count % 2 == 0:
+                        self._update_status_cache()
+                    
+                    # Always try to flush if there are updates
+                    self.smart_flush()
+                    
+                    # Check quotas every 10 iterations (every 5 seconds)
+                    if iteration_count % 10 == 0:
                         self._check_quotas_and_enforce()
-                        last_quota_check = current_time
-                    if current_time - last_cleanup >= 60:
-                        self._cleanup_stale_sessions()
-                        last_cleanup = current_time
-                    if current_time - last_cache_cleanup >= 300:
-                        self._cleanup_caches()
-                        last_cache_cleanup = current_time
-                    if current_time - self.last_flush >= FLUSH_INTERVAL:
-                        self.smart_flush()
+                    
+                    # Reset counter to prevent overflow
+                    if iteration_count > 1000:
+                        iteration_count = 0
+                    
+                    # Sleep 0.5 seconds between iterations
+                    time.sleep(0.5)
+                    
+                except KeyboardInterrupt:
+                    self._log("Received interrupt signal, shutting down")
+                    break
+                except Exception as e:
+                    self._log(f"ERROR: Polling failed: {e}")
                     time.sleep(1)
-            except KeyboardInterrupt:
-                self._log("Received interrupt signal, shutting down")
-                break
-            except Exception as e:
-                self._log(f"ERROR: Main loop failed: {e}")
-                time.sleep(30)
-            finally:
-                self.disconnect()
-        self.running = False
-        self.db_writer.shutdown()
-        self._log("Optimized OpenVPN traffic monitor stopped")
+        except Exception as e:
+            self._log(f"ERROR: Main loop failed: {e}")
+        finally:
+            self.disconnect()
+            self.db_writer.shutdown()
+            self._log("Optimized OpenVPN traffic monitor stopped")
 
     def _cleanup_caches(self):
         try:
