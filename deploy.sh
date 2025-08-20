@@ -7,7 +7,7 @@ set -o pipefail # Fail if any command in a pipeline fails
 
 # --- Configuration ---
 REPO_URL="https://github.com/smaghili/openvpn.git"
-BRANCH="ui-version"
+BRANCH="backup-ui-version"
 PROJECT_DIR="/etc/owpanel"
 ENV_FILE="/etc/owpanel/.env"
 # Use the same database path that the application uses (will be set dynamically)
