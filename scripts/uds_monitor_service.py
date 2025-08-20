@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-OpenVPN Traffic Monitor Service - UDS Implementation
-Connects to OpenVPN management interface via Unix Domain Socket for near-realtime traffic monitoring.
-"""
-
 import socket
 import time
 import os
@@ -11,10 +6,10 @@ import sys
 import datetime
 import threading
 import sqlite3
-from typing import Dict, Tuple, Optional, List
+import queue
+from typing import Dict, Tuple, Optional, Set
 from dataclasses import dataclass
 
-# Add project root to path
 temp_project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if temp_project_root not in sys.path:
     sys.path.insert(0, temp_project_root)
@@ -24,18 +19,15 @@ from config.paths import VPNPaths
 from data.db import Database
 from data.user_repository import UserRepository
 
-# Configuration
 UDS_SOCKET_PATH = get_config_value("OPENVPN_UDS_SOCKET", "/run/openvpn-server/ovpn-mgmt-cert.sock")
-BYTECOUNT_INTERVAL = get_int_config("BYTECOUNT_INTERVAL", 5)  # seconds
-RECONCILE_INTERVAL = get_int_config("RECONCILE_INTERVAL", 300)  # 5 minutes
-DB_FLUSH_INTERVAL = get_int_config("DB_FLUSH_INTERVAL", 30)  # seconds
-QUOTA_BUFFER_BYTES = get_int_config("QUOTA_BUFFER_BYTES", 20 * 1024 * 1024)  # 20MB default
+FLUSH_INTERVAL = get_int_config("FLUSH_INTERVAL", 500) / 1000.0
 LOG_FILE = VPNPaths.get_log_file()
-MAX_LOG_SIZE = get_int_config("MAX_LOG_SIZE", 10485760)  # 10MB
+MAX_LOG_SIZE = get_int_config("MAX_LOG_SIZE", 10485760)
+MAX_SESSIONS = get_int_config("MAX_SESSIONS", 1000)
+DATABASE_FILE = VPNPaths.get_database_file()
 
 @dataclass
 class SessionData:
-    """Represents a single VPN session with traffic counters."""
     common_name: str
     client_id: str
     bytes_sent: int = 0
@@ -45,108 +37,159 @@ class SessionData:
     connected_at: datetime.datetime = None
     last_seen: datetime.datetime = None
 
-class UDSOpenVPNMonitor:
-    """UDS-based OpenVPN traffic monitor with near-realtime bytecount events."""
-    
+class BackgroundDBWriter:
+    def __init__(self, database_file: str):
+        self.database_file = database_file
+        self.write_queue = queue.Queue(maxsize=10000)
+        self.backup_queue = []
+        self.conn = None
+        self.running = True
+        self.max_retry_attempts = 3
+        self.setup_database()
+        self.writer_thread = threading.Thread(target=self.background_writer, daemon=True)
+        self.writer_thread.start()
+
+    def setup_database(self):
+        self.conn = sqlite3.connect(self.database_file, check_same_thread=False)
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA synchronous=NORMAL")
+        self.conn.execute("PRAGMA cache_size=10000")
+        self.conn.execute("PRAGMA temp_store=MEMORY")
+
+    def queue_updates(self, updates: Dict[str, Tuple[int, int]]):
+        if updates:
+            try:
+                self.write_queue.put(updates.copy(), timeout=0.1)
+            except queue.Full:
+                self.backup_queue.extend(updates.items())
+                if len(self.backup_queue) > 50000:
+                    self.backup_queue = self.backup_queue[-25000:]
+
+    def background_writer(self):
+        while self.running:
+            try:
+                updates = self.write_queue.get(timeout=1.0)
+                self.bulk_update_with_retry(updates)
+            except queue.Empty:
+                if self.backup_queue:
+                    backup_updates = dict(self.backup_queue[:1000])
+                    self.backup_queue = self.backup_queue[1000:]
+                    self.bulk_update_with_retry(backup_updates)
+                continue
+            except Exception as e:
+                self._log_error(f"Background writer error: {e}")
+                time.sleep(5)
+
+    def bulk_update_with_retry(self, updates: Dict[str, Tuple[int, int]]):
+        for attempt in range(self.max_retry_attempts):
+            try:
+                self.bulk_update(updates)
+                return
+            except Exception as e:
+                self._log_error(f"Bulk update attempt {attempt + 1} failed: {e}")
+                if attempt == self.max_retry_attempts - 1:
+                    self.backup_queue.extend(updates.items())
+                else:
+                    time.sleep(2 ** attempt)
+
+    def bulk_update(self, updates: Dict[str, Tuple[int, int]]):
+        with self.conn:
+            cursor = self.conn.cursor()
+            for username, (bytes_sent, bytes_received) in updates.items():
+                try:
+                    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+                    user_row = cursor.fetchone()
+                    if user_row:
+                        user_id = user_row[0]
+                        total_bytes = bytes_sent + bytes_received
+                        cursor.execute("""
+                            INSERT INTO user_quotas (user_id, bytes_used)
+                            VALUES (?, ?)
+                            ON CONFLICT(user_id) DO UPDATE SET
+                                bytes_used = user_quotas.bytes_used + excluded.bytes_used,
+                                updated_at = CURRENT_TIMESTAMP
+                        """, (user_id, total_bytes))
+                        cursor.execute("""
+                            INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp)
+                            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        """, (user_id, bytes_sent, bytes_received))
+                    else:
+                        self._log_error(f"User not found in database: {username}")
+                except Exception as e:
+                    self._log_error(f"Failed to update user {username}: {e}")
+                    raise
+
+    def _log_error(self, message: str):
+        timestamp = datetime.datetime.now().isoformat()
+        try:
+            with open(LOG_FILE, "a") as f:
+                f.write(f"{timestamp} - DB_WRITER_ERROR - {message}\n")
+        except:
+            pass
+
+    def shutdown(self):
+        self.running = False
+        if self.conn:
+            self.conn.close()
+
+class OptimizedUDSMonitor:
     def __init__(self):
         self.socket_path = UDS_SOCKET_PATH
         self.sock = None
         self.file_handle = None
-        self.db = Database()
-        self.user_repo = UserRepository(self.db)
+        self.traffic_buffer: Dict[str, Tuple[int, int]] = {}
+        self.dirty_users: Set[str] = set()
         self.sessions: Dict[Tuple[str, str], SessionData] = {}
-        self.user_totals: Dict[str, int] = {}
-        self.last_reconcile = time.time()
-        self.last_db_flush = time.time()
+        self.user_cache: Dict[str, int] = {}
+        self.user_repo = UserRepository(Database())
+        self.db_writer = BackgroundDBWriter(DATABASE_FILE)
+        self.last_flush = time.time()
+        self.last_status_update = time.time()
         self.running = False
         self.lock = threading.Lock()
-        
-        # Ensure log directory exists
+        self.status_cache: Dict[str, str] = {}
         log_dir = os.path.dirname(LOG_FILE)
         os.makedirs(log_dir, exist_ok=True)
-        
-        # Initialize database with WAL mode and optimizations
-        self._init_database()
-    
-    def _init_database(self):
-        """Initialize database with WAL mode and performance optimizations."""
-        try:
-            with self.db.get_connection() as conn:
-                conn.execute("PRAGMA journal_mode=WAL")
-                conn.execute("PRAGMA busy_timeout=3000")
-                conn.execute("PRAGMA synchronous=NORMAL")
-                conn.execute("PRAGMA cache_size=10000")
-                conn.execute("PRAGMA temp_store=MEMORY")
-                
-                # Ensure indexes exist
-                conn.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_user_quotas_username 
-                    ON user_quotas(user_id)
-                """)
-                conn.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_traffic_logs_user_time 
-                    ON traffic_logs(user_id, log_timestamp)
-                """)
-                
-            self._log("Database initialized with WAL mode and optimizations")
-        except Exception as e:
-            self._log(f"ERROR: Database initialization failed: {e}")
-            raise
-    
+
     def _log(self, message: str):
-        """Log message with timestamp and rotation."""
         timestamp = datetime.datetime.now().isoformat()
         self._rotate_log_if_needed()
         try:
             with open(LOG_FILE, "a") as f:
-                f.write(f"{timestamp} - UDS_MONITOR - {message}\n")
+                f.write(f"{timestamp} - OPTIMIZED_MONITOR - {message}\n")
         except Exception as e:
-            print(f"{timestamp} - UDS_MONITOR - {message}", file=sys.stderr)
-            print(f"{timestamp} - LOG ERROR - {e}", file=sys.stderr)
-    
+            print(f"{timestamp} - OPTIMIZED_MONITOR - {message}", file=sys.stderr)
+
     def _rotate_log_if_needed(self):
-        """Rotate log file if it exceeds maximum size."""
         try:
             if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > MAX_LOG_SIZE:
                 backup_file = f"{LOG_FILE}.old"
                 if os.path.exists(backup_file):
                     os.remove(backup_file)
                 os.rename(LOG_FILE, backup_file)
-        except Exception:
+        except:
             pass
-    
+
     def connect(self) -> bool:
-        """Connect to OpenVPN management interface via UDS."""
         try:
             if not os.path.exists(self.socket_path):
                 self._log(f"ERROR: UDS socket not found: {self.socket_path}")
                 return False
-            
             self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self.sock.connect(self.socket_path)
             self.file_handle = self.sock.makefile('rwb', buffering=0)
-            
-            # Read welcome message
             welcome = self.file_handle.readline().decode('utf-8', errors='ignore').strip()
-            self._log(f"Connected to OpenVPN management interface: {welcome}")
-            
-            # Enable bytecount events for near-realtime monitoring
-            self.file_handle.write(f"bytecount {BYTECOUNT_INTERVAL}\n".encode())
+            self._log(f"Connected to OpenVPN: {welcome}")
+            self.file_handle.write(b"bytecount 1\n")
             self.file_handle.flush()
-            
-            # Enable state events for session tracking
             self.file_handle.write(b"state on\n")
             self.file_handle.flush()
-            
-            self._log(f"Enabled bytecount events every {BYTECOUNT_INTERVAL} seconds")
             return True
-            
         except Exception as e:
-            self._log(f"ERROR: Failed to connect to UDS socket: {e}")
+            self._log(f"ERROR: Connection failed: {e}")
             return False
-    
+
     def disconnect(self):
-        """Disconnect from OpenVPN management interface."""
         try:
             if self.file_handle:
                 self.file_handle.close()
@@ -154,58 +197,24 @@ class UDSOpenVPNMonitor:
             if self.sock:
                 self.sock.close()
                 self.sock = None
-            self._log("Disconnected from OpenVPN management interface")
         except Exception as e:
-            self._log(f"ERROR: Error during disconnect: {e}")
-    
-    def _send_command(self, command: str) -> Optional[str]:
-        """Send command to OpenVPN management interface."""
-        try:
-            if not self.file_handle:
-                return None
-            
-            self.file_handle.write(f"{command}\n".encode())
-            self.file_handle.flush()
-            
-            # Read response
-            response_lines = []
-            while True:
-                line = self.file_handle.readline().decode('utf-8', errors='ignore').strip()
-                if line == "END":
-                    break
-                if line == "SUCCESS:" or line == "ERROR:":
-                    break
-                response_lines.append(line)
-            
-            return "\n".join(response_lines)
-            
-        except Exception as e:
-            self._log(f"ERROR: Command '{command}' failed: {e}")
-            return None
-    
+            self._log(f"ERROR: Disconnect error: {e}")
+
     def _parse_bytecount_event(self, line: str):
-        """Parse bytecount event from OpenVPN management interface."""
         try:
-            # Format: >BYTECOUNT:<client_id>,<bytes_sent>,<bytes_received>
             if not line.startswith(">BYTECOUNT:"):
                 return
-            
             parts = line[11:].split(',')
             if len(parts) != 3:
                 return
-            
             client_id = parts[0]
             bytes_sent = int(parts[1])
             bytes_received = int(parts[2])
-            
-            # Get common name for this client_id
             common_name = self._get_common_name_for_client(client_id)
             if not common_name:
                 return
-            
             session_key = (common_name, client_id)
             now = datetime.datetime.now()
-            
             with self.lock:
                 if session_key not in self.sessions:
                     self.sessions[session_key] = SessionData(
@@ -214,37 +223,31 @@ class UDSOpenVPNMonitor:
                         connected_at=now,
                         last_seen=now
                     )
-                
                 session = self.sessions[session_key]
                 session.last_seen = now
-                
-                # Calculate incremental traffic (clamp to prevent negative values)
                 sent_increment = max(0, bytes_sent - session.last_bytes_sent)
                 received_increment = max(0, bytes_received - session.last_bytes_received)
-                
                 session.bytes_sent += sent_increment
                 session.bytes_received += received_increment
                 session.last_bytes_sent = bytes_sent
                 session.last_bytes_received = bytes_received
-                
-                # Update user totals
-                total_increment = sent_increment + received_increment
-                if common_name not in self.user_totals:
-                    self.user_totals[common_name] = 0
-                self.user_totals[common_name] += total_increment
-                
-                self._log(f"Session {session_key}: +{total_increment} bytes (sent: {sent_increment}, received: {received_increment})")
-                
+                if sent_increment > 0 or received_increment > 0:
+                    current_sent, current_received = self.traffic_buffer.get(common_name, (0, 0))
+                    self.traffic_buffer[common_name] = (current_sent + sent_increment, current_received + received_increment)
+                    self.dirty_users.add(common_name)
+                    if time.time() - self.last_flush >= FLUSH_INTERVAL:
+                        self.smart_flush()
         except Exception as e:
-            self._log(f"ERROR: Failed to parse bytecount event '{line}': {e}")
-    
-    def _get_common_name_for_client(self, client_id: str) -> Optional[str]:
-        """Get common name for a client ID from status output."""
+            self._log(f"ERROR: Parse bytecount failed: {e}")
+
+    def _update_status_cache(self):
         try:
+            if time.time() - self.last_status_update < 30:
+                return
             status_output = self._send_command("status 3")
             if not status_output:
-                return None
-            
+                return
+            self.status_cache.clear()
             for line in status_output.split('\n'):
                 if line.startswith("OpenVPN CLIENT LIST"):
                     continue
@@ -252,35 +255,139 @@ class UDSOpenVPNMonitor:
                     continue
                 if line.startswith("ROUTING TABLE"):
                     break
-                
                 parts = line.split(',')
-                if len(parts) >= 4 and parts[0] == client_id:
-                    return parts[1]  # Common name is second field
-            
-            return None
-            
+                if len(parts) >= 4:
+                    client_id = parts[0]
+                    common_name = parts[1]
+                    self.status_cache[client_id] = common_name
+            self.last_status_update = time.time()
         except Exception as e:
-            self._log(f"ERROR: Failed to get common name for client {client_id}: {e}")
-            return None
-    
-    def _parse_state_event(self, line: str):
-        """Parse state event for session tracking."""
+            self._log(f"ERROR: Status cache update failed: {e}")
+
+    def _get_common_name_for_client(self, client_id: str) -> Optional[str]:
+        self._update_status_cache()
+        return self.status_cache.get(client_id)
+
+    def _send_command(self, command: str) -> Optional[str]:
         try:
-            # Format: >STATE:<client_id>,<state>,<common_name>,<remote_ip>
+            if not self.file_handle:
+                return None
+            self.file_handle.write(f"{command}\n".encode())
+            self.file_handle.flush()
+            response_lines = []
+            while True:
+                line = self.file_handle.readline().decode('utf-8', errors='ignore').strip()
+                if line == "END" or line == "SUCCESS:" or line == "ERROR:":
+                    break
+                response_lines.append(line)
+            return "\n".join(response_lines)
+        except Exception as e:
+            self._log(f"ERROR: Command failed: {e}")
+            return None
+
+    def smart_flush(self):
+        with self.lock:
+            if not self.dirty_users:
+                return
+            updates = {}
+            for user in self.dirty_users:
+                if user in self.traffic_buffer:
+                    updates[user] = self.traffic_buffer[user]
+            if updates:
+                self.db_writer.queue_updates(updates)
+            self.dirty_users.clear()
+            self.last_flush = time.time()
+
+    def _check_quotas_and_enforce(self):
+        try:
+            with self.lock:
+                for common_name in list(self.traffic_buffer.keys()):
+                    user_id = self._get_user_id_cached(common_name)
+                    if not user_id:
+                        continue
+                    quota_data = self.user_repo.get_user_quota_status(user_id)
+                    if not quota_data or quota_data.get('quota_bytes', 0) == 0:
+                        continue
+                    quota_bytes = quota_data['quota_bytes']
+                    bytes_sent, bytes_received = self.traffic_buffer[common_name]
+                    current_usage = quota_data.get('bytes_used', 0) + bytes_sent + bytes_received
+                    if current_usage >= quota_bytes:
+                        self._log(f"QUOTA EXCEEDED: {common_name}")
+                        self._disconnect_user(common_name)
+        except Exception as e:
+            self._log(f"ERROR: Quota check failed: {e}")
+
+    def _get_user_id_cached(self, username: str) -> Optional[int]:
+        if username in self.user_cache:
+            return self.user_cache[username]
+        try:
+            user = self.user_repo.get_user_by_username(username)
+            if user:
+                self.user_cache[username] = user['id']
+                return user['id']
+        except Exception as e:
+            self._log(f"ERROR: User lookup failed for {username}: {e}")
+        return None
+
+    def _disconnect_user(self, common_name: str):
+        try:
+            sessions_to_disconnect = []
+            with self.lock:
+                for session_key, session in self.sessions.items():
+                    if session.common_name == common_name:
+                        sessions_to_disconnect.append(session_key)
+            for session_key in sessions_to_disconnect:
+                client_id = session_key[1]
+                self._send_command(f"kill {client_id}")
+                self._log(f"Disconnected user {common_name}")
+        except Exception as e:
+            self._log(f"ERROR: Disconnect user failed: {e}")
+
+    def _cleanup_stale_sessions(self):
+        try:
+            now = datetime.datetime.now()
+            stale_sessions = []
+            with self.lock:
+                for session_key, session in self.sessions.items():
+                    if (now - session.last_seen).total_seconds() > 300:
+                        stale_sessions.append(session_key)
+                for session_key in stale_sessions:
+                    del self.sessions[session_key]
+                if len(self.sessions) > MAX_SESSIONS:
+                    oldest_sessions = sorted(self.sessions.items(), key=lambda x: x[1].last_seen)
+                    for session_key, _ in oldest_sessions[:len(self.sessions) - MAX_SESSIONS]:
+                        del self.sessions[session_key]
+        except Exception as e:
+            self._log(f"ERROR: Session cleanup failed: {e}")
+
+    def _read_events(self):
+        try:
+            while self.running and self.file_handle:
+                line = self.file_handle.readline()
+                if not line:
+                    break
+                line_str = line.decode('utf-8', errors='ignore').strip()
+                if not line_str:
+                    continue
+                if line_str.startswith(">BYTECOUNT:"):
+                    self._parse_bytecount_event(line_str)
+                elif line_str.startswith(">STATE:"):
+                    self._parse_state_event(line_str)
+        except Exception as e:
+            self._log(f"ERROR: Event reading failed: {e}")
+
+    def _parse_state_event(self, line: str):
+        try:
             if not line.startswith(">STATE:"):
                 return
-            
             parts = line[7:].split(',')
             if len(parts) < 3:
                 return
-            
             client_id = parts[0]
             state = parts[1]
             common_name = parts[2]
-            
             session_key = (common_name, client_id)
             now = datetime.datetime.now()
-            
             with self.lock:
                 if state == "CONNECTED":
                     if session_key not in self.sessions:
@@ -290,260 +397,75 @@ class UDSOpenVPNMonitor:
                             connected_at=now,
                             last_seen=now
                         )
-                        self._log(f"New session started: {session_key}")
-                
                 elif state == "DISCONNECTED":
                     if session_key in self.sessions:
                         session = self.sessions[session_key]
-                        total_bytes = session.bytes_sent + session.bytes_received
-                        self._log(f"Session ended: {session_key}, total bytes: {total_bytes}")
-                        
-                        # Record session traffic
-                        self._record_session_traffic(session)
-                        
-                        # Remove from active sessions
+                        if session.bytes_sent > 0 or session.bytes_received > 0:
+                            current_sent, current_received = self.traffic_buffer.get(common_name, (0, 0))
+                            self.traffic_buffer[common_name] = (current_sent + session.bytes_sent, current_received + session.bytes_received)
+                            self.dirty_users.add(common_name)
                         del self.sessions[session_key]
-                        
-                        # Update user totals
-                        if common_name in self.user_totals:
-                            self.user_totals[common_name] -= total_bytes
-                            if self.user_totals[common_name] <= 0:
-                                del self.user_totals[common_name]
-                
         except Exception as e:
-            self._log(f"ERROR: Failed to parse state event '{line}': {e}")
-    
-    def _record_session_traffic(self, session: SessionData):
-        """Record session traffic to database."""
-        try:
-            total_bytes = session.bytes_sent + session.bytes_received
-            if total_bytes == 0:
-                return
-            
-            # Get user ID from common name
-            user = self.user_repo.get_user_by_username(session.common_name)
-            if not user:
-                self._log(f"WARNING: User not found for common name: {session.common_name}")
-                return
-            
-            with self.db.get_connection() as conn:
-                # Record session traffic
-                conn.execute("""
-                    INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp)
-                    VALUES (?, ?, ?, ?)
-                """, (user['id'], session.bytes_sent, session.bytes_received, session.connected_at))
-                
-                # Update user quota usage
-                conn.execute("""
-                    INSERT INTO user_quotas (user_id, bytes_used)
-                    VALUES (?, ?)
-                    ON CONFLICT(user_id) DO UPDATE SET
-                        bytes_used = user_quotas.bytes_used + excluded.bytes_used,
-                        updated_at = CURRENT_TIMESTAMP
-                """, (user['id'], total_bytes))
-                
-            self._log(f"Recorded session traffic for {session.common_name}: {total_bytes} bytes")
-            
-        except Exception as e:
-            self._log(f"ERROR: Failed to record session traffic: {e}")
-    
-    def _reconcile_sessions(self):
-        """Reconcile sessions with full status output."""
-        try:
-            status_output = self._send_command("status 3")
-            if not status_output:
-                return
-            
-            current_sessions = set()
-            now = datetime.datetime.now()
-            
-            # Parse CLIENT_LIST section
-            in_client_list = False
-            for line in status_output.split('\n'):
-                if line.startswith("OpenVPN CLIENT LIST"):
-                    in_client_list = True
-                    continue
-                if line.startswith("ROUTING TABLE"):
-                    break
-                
-                if in_client_list and line.strip() and not line.startswith("Common Name"):
-                    parts = line.split(',')
-                    if len(parts) >= 4:
-                        client_id = parts[0]
-                        common_name = parts[1]
-                        session_key = (common_name, client_id)
-                        current_sessions.add(session_key)
-                        
-                        # Update last seen for existing sessions
-                        with self.lock:
-                            if session_key in self.sessions:
-                                self.sessions[session_key].last_seen = now
-            
-            # Clean up disconnected sessions
-            with self.lock:
-                disconnected_sessions = []
-                for session_key in list(self.sessions.keys()):
-                    if session_key not in current_sessions:
-                        session = self.sessions[session_key]
-                        # Check if session has been inactive for more than 30 seconds
-                        if (now - session.last_seen).total_seconds() > 30:
-                            disconnected_sessions.append(session)
-                            del self.sessions[session_key]
-                
-                # Record traffic for disconnected sessions
-                for session in disconnected_sessions:
-                    self._record_session_traffic(session)
-            
-            self._log(f"Reconciled {len(current_sessions)} active sessions")
-            
-        except Exception as e:
-            self._log(f"ERROR: Failed to reconcile sessions: {e}")
-    
-    def _check_quotas_and_enforce(self):
-        """Check user quotas and disconnect violators."""
-        try:
-            with self.lock:
-                for common_name, total_bytes in self.user_totals.items():
-                    user = self.user_repo.get_user_by_username(common_name)
-                    if not user:
-                        continue
-                    
-                    # Get user quota
-                    quota_data = self.user_repo.get_user_quota(user['id'])
-                    if not quota_data or quota_data['quota_bytes'] == 0:
-                        continue  # Unlimited quota
-                    
-                    quota_bytes = quota_data['quota_bytes']
-                    current_usage = quota_data['bytes_used'] + total_bytes
-                    
-                    if current_usage >= quota_bytes + QUOTA_BUFFER_BYTES:
-                        self._log(f"QUOTA EXCEEDED: {common_name} - {current_usage}/{quota_bytes} bytes")
-                        self._disconnect_user(common_name, "quota_exceeded")
-            
-        except Exception as e:
-            self._log(f"ERROR: Failed to check quotas: {e}")
-    
-    def _disconnect_user(self, common_name: str, reason: str):
-        """Disconnect user from all sessions."""
-        try:
-            sessions_to_disconnect = []
-            with self.lock:
-                for session_key, session in self.sessions.items():
-                    if session.common_name == common_name:
-                        sessions_to_disconnect.append(session_key)
-            
-            for session_key in sessions_to_disconnect:
-                client_id = session_key[1]
-                self._send_command(f"kill {client_id}")
-                self._log(f"Disconnected user {common_name} (client {client_id}): {reason}")
-                
-                # Record the session traffic before removing
-                with self.lock:
-                    if session_key in self.sessions:
-                        session = self.sessions[session_key]
-                        self._record_session_traffic(session)
-                        del self.sessions[session_key]
-            
-        except Exception as e:
-            self._log(f"ERROR: Failed to disconnect user {common_name}: {e}")
-    
-    def _flush_database(self):
-        """Flush any pending database operations."""
-        try:
-            # This is handled by SQLite WAL mode, but we can force a checkpoint
-            with self.db.get_connection() as conn:
-                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            self._log("Database checkpoint completed")
-        except Exception as e:
-            self._log(f"ERROR: Database flush failed: {e}")
-    
-    def _read_events(self):
-        """Read events from OpenVPN management interface."""
-        try:
-            while self.running and self.file_handle:
-                line = self.file_handle.readline()
-                if not line:
-                    break
-                
-                line_str = line.decode('utf-8', errors='ignore').strip()
-                if not line_str:
-                    continue
-                
-                # Parse different event types
-                if line_str.startswith(">BYTECOUNT:"):
-                    self._parse_bytecount_event(line_str)
-                elif line_str.startswith(">STATE:"):
-                    self._parse_state_event(line_str)
-                elif line_str.startswith(">INFO:"):
-                    # Log info messages
-                    self._log(f"INFO: {line_str[6:]}")
-                elif line_str.startswith(">HOLD:"):
-                    # Handle hold events
-                    self._log(f"HOLD: {line_str[6:]}")
-                elif line_str.startswith(">LOG:"):
-                    # Log OpenVPN log messages
-                    self._log(f"OPENVPN: {line_str[5:]}")
-                
-        except Exception as e:
-            self._log(f"ERROR: Event reading failed: {e}")
-    
+            self._log(f"ERROR: Parse state event failed: {e}")
+
     def run_forever(self):
-        """Main monitoring loop."""
         self.running = True
-        self._log("Starting UDS-based OpenVPN traffic monitor")
-        
+        self._log("Starting optimized OpenVPN traffic monitor")
         while self.running:
             try:
-                # Connect to management interface
                 if not self.connect():
-                    self._log("Failed to connect, retrying in 30 seconds...")
+                    self._log("Failed to connect, retrying in 30 seconds")
                     time.sleep(30)
                     continue
-                
-                # Start event reading thread
                 event_thread = threading.Thread(target=self._read_events, daemon=True)
                 event_thread.start()
-                
-                # Main monitoring loop
+                last_quota_check = time.time()
+                last_cleanup = time.time()
+                last_cache_cleanup = time.time()
                 while self.running:
                     current_time = time.time()
-                    
-                    # Periodic quota checking
-                    self._check_quotas_and_enforce()
-                    
-                    # Periodic reconciliation
-                    if current_time - self.last_reconcile >= RECONCILE_INTERVAL:
-                        self._reconcile_sessions()
-                        self.last_reconcile = current_time
-                    
-                    # Periodic database flush
-                    if current_time - self.last_db_flush >= DB_FLUSH_INTERVAL:
-                        self._flush_database()
-                        self.last_db_flush = current_time
-                    
-                    time.sleep(5)  # Check every 5 seconds
-                
+                    if current_time - last_quota_check >= 10:
+                        self._check_quotas_and_enforce()
+                        last_quota_check = current_time
+                    if current_time - last_cleanup >= 60:
+                        self._cleanup_stale_sessions()
+                        last_cleanup = current_time
+                    if current_time - last_cache_cleanup >= 300:
+                        self._cleanup_caches()
+                        last_cache_cleanup = current_time
+                    if current_time - self.last_flush >= FLUSH_INTERVAL:
+                        self.smart_flush()
+                    time.sleep(1)
             except KeyboardInterrupt:
-                self._log("Received interrupt signal, shutting down...")
+                self._log("Received interrupt signal, shutting down")
                 break
             except Exception as e:
-                self._log(f"ERROR: Monitoring loop failed: {e}")
-                time.sleep(30)  # Wait before retrying
+                self._log(f"ERROR: Main loop failed: {e}")
+                time.sleep(30)
             finally:
                 self.disconnect()
-        
         self.running = False
-        self._log("UDS-based OpenVPN traffic monitor stopped")
+        self.db_writer.shutdown()
+        self._log("Optimized OpenVPN traffic monitor stopped")
+
+    def _cleanup_caches(self):
+        try:
+            if len(self.user_cache) > 1000:
+                self.user_cache.clear()
+            if len(self.status_cache) > 1000:
+                self.status_cache.clear()
+        except Exception as e:
+            self._log(f"ERROR: Cache cleanup failed: {e}")
 
 def main():
-    """Main entry point."""
-    monitor = UDSOpenVPNMonitor()
+    monitor = OptimizedUDSMonitor()
     try:
         monitor.run_forever()
     except KeyboardInterrupt:
         monitor._log("Shutdown requested")
     finally:
         monitor.disconnect()
+        monitor.db_writer.shutdown()
 
 if __name__ == "__main__":
-    main() 
+    main()

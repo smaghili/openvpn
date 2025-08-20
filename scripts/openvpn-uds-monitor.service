@@ -1,5 +1,5 @@
 [Unit]
-Description=OpenVPN UDS Traffic Monitor Service
+Description=Optimized OpenVPN UDS Traffic Monitor Service
 After=network.target openvpn@server-cert.service openvpn@server-login.service
 Wants=openvpn@server-cert.service
 PartOf=openvpn@server-cert.service
@@ -8,31 +8,28 @@ PartOf=openvpn@server-cert.service
 Type=simple
 User=root
 Group=openvpn
-WorkingDirectory=/etc/owpanel
-ExecStart=/usr/bin/python3 /etc/owpanel/scripts/uds_monitor_service.py
+WorkingDirectory=/root/openvpn
+ExecStart=/usr/bin/python3 /root/openvpn/scripts/uds_monitor_service.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
-# Security settings
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log/openvpn /etc/owpanel/openvpn_data
+ReadWritePaths=/var/log/openvpn /root/openvpn/openvpn_data
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 
-# Resource limits
 LimitNOFILE=65536
-MemoryMax=100M
-CPUQuota=10%
+MemoryMax=50M
+CPUQuota=5%
 
-# Environment configuration
-EnvironmentFile=/etc/owpanel/.env
+EnvironmentFile=-/root/openvpn/.env
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
-WantedBy=multi-user.target 
+WantedBy=multi-user.target
