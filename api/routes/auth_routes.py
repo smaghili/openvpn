@@ -87,7 +87,8 @@ def logout():
         token = JWTMiddleware._extract_token(request)
         auth_service = g.auth_service
         result = auth_service.logout(token)
-        resp = make_response(jsonify(result), 200)
+        response_data = result if isinstance(result, dict) else {"message": "Logged out"}
+        resp = make_response(jsonify(response_data), 200)
         resp.delete_cookie('token')
         return resp
     except Exception as e:

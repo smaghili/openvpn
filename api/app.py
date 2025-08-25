@@ -4,6 +4,7 @@ import sys
 from flask import Flask, send_from_directory, request, redirect, url_for
 from flask_cors import CORS
 
+
 from .routes.user_routes import user_bp
 from .routes.quota_routes import quota_bp
 from .routes.system_routes import system_bp
@@ -116,17 +117,24 @@ def main() -> None:
 
     app = create_app()
     port = int(os.environ.get("API_PORT", 5000))
+
+    def calculate_optimal_threads() -> int:
+        """Determine a sensible Waitress thread count based on CPU cores."""
+        cores = os.cpu_count() or 1
+        # Allow multiple concurrent connections per core but cap to avoid exhaustion
+        return max(4, min(32, cores * 2))
+
     print(f"🚀 Starting OpenVPN Manager API Server on http://0.0.0.0:{port}")
     print(f"🔗 API Endpoints: http://YOUR_IP:{port}/api")
     print(f"📊 Health Check: http://YOUR_IP:{port}/api/health")
 
     from waitress import serve
     import logging
-    
+
     # Suppress Waitress queue warnings
     logging.getLogger('waitress.queue').setLevel(logging.ERROR)
 
-    serve(app, host="0.0.0.0", port=port, threads=4)
+    serve(app, host="0.0.0.0", port=port, threads=calculate_optimal_threads())
 
 
 if __name__ == "__main__":
