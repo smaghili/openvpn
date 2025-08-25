@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from api.middleware.jwt_middleware import JWTMiddleware
 from service.user_service import UserService
+from service.units import bytes_to_human
 from core.openvpn_manager import OpenVPNManager
 from core.login_user_manager import LoginUserManager
 from data.db import Database
@@ -16,19 +17,8 @@ def get_user_service() -> UserService:
     openvpn_manager = OpenVPNManager()
     return UserService(user_repo, openvpn_manager, login_manager)
 
-def bytes_to_human(byte_count: int) -> str:
-    """Converts a byte count to a human-readable format (KB, MB, GB)."""
-    if byte_count is None or not isinstance(byte_count, (int, float)):
-        return "N/A"
-    if byte_count == 0:
-        return "0 B"
-    power = 1024
-    n = 0
-    power_labels = {0: 'B', 1: 'KB', 2: 'MB', 3: 'GB', 4: 'TB'}
-    while byte_count >= power and n < len(power_labels) - 1:
-        byte_count /= power
-        n += 1
-    return f"{byte_count:.2f} {power_labels[n]}"
+def _fmt(bytes_value: int) -> str:
+    return bytes_to_human(bytes_value, system="IEC")
 
 @quota_bp.route('/<username>', methods=['PUT'])
 @JWTMiddleware.require_auth
@@ -73,7 +63,7 @@ def set_user_quota(username: str):
         'username': username,
         'quota_gb': quota_gb,
         'quota_bytes': quota_bytes,
-        'quota_human': bytes_to_human(quota_bytes) if quota_bytes > 0 else 'Unlimited'
+        'quota_human': _fmt(quota_bytes) if quota_bytes > 0 else 'Unlimited'
     }), 200
 
 @quota_bp.route('/<username>', methods=['GET'])
@@ -96,12 +86,12 @@ def get_user_status(username: str):
     response_data = {
         'username': status['username'],
         'quota_bytes': quota,
-        'quota_human': bytes_to_human(quota) if quota > 0 else 'Unlimited',
+        'quota_human': _fmt(quota) if quota > 0 else 'Unlimited',
         'bytes_used': used,
-        'bytes_used_human': bytes_to_human(used),
+        'bytes_used_human': _fmt(used),
         'usage_percentage': round((used / quota) * 100, 2) if quota > 0 else None,
         'remaining_bytes': quota - used if quota > 0 else None,
-        'remaining_human': bytes_to_human(quota - used) if quota > 0 else None,
+        'remaining_human': _fmt(quota - used) if quota > 0 else None,
         'is_over_quota': used > quota if quota > 0 else False
     }
     

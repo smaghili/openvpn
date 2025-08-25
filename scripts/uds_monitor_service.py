@@ -37,6 +37,7 @@ QUOTA_CHECK_INTERVAL = 5.0      # Check quotas every 5 seconds
 DB_FLUSH_INTERVAL = 2.0         # Flush to database every 2 seconds
 MEMORY_CLEANUP_INTERVAL = 30.0  # Clean memory every 30 seconds
 MAX_USERS_IN_MEMORY = 2000      # Maximum users to keep in memory
+RECONCILE_INTERVAL = get_int_config("RECONCILE_INTERVAL", 300)  # Full reconciliation every 5 minutes
 
 @dataclass
 class UserTrafficData:
@@ -72,40 +73,39 @@ class SimpleProfessionalSQLiteManager:
         self.conn.execute("PRAGMA wal_autocheckpoint=1000")  # Auto checkpoint
         self.conn.execute("PRAGMA optimize")                 # Auto optimize
         
-    def batch_update_traffic(self, traffic_data: Dict[str, Tuple[int, int]]) -> bool:
-        """Professional batch update - Simple and efficient"""
-        if not traffic_data:
+    def batch_update_traffic(self, increment_data: Dict[str, int]) -> bool:
+        """Incrementally add traffic deltas to bytes_used and optionally log."""
+        if not increment_data:
             return True
-            
+        
         try:
-            # Prepare batch data efficiently
-            quota_updates = [(sent + received, username) 
-                           for username, (sent, received) in traffic_data.items()]
+            # Prepare batch data (username -> delta_bytes)
+            quota_updates = [(delta_bytes, username)
+                             for username, delta_bytes in increment_data.items()
+                             if delta_bytes > 0]
+            if not quota_updates:
+                return True
             
-            # Single transaction for all updates - maximum efficiency
             cursor = self.conn.cursor()
             cursor.executemany(
-                "UPDATE user_quotas SET bytes_used = ?, updated_at = CURRENT_TIMESTAMP "
+                "UPDATE user_quotas SET bytes_used = bytes_used + ?, updated_at = CURRENT_TIMESTAMP "
                 "WHERE user_id = (SELECT id FROM users WHERE username = ?)",
                 quota_updates
             )
             
-            # Log only significant traffic (>10MB) to reduce I/O
-            significant_traffic = [
-                (sent, received, username) 
-                for username, (sent, received) in traffic_data.items()
-                if sent + received > 10485760  # 10MB threshold
-            ]
-            
-            if significant_traffic:
+            # Optionally log large deltas as session snapshots to reduce I/O
+            # We log them as received=delta, sent=0 for simplicity, since aggregate reporting sums both.
+            significant = [(delta_bytes, 0, username)
+                           for username, delta_bytes in increment_data.items()
+                           if delta_bytes >= 10485760]
+            if significant:
                 cursor.executemany(
                     "INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) "
                     "SELECT id, ?, ?, CURRENT_TIMESTAMP FROM users WHERE username = ?",
-                    significant_traffic
+                    significant
                 )
             
             return True
-            
         except sqlite3.Error as e:
             self._log_error(f"Database update failed: {e}")
             return False
@@ -158,8 +158,10 @@ class UltraLightMonitor:
         self.socket_path_login = UDS_SOCKET_PATH_LOGIN
         
         # Core data structures (minimal memory footprint)
-        self.traffic_data: Dict[str, Tuple[int, int]] = {}  # username -> (sent, received)
+        # prev_status holds the last snapshot per user from OpenVPN status
+        self.traffic_data: Dict[str, Tuple[int, int]] = {}  # Back-compat name: holds last snapshot (sent, received)
         self.user_quota_cache: Dict[str, Dict] = {}         # LRU cache for quota data
+        self.pending_increments: Dict[str, int] = {}        # username -> total delta bytes since last DB flush
         
         # Database manager
         self.db_manager = SimpleProfessionalSQLiteManager(DATABASE_FILE)
@@ -170,6 +172,7 @@ class UltraLightMonitor:
         self.last_quota_check = 0.0
         self.last_db_flush = 0.0
         self.last_memory_cleanup = 0.0
+        self.last_reconcile = 0.0
         
         # Performance counters
         self.iteration_count = 0
@@ -244,20 +247,50 @@ class UltraLightMonitor:
 
     def _get_openvpn_status(self) -> Dict[str, Tuple[int, int]]:
         """Get traffic status from OpenVPN servers"""
-        traffic_updates = {}
+        aggregated: Dict[str, Tuple[int, int]] = {}
         
-        # Try certificate server first (usually has most users)
-        status_output = self._send_command("status", self.socket_path_cert)
-        if status_output:
-            traffic_updates.update(self._parse_status_output(status_output))
+        # Certificate-based server snapshot
+        cert_status = self._send_command("status", self.socket_path_cert)
+        if cert_status:
+            parsed = self._parse_status_output(cert_status)
+            for username, (sent, received) in parsed.items():
+                ps, pr = aggregated.get(username, (0, 0))
+                aggregated[username] = (ps + sent, pr + received)
         
-        # Try login server if exists
-        status_output = self._send_command("status", self.socket_path_login)
-        if status_output:
-            traffic_updates.update(self._parse_status_output(status_output))
+        # Login-based server snapshot
+        login_status = self._send_command("status", self.socket_path_login)
+        if login_status:
+            parsed = self._parse_status_output(login_status)
+            for username, (sent, received) in parsed.items():
+                ps, pr = aggregated.get(username, (0, 0))
+                aggregated[username] = (ps + sent, pr + received)
         
-        return traffic_updates
+        return aggregated
     
+    def _process_status_delta(self, snapshot: Dict[str, Tuple[int, int]]) -> None:
+        """Compute deltas between the new snapshot and the last snapshot, accumulate pending increments."""
+        try:
+            # Compute per-user deltas
+            for username, (sent, received) in snapshot.items():
+                prev_sent, prev_received = self.traffic_data.get(username, (0, 0))
+                delta_sent = sent - prev_sent
+                delta_received = received - prev_received
+                if delta_sent < 0:
+                    delta_sent = 0
+                if delta_received < 0:
+                    delta_received = 0
+                delta_total = delta_sent + delta_received
+                if delta_total > 0:
+                    self.pending_increments[username] = self.pending_increments.get(username, 0) + delta_total
+
+            # Replace previous snapshot with current snapshot
+            self.traffic_data = snapshot
+
+            # Cleanup users no longer present to avoid unbounded growth
+            # (No action needed for pending_increments; they'll be flushed soon)
+        except Exception as e:
+            self._log(f"Delta processing error: {e}", "ERROR")
+
     def _parse_status_output(self, status_output: str) -> Dict[str, Tuple[int, int]]:
         """Parse OpenVPN status output and extract traffic data"""
         traffic_data = {}
@@ -284,7 +317,11 @@ class UltraLightMonitor:
                         bytes_sent = int(parts[3]) if parts[3].isdigit() else 0
                         
                         if common_name and (bytes_sent > 0 or bytes_received > 0):
-                            traffic_data[common_name] = (bytes_sent, bytes_received)
+                            prev_sent, prev_received = traffic_data.get(common_name, (0, 0))
+                            traffic_data[common_name] = (
+                                prev_sent + bytes_sent,
+                                prev_received + bytes_received,
+                            )
                     except (ValueError, IndexError):
                         continue
                         
@@ -295,11 +332,12 @@ class UltraLightMonitor:
     
     def _check_user_quotas(self):
         """Check user quotas and disconnect if exceeded"""
-        if not self.traffic_data:
+        if not (self.traffic_data or self.pending_increments):
             return
             
         try:
-            for username, (bytes_sent, bytes_received) in list(self.traffic_data.items()):
+            user_set = set(list(self.traffic_data.keys()) + list(self.pending_increments.keys()))
+            for username in user_set:
                 # Get cached quota data or fetch from database
                 quota_data = self.user_quota_cache.get(username)
                 if not quota_data:
@@ -314,15 +352,19 @@ class UltraLightMonitor:
                     continue
                     
                 current_usage = quota_data.get('bytes_used', 0)
-                total_bytes = bytes_sent + bytes_received
+                pending = self.pending_increments.get(username, 0)
+                projected_usage = current_usage + pending
                 
-                if current_usage + total_bytes >= quota_bytes:
-                    self._log(f"QUOTA EXCEEDED: {username} ({current_usage + total_bytes}/{quota_bytes} bytes)", "WARN")
+                if projected_usage >= quota_bytes:
+                    self._log(f"QUOTA EXCEEDED: {username} ({projected_usage}/{quota_bytes} bytes)", "WARN")
                     self._disconnect_user(username)
                     # Remove from tracking
-                    del self.traffic_data[username]
+                    if username in self.traffic_data:
+                        del self.traffic_data[username]
                     if username in self.user_quota_cache:
                         del self.user_quota_cache[username]
+                    if username in self.pending_increments:
+                        del self.pending_increments[username]
                         
         except Exception as e:
             self._log(f"Quota check error: {e}", "ERROR")
@@ -388,32 +430,42 @@ class UltraLightMonitor:
                 
                 try:
                     # 1. Update traffic data (every iteration - real-time)
-                    if time.time() - self.last_status_update >= STATUS_UPDATE_INTERVAL:
-                        new_traffic = self._get_openvpn_status()
-                        if new_traffic:
-                            self.traffic_data.update(new_traffic)
-                            self.update_count += len(new_traffic)
-                        self.last_status_update = time.time()
+                    now = time.time()
+                    if now - self.last_status_update >= STATUS_UPDATE_INTERVAL:
+                        new_snapshot = self._get_openvpn_status()
+                        if new_snapshot:
+                            self._process_status_delta(new_snapshot)
+                            self.update_count += len(new_snapshot)
+                        self.last_status_update = now
+
+                    # 1.a Periodic reconciliation to avoid drift if any events were missed
+                    if now - self.last_reconcile >= RECONCILE_INTERVAL:
+                        # Force a fresh snapshot and replace the baseline without producing deltas
+                        reconcile_snapshot = self._get_openvpn_status()
+                        if reconcile_snapshot:
+                            self.traffic_data = reconcile_snapshot
+                        self.last_reconcile = now
                     
                     # 2. Flush to database (every 2 seconds)
-                    if time.time() - self.last_db_flush >= DB_FLUSH_INTERVAL:
-                        if self.traffic_data:
-                            success = self.db_manager.batch_update_traffic(self.traffic_data)
+                    if now - self.last_db_flush >= DB_FLUSH_INTERVAL:
+                        if self.pending_increments:
+                            success = self.db_manager.batch_update_traffic(self.pending_increments)
                             if success:
-                                self._log(f"Flushed {len(self.traffic_data)} traffic records to database")
+                                self._log(f"Flushed {len(self.pending_increments)} incremental traffic records")
+                                self.pending_increments.clear()
                             else:
                                 self.error_count += 1
-                        self.last_db_flush = time.time()
+                        self.last_db_flush = now
                     
                     # 3. Check quotas (every 5 seconds)
-                    if time.time() - self.last_quota_check >= QUOTA_CHECK_INTERVAL:
+                    if now - self.last_quota_check >= QUOTA_CHECK_INTERVAL:
                         self._check_user_quotas()
-                        self.last_quota_check = time.time()
+                        self.last_quota_check = now
                     
                     # 4. Memory cleanup (every 30 seconds)
-                    if time.time() - self.last_memory_cleanup >= MEMORY_CLEANUP_INTERVAL:
+                    if now - self.last_memory_cleanup >= MEMORY_CLEANUP_INTERVAL:
                         self._cleanup_memory()
-                        self.last_memory_cleanup = time.time()
+                        self.last_memory_cleanup = now
                     
                     # 5. Performance logging
                     self._log_performance_stats()
@@ -442,9 +494,10 @@ class UltraLightMonitor:
         self._log("Shutting down Ultra-Light Monitor...")
         
         # Final database flush
-        if self.traffic_data:
-            self.db_manager.batch_update_traffic(self.traffic_data)
-            self._log(f"Final flush: {len(self.traffic_data)} records")
+        if self.pending_increments:
+            self.db_manager.batch_update_traffic(self.pending_increments)
+            self._log(f"Final flush: {len(self.pending_increments)} records")
+            self.pending_increments.clear()
         
         # Close database
         self.db_manager.close()

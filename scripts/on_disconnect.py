@@ -108,19 +108,32 @@ def update_traffic_usage():
 
             user_id = user_row['id']
 
-            # Update the cumulative usage and log the session
-            cursor.execute(
-                "UPDATE user_quotas SET bytes_used = bytes_used + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
-                (total_session_bytes, user_id),
-            )
-            cursor.execute(
-                "INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
-                (user_id, bytes_sent, bytes_received),
-            )
+            # Determine if we are in fallback mode. In fallback, we update quotas; otherwise only log the session.
+            fallback_mode = os.environ.get("OPENVPN_MONITOR_FALLBACK", "0").strip().lower() in ("1", "true", "yes")
 
-            # Log successful update
+            if fallback_mode:
+                # Update the cumulative usage and log the session (fallback when monitor is not running)
+                cursor.execute(
+                    "UPDATE user_quotas SET bytes_used = bytes_used + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+                    (total_session_bytes, user_id),
+                )
+                cursor.execute(
+                    "INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                    (user_id, bytes_sent, bytes_received),
+                )
+            else:
+                # Monitor handles quota increments incrementally; only record the session log
+                cursor.execute(
+                    "INSERT INTO traffic_logs (user_id, bytes_sent, bytes_received, log_timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                    (user_id, bytes_sent, bytes_received),
+                )
+
+            # Log successful handling
             with open(log_file, "a") as f:
-                f.write(f"{timestamp} - INFO: Updated usage for user '{username}': +{total_session_bytes} bytes\n")
+                if fallback_mode:
+                    f.write(f"{timestamp} - INFO: Fallback update for user '{username}': +{total_session_bytes} bytes\n")
+                else:
+                    f.write(f"{timestamp} - INFO: Session logged for user '{username}': Sent={bytes_sent}, Received={bytes_received}\n")
 
     except Exception as e:
         # Log error but don't fail
